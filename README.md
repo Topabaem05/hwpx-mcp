@@ -1,5 +1,7 @@
 # HWPX-MCP
 
+**[English](README.md) | [한국어](README.kr.md)**
+
 A Model Context Protocol (MCP) server for creating and editing HWP/HWPX documents. This server provides AI assistants (like Claude, Cursor) with the ability to programmatically create, edit, and manipulate Hangul (Korean word processor) documents.
 
 ## Features

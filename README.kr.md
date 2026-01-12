@@ -1,0 +1,355 @@
+# HWPX-MCP
+
+**[English](README.md) | 한국어**
+
+한글(HWP/HWPX) 문서를 생성하고 편집하기 위한 Model Context Protocol (MCP) 서버입니다. 이 서버는 AI 어시스턴트(Claude, Cursor 등)가 한글 문서를 프로그래밍 방식으로 생성, 편집 및 조작할 수 있도록 지원합니다.
+
+## 주요 기능
+
+- **크로스 플랫폼 지원**: Windows (COM Automation) 및 macOS/Linux (python-hwpx)에서 동작
+- **120+ MCP 도구**: 문서 조작을 위한 포괄적인 도구 세트
+- **템플릿 지원**: 필드 대체가 가능한 템플릿에서 문서 생성
+- **차트 생성**: 문서에 차트 삽입 및 구성
+- **수식 지원**: 수학 공식 (LaTeX/Script) 삽입
+- **표 조작**: 표 생성, 편집, 서식 지정의 전체 기능
+- **서식 제어**: 문자 및 문단 서식 지정
+
+## 설치 방법
+
+```bash
+# 저장소 클론
+git clone https://github.com/Topabaem05/hwpx-mcp.git
+cd hwpx-mcp
+
+# 의존성 설치
+pip install -e .
+
+# 또는 uv 사용 (권장)
+uv pip install -e .
+```
+
+## MCP 클라이언트 설정
+
+### Claude Desktop (macOS/Linux)
+
+`claude_desktop_config.json`에 추가:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/hwpx-mcp",
+        "run",
+        "hwpx-mcp"
+      ]
+    }
+  }
+}
+```
+
+### Claude Desktop (Windows)
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "uv --directory C:\\path\\to\\hwpx-mcp run hwpx-mcp"
+      ]
+    }
+  }
+}
+```
+
+## 사용 가능한 도구
+
+### 시스템 및 연결
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_connect` | HWP 컨트롤러에 연결 (Windows COM 또는 크로스 플랫폼 자동 선택) | 전체 |
+| `hwp_disconnect` | HWP 컨트롤러 연결 해제 및 리소스 정리 | 전체 |
+| `hwp_platform_info` | 현재 플랫폼 정보 및 사용 가능한 HWP 기능 확인 | 전체 |
+| `hwp_capabilities` | 지원되는 전체 기능 매트릭스 확인 | 전체 |
+
+### 문서 생명주기
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_create` | 새 HWP 문서 생성 | 전체 |
+| `hwp_open` | 기존 HWP/HWPX 문서 열기 | 전체 |
+| `hwp_save` | 현재 문서 저장 | 전체 |
+| `hwp_save_as` | 지정된 형식(hwp, hwpx, pdf)으로 문서 저장 | 전체 |
+| `hwp_close` | 현재 문서 닫기 | 전체 |
+
+### 텍스트 및 편집
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_insert_text` | 현재 커서 위치에 텍스트 삽입 | 전체 |
+| `hwp_get_text` | 현재 문서에서 전체 텍스트 가져오기 | 전체 |
+| `hwp_find` | 문서에서 텍스트 찾기 | 전체 |
+| `hwp_find_replace` | 텍스트 찾아 바꾸기 (1회) | Windows |
+| `hwp_find_replace_all` | 모든 occurrence 찾아 바꾸기 | Windows |
+| `hwp_find_advanced` | 정규식 지원 고급 검색 | Windows |
+| `hwp_find_replace_advanced` | 정규식 지원 고급 찾아 바꾸기 | Windows |
+
+### 표 조작
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_create_table` | 지정된 행과 열로 표 생성 | 전체 |
+| `hwp_set_cell_text` | 특정 셀(행, 열)에 텍스트 설정 | 전체 |
+| `hwp_get_cell_text` | 특정 셀에서 텍스트 가져오기 | 전체 |
+| `hwp_goto_cell` | 특정 셀 주소로 이동 (예: 'A1') | Windows |
+| `hwp_get_cell_addr` | 현재 셀 주소 가져오기 (예: 'A1') | Windows |
+| `hwp_adjust_cellwidth` | 열 너비 조정 (비율 모드 지원) | Windows |
+
+### 서식 지정
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_set_font` | 글꼴 이름 및 크기 설정 | 전체 |
+| `hwp_set_charshape` | 문자 모양 설정 (진하게, 기울임, 밑줄, 색상) | Windows |
+| `hwp_get_charshape` | 현재 문자 모양 정보 가져오기 | Windows |
+| `hwp_set_parashape` | 문단 모양 설정 (정렬, 줄 간격) | Windows |
+| `hwp_toggle_bold` | 진하게 서식 토글 | Windows |
+| `hwp_toggle_italic` | 기울임 서식 토글 | Windows |
+| `hwp_toggle_underline` | 밑줄 서식 토글 | Windows |
+| `hwp_toggle_strikethrough` | 취소선 서식 토글 | Windows |
+
+### 차트
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_create_chart` | 데이터로 차트 생성 | 전체 |
+
+### 수식
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_create_equation` | 수학 공식 생성 | 전체 |
+
+### 템플릿
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_create_from_template` | 템플릿 파일에서 문서 생성 | 전체 |
+| `hwp_fill_template` | 템플릿 필드에 데이터 채우기 | 전체 |
+
+### 필드 (누름틀)
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_get_field_list` | 모든 필드 이름 목록 가져오기 | Windows |
+| `hwp_put_field_text` | 이름으로 필드에 텍스트 설정 | Windows |
+| `hwp_get_field_text` | 필드에서 텍스트 가져오기 | Windows |
+| `hwp_field_exists` | 필드가 존재하는지 확인 | Windows |
+| `hwp_create_field` | 새 필드 생성 | Windows |
+
+### 페이지 및 탐색
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_get_page_count` | 전체 페이지 수 가져오기 | 전체 |
+| `hwp_goto_page` | 특정 페이지로 이동 (0 기반) | 전체 |
+| `hwp_move_to_start` | 커서를 문서 시작 위치로 이동 | Windows |
+| `hwp_move_to_end` | 커서를 문서 끝 위치로 이동 | Windows |
+| `hwp_get_page_text` | 특정 페이지에서 텍스트 가져오기 | Windows |
+
+### 유틸리티 도구
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_head_type` | 제목 유형 문자열을 HWP 정수 값으로 변환 | 전체 |
+| `hwp_line_type` | 선 유형 문자열을 HWP 정수 값으로 변환 | 전체 |
+| `hwp_line_width` | 선 두께 문자열을 HWP 정수 값으로 변환 | 전체 |
+| `hwp_number_format` | 숫자 형식 문자열을 HWP 정수로 변환 | 전체 |
+| `hwp_convert_unit` | HwpUnit과 mm 간 변환 | 전체 |
+| `hwp_get_head_types` | 사용 가능한 제목 유형 가져오기 | 전체 |
+| `hwp_get_line_types` | 사용 가능한 선 유형 가져오기 | 전체 |
+| `hwp_get_line_widths` | 사용 가능한 선 두께 가져오기 | 전체 |
+| `hwp_get_number_formats` | 사용 가능한 숫자 형식 가져오기 | 전체 |
+
+## 사용 예시
+
+### 기본 문서 생성
+
+```python
+# HWP에 연결
+hwp_connect(visible=True)
+
+# 새 문서 생성
+hwp_create()
+
+# 글꼴 설정 및 텍스트 삽입
+hwp_set_font(font_name="NanumGothic", size=12)
+hwp_insert_text("Hello, HWP MCP!")
+
+# 문서 저장
+hwp_save_as(path="output.hwpx", format="hwpx")
+hwp_disconnect()
+```
+
+### 표 생성
+
+```python
+hwp_connect()
+hwp_create()
+
+# 3x2 표 생성
+hwp_create_table(rows=3, cols=2)
+
+# 헤더 행 채우기
+hwp_set_cell_text(row=0, col=0, text="이름")
+hwp_set_cell_text(row=0, col=1, text="값")
+
+# 데이터 채우기
+hwp_set_cell_text(row=1, col=0, text="항목 1")
+hwp_set_cell_text(row=1, col=1, text="100")
+hwp_set_cell_text(row=2, col=0, text="항목 2")
+hwp_set_cell_text(row=2, col=1, text="200")
+
+# 저장
+hwp_save_as(path="table_example.hwpx")
+```
+
+### 템플릿 사용
+
+```python
+hwp_connect()
+hwp_open(path="template.hwpx")
+
+# 필드 채우기
+hwp_put_field_text(name="title", text="내 문서 제목")
+hwp_put_field_text(name="author", text="홍길동")
+hwp_put_field_text(name="date", text="2024-01-15")
+
+# 새 문서로 저장
+hwp_save_as(path="filled_document.hwpx")
+```
+
+### 텍스트 검색 및 바꾸기
+
+```python
+hwp_connect()
+hwp_open(path="document.hwpx")
+
+# 텍스트 찾기
+result = hwp_find(text="古いテキスト")
+if result["found"]:
+    print("텍스트를 찾았습니다!")
+
+# 모든 occurrence 바꾸기
+result = hwp_find_replace_all(find_text="古い", replace_text="新しい")
+print(f"{result['count']}개 교체됨")
+
+# 정규식으로 고급 교체
+result = hwp_find_replace_all_advanced(
+    find_text=r"\d+",  # 숫자 매칭
+    replace_text="[숫자]",
+    regex=True
+)
+```
+
+### 텍스트 서식 지정
+
+```python
+hwp_connect()
+hwp_create()
+
+# 글꼴 설정
+hwp_set_font(font_name="NanumGothic", size=16, bold=True)
+
+# 제목 삽입
+hwp_insert_text("문서 제목\n\n")
+
+# 서식 초기화
+hwp_set_font(font_name="NanumGothic", size=12)
+
+# 본문 삽입
+hwp_insert_text("이것은 본문 텍스트입니다.")
+
+# 선택 영역에서 진하게 토글
+hwp_toggle_bold()
+```
+
+## 플랫폼별 차이점
+
+| 기능 | Windows (COM) | macOS/Linux (python-hwpx) |
+|------|---------------|---------------------------|
+| 기존 HWP 편집 | ✅ 전체 지원 | ❌ 읽기 전용 |
+| 새 HWPX 생성 | ✅ 전체 지원 | ✅ 전체 지원 |
+| 표 | ✅ 모든 기능 | ✅ 기본 기능 |
+| 차트 | ✅ 모든 기능 | ✅ 생성만 |
+| 수식 | ✅ 모든 기능 | ✅ 생성만 |
+| 필드 | ✅ 전체 지원 | ❌ 미지원 |
+| 서식 | ✅ 전체 제어 | ✅ 기본 제어 |
+
+## 요구사항
+
+- Python 3.10 이상
+- MCP >= 1.0.0
+- fastmcp >= 0.2.0
+- pyhwp >= 0.1a (비 Windows에서 HWP 읽기용)
+- python-hwpx >= 1.9 (HWPX 생성용)
+- pandas >= 2.0.0 (차트 데이터용)
+- matplotlib >= 3.7.0 (차트 렌더링용)
+
+### Windows 전용
+- pywin32 >= 300 (COM 자동화용)
+- 한글 2010 이상
+
+## 아키텍처
+
+```
+┌─────────────────────────────────────────────────┐
+│              MCP 클라이언트 (Claude 등)           │
+└───────────────────┬─────────────────────────────┘
+                    │ JSON-RPC
+                    ▼
+┌─────────────────────────────────────────────────┐
+│              HWPX-MCP 서버                       │
+│              (src/server.py)                     │
+└───────────────────┬─────────────────────────────┘
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+┌─────────────────┐  ┌─────────────────────┐
+│ Windows HWP     │  │ 크로스 플랫폼 HWPX  │
+│ 컨트롤러        │  │ 컨트롤러            │
+│ (pywin32/COM)   │  │ (python-hwpx)       │
+└─────────────────┘  └─────────────────────┘
+          │                   │
+          ▼                   ▼
+┌─────────────────┐  ┌─────────────────────┐
+│ 한글 오피스     │  │ HWPX 파일 생성       │
+│ (Windows 전용)  │  │ (Headless)          │
+└─────────────────┘  └─────────────────────┘
+```
+
+## 개발
+
+```bash
+# 개발 의존성 설치
+pip install -e ".[dev]"
+
+# 테스트 실행
+pytest src/tests/ -v
+
+# 서버 실행
+python -m src.server
+```
+
+## 라이선스
+
+MIT 라이선스
+
+## 기여
+
+기여는 환영입니다!Pull Request를 자유롭게 제출해 주세요.

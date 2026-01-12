@@ -1,6 +1,6 @@
 # HWPX-MCP
 
-**[English](README.md) | 한국어**
+**[English](README.md) | [한국어](README.kr.md)**
 
 한글(HWP/HWPX) 문서를 생성하고 편집하기 위한 Model Context Protocol (MCP) 서버입니다. 이 서버는 AI 어시스턴트(Claude, Cursor 등)가 한글 문서를 프로그래밍 방식으로 생성, 편집 및 조작할 수 있도록 지원합니다.
 
@@ -353,3 +353,15 @@ MIT 라이선스
 ## 기여
 
 기여는 환영입니다!Pull Request를 자유롭게 제출해 주세요.
+
+## 참고 프로젝트
+
+이 프로젝트는 다음의 한글 HWP 라이브러리 및 MCP 서버에서 영감을 받아 개발되었습니다:
+
+- **[hwplibsharp](https://github.com/rkttu/hwplibsharp)** - HWP 파일 형식을 위한 C# 라이브러리
+- **[hwplib](https://github.com/neolord0/hwplib)** - HWP 파일 형식을 위한 Java 라이브러리
+- **[pyhwpx](https://github.com/martiniifun/pyhwpx)** - HWP 자동화를 위한 Python 래퍼
+- **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - 한글 문서를 위한 MCP 서버
+- **[python-hwpx](https://github.com/airmang/python-hwpx)** - HWPX 파일 조작을 위한 Python 라이브러리
+
+HWP 생태계에 기여해 주신 개발자들에게 감사드립니다.

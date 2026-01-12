@@ -353,3 +353,15 @@ MIT License
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## References
+
+This project was inspired and referenced by the following excellent HWP libraries and MCP servers:
+
+- **[hwplibsharp](https://github.com/rkttu/hwplibsharp)** - C# library for HWP file format
+- **[hwplib](https://github.com/neolord0/hwplib)** - Java library for HWP file format
+- **[pyhwpx](https://github.com/martiniifun/pyhwpx)** - Python wrapper for HWP automation
+- **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - MCP server for HWP documents
+- **[python-hwpx](https://github.com/airmang/python-hwpx)** - Python library for HWPX file manipulation
+
+Special thanks to the developers of these projects for their contributions to the HWP ecosystem.

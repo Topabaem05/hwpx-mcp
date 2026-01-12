@@ -1,0 +1,57 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project]
+name = "hwp-mcp-extended"
+version = "0.1.0"
+description = "HWP MCP Server with Chart, Equation, Document, and Template support"
+authors = [
+    {name = "HWP MCP Team"}
+]
+dependencies = [
+    # Core MCP
+    "mcp>=1.0.0",
+    "fastmcp>=0.2.0",
+    
+    # Cross-platform HWP processing
+    "pyhwp>=0.1a",
+    
+    # Data Processing
+    "pandas>=2.0.0",
+    "matplotlib>=3.7.0",
+    
+    # Validation
+    "pydantic>=2.5.0",
+    "python-dotenv>=1.0.0",
+    
+    # HWPX creation
+    "python-hwpx>=1.9",
+]
+
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+]
+windows = [
+    "pywin32>=300",
+]
+all = [
+    "pywin32>=300",
+]
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.scripts]
+start = "python -m src.server"
+test = "pytest src/tests/ -v"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["src/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

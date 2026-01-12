@@ -1,0 +1,353 @@
+# HWPX-MCP
+
+A Model Context Protocol (MCP) server for creating and editing HWP/HWPX documents. This server provides AI assistants (like Claude, Cursor) with the ability to programmatically create, edit, and manipulate Hangul (Korean word processor) documents.
+
+## Features
+
+- **Cross-Platform Support**: Works on Windows (via COM Automation) and macOS/Linux (via python-hwpx)
+- **120+ MCP Tools**: Comprehensive set of tools for document manipulation
+- **Template Support**: Create documents from templates with field substitution
+- **Chart Creation**: Insert and configure charts in documents
+- **Equation Support**: Insert mathematical equations (LaTeX/Script)
+- **Table Operations**: Full table manipulation (create, edit, format)
+- **Formatting Control**: Character and paragraph formatting
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Topabaem05/hwpx-mcp.git
+cd hwpx-mcp
+
+# Install dependencies
+pip install -e .
+
+# Or using uv (recommended)
+uv pip install -e .
+```
+
+## MCP Client Configuration
+
+### Claude Desktop (macOS/Linux)
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/hwpx-mcp",
+        "run",
+        "hwpx-mcp"
+      ]
+    }
+  }
+}
+```
+
+### Claude Desktop (Windows)
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "uv --directory C:\\path\\to\\hwpx-mcp run hwpx-mcp"
+      ]
+    }
+  }
+}
+```
+
+## Available Tools
+
+### System & Connection
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_connect` | Connect to HWP controller (auto-selects Windows COM or cross-platform) | All |
+| `hwp_disconnect` | Disconnect from HWP controller and release resources | All |
+| `hwp_platform_info` | Get current platform information and available HWP capabilities | All |
+| `hwp_capabilities` | Get the full capability matrix showing what's supported | All |
+
+### Document Lifecycle
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_create` | Create a new HWP document | All |
+| `hwp_open` | Open an existing HWP/HWPX document | All |
+| `hwp_save` | Save the current document | All |
+| `hwp_save_as` | Save document in specified format (hwp, hwpx, pdf) | All |
+| `hwp_close` | Close the current document | All |
+
+### Text & Editing
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_insert_text` | Insert text at current cursor position | All |
+| `hwp_get_text` | Get all text from the current document | All |
+| `hwp_find` | Find text in the document | All |
+| `hwp_find_replace` | Find and replace text (1 occurrence) | Windows |
+| `hwp_find_replace_all` | Find and replace all occurrences | Windows |
+| `hwp_find_advanced` | Advanced find with regex support | Windows |
+| `hwp_find_replace_advanced` | Advanced find/replace with regex | Windows |
+
+### Table Operations
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_create_table` | Create a table with specified rows and columns | All |
+| `hwp_set_cell_text` | Set text in a specific cell (row, col) | All |
+| `hwp_get_cell_text` | Get text from a specific cell | All |
+| `hwp_goto_cell` | Go to a specific cell address (e.g., 'A1') | Windows |
+| `hwp_get_cell_addr` | Get current cell address (e.g., 'A1') | Windows |
+| `hwp_adjust_cellwidth` | Adjust column widths (ratio mode supported) | Windows |
+
+### Formatting
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_set_font` | Set font name and size | All |
+| `hwp_set_charshape` | Set character shape (bold, italic, underline, color) | Windows |
+| `hwp_get_charshape` | Get current character shape info | Windows |
+| `hwp_set_parashape` | Set paragraph shape (alignment, line spacing) | Windows |
+| `hwp_toggle_bold` | Toggle bold formatting | Windows |
+| `hwp_toggle_italic` | Toggle italic formatting | Windows |
+| `hwp_toggle_underline` | Toggle underline formatting | Windows |
+| `hwp_toggle_strikethrough` | Toggle strikethrough formatting | Windows |
+
+### Charts
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_create_chart` | Create a chart with data | All |
+
+### Equations
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_create_equation` | Create a mathematical equation | All |
+
+### Templates
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_create_from_template` | Create document from template file | All |
+| `hwp_fill_template` | Fill template fields with data | All |
+
+### Fields (Click-Here Fields)
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_get_field_list` | Get list of all field names | Windows |
+| `hwp_put_field_text` | Set text in a field by name | Windows |
+| `hwp_get_field_text` | Get text from a field | Windows |
+| `hwp_field_exists` | Check if a field exists | Windows |
+| `hwp_create_field` | Create a new field | Windows |
+
+### Page & Navigation
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_get_page_count` | Get total page count | All |
+| `hwp_goto_page` | Go to specific page (0-based) | All |
+| `hwp_move_to_start` | Move cursor to document start | Windows |
+| `hwp_move_to_end` | Move cursor to document end | Windows |
+| `hwp_get_page_text` | Get text from a specific page | Windows |
+
+### Utility Tools
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_head_type` | Convert heading type string to HWP integer value | All |
+| `hwp_line_type` | Convert line type string to HWP integer value | All |
+| `hwp_line_width` | Convert line width string to HWP integer value | All |
+| `hwp_number_format` | Convert number format string to HWP integer | All |
+| `hwp_convert_unit` | Convert between HwpUnit and millimeters | All |
+| `hwp_get_head_types` | Get available heading types | All |
+| `hwp_get_line_types` | Get available line types | All |
+| `hwp_get_line_widths` | Get available line widths | All |
+| `hwp_get_number_formats` | Get available number formats | All |
+
+## Usage Examples
+
+### Basic Document Creation
+
+```python
+# Connect to HWP
+hwp_connect(visible=True)
+
+# Create a new document
+hwp_create()
+
+# Set font and insert text
+hwp_set_font(font_name="NanumGothic", size=12)
+hwp_insert_text("Hello, HWP MCP!")
+
+# Save the document
+hwp_save_as(path="output.hwpx", format="hwpx")
+hwp_disconnect()
+```
+
+### Creating a Table
+
+```python
+hwp_connect()
+hwp_create()
+
+# Create a 3x2 table
+hwp_create_table(rows=3, cols=2)
+
+# Fill header row
+hwp_set_cell_text(row=0, col=0, text="Name")
+hwp_set_cell_text(row=0, col=1, text="Value")
+
+# Fill data
+hwp_set_cell_text(row=1, col=0, text="Item 1")
+hwp_set_cell_text(row=1, col=1, text="100")
+hwp_set_cell_text(row=2, col=0, text="Item 2")
+hwp_set_cell_text(row=2, col=1, text="200")
+
+# Save
+hwp_save_as(path="table_example.hwpx")
+```
+
+### Using Templates
+
+```python
+hwp_connect()
+hwp_open(path="template.hwpx")
+
+# Fill fields
+hwp_put_field_text(name="title", text="My Document Title")
+hwp_put_field_text(name="author", text="John Doe")
+hwp_put_field_text(name="date", text="2024-01-15")
+
+# Save as new document
+hwp_save_as(path="filled_document.hwpx")
+```
+
+### Finding and Replacing Text
+
+```python
+hwp_connect()
+hwp_open(path="document.hwpx")
+
+# Find text
+result = hwp_find(text="old text")
+if result["found"]:
+    print("Text found!")
+
+# Replace all occurrences
+result = hwp_find_replace_all(find_text="old", replace_text="new")
+print(f"Replaced {result['count']} occurrences")
+
+# Advanced replace with regex
+result = hwp_find_replace_all_advanced(
+    find_text=r"\d+",  # Match numbers
+    replace_text="[NUMBER]",
+    regex=True
+)
+```
+
+### Formatting Text
+
+```python
+hwp_connect()
+hwp_create()
+
+# Set font
+hwp_set_font(font_name="NanumGothic", size=16, bold=True)
+
+# Insert title
+hwp_insert_text("Document Title\n\n")
+
+# Reset formatting
+hwp_set_font(font_name="NanumGothic", size=12)
+
+# Insert body
+hwp_insert_text("This is the body text.")
+
+# Toggle bold on selection
+hwp_toggle_bold()
+```
+
+## Platform Differences
+
+| Feature | Windows (COM) | macOS/Linux (python-hwpx) |
+|---------|---------------|---------------------------|
+| Edit existing HWP | ✅ Full support | ❌ Read-only |
+| Create new HWPX | ✅ Full support | ✅ Full support |
+| Tables | ✅ All features | ✅ Basic features |
+| Charts | ✅ All features | ✅ Creation only |
+| Equations | ✅ All features | ✅ Creation only |
+| Fields | ✅ Full support | ❌ Not supported |
+| Formatting | ✅ Full control | ✅ Basic control |
+
+## Requirements
+
+- Python 3.10+
+- MCP >= 1.0.0
+- fastmcp >= 0.2.0
+- pyhwp >= 0.1a (for HWP reading on non-Windows)
+- python-hwpx >= 1.9 (for HWPX creation)
+- pandas >= 2.0.0 (for chart data)
+- matplotlib >= 3.7.0 (for chart rendering)
+
+### Windows Only
+- pywin32 >= 300 (for COM automation)
+- Hancom Office 2010 or later
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              MCP Client (Claude, etc.)           │
+└───────────────────┬─────────────────────────────┘
+                    │ JSON-RPC
+                    ▼
+┌─────────────────────────────────────────────────┐
+│              HWPX-MCP Server                     │
+│              (src/server.py)                     │
+└───────────────────┬─────────────────────────────┘
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+┌─────────────────┐  ┌─────────────────────┐
+│ Windows HWP     │  │ Cross-Platform HWPX │
+│ Controller      │  │ Controller          │
+│ (pywin32/COM)   │  │ (python-hwpx)       │
+└─────────────────┘  └─────────────────────┘
+          │                   │
+          ▼                   ▼
+┌─────────────────┐  ┌─────────────────────┐
+│ Hancom Office   │  │ HWPX File Generation│
+│ (Windows only)  │  │ (Headless)          │
+└─────────────────┘  └─────────────────────┘
+```
+
+## Development
+
+```bash
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest src/tests/ -v
+
+# Run the server
+python -m src.server
+```
+
+## License
+
+MIT License
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

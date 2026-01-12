@@ -1,0 +1,24 @@
+# HWP MCP Extended Dependencies
+
+# Core MCP
+mcp>=1.0.0
+fastmcp>=0.2.0
+
+# HWP Automation
+pywin32>=305
+
+# Data Processing
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# Validation
+pydantic>=2.5.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+latex2mathml>=3.77.0
+python-hwpx>=1.9

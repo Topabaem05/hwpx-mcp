@@ -18,10 +18,28 @@ A Model Context Protocol (MCP) server for creating and editing HWP/HWPX document
 
 ### 1. Install
 
+<details>
+<summary><b>Using uv (recommended)</b></summary>
+
 ```bash
 git clone https://github.com/Topabaem05/hwpx-mcp.git
 cd hwpx-mcp && uv pip install -e .
 ```
+
+</details>
+
+<details>
+<summary><b>Using Anaconda/Conda</b></summary>
+
+```bash
+git clone https://github.com/Topabaem05/hwpx-mcp.git
+cd hwpx-mcp
+conda create -n hwpx-mcp python=3.11 -y
+conda activate hwpx-mcp
+pip install -e .
+```
+
+</details>
 
 ### 2. Get Your Install Path
 
@@ -36,12 +54,22 @@ pwd           # Linux (copy manually)
 (Get-Location).Path | clip
 ```
 
+**For Anaconda users**, also get your Python path:
+
+```bash
+# macOS/Linux
+which python | pbcopy  # After: conda activate hwpx-mcp
+
+# Windows (PowerShell)
+(Get-Command python).Source | clip
+```
+
 ### 3. Configure Your MCP Client
 
 Use the path from step 2 in the config below:
 
 <details>
-<summary><b>Claude Desktop (macOS)</b></summary>
+<summary><b>Claude Desktop (macOS) - uv</b></summary>
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -59,7 +87,28 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 </details>
 
 <details>
-<summary><b>Claude Desktop (Windows)</b></summary>
+<summary><b>Claude Desktop (macOS) - Anaconda</b></summary>
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+      "args": ["-m", "src.server"],
+      "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+    }
+  }
+}
+```
+
+> Example Python path: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python`
+
+</details>
+
+<details>
+<summary><b>Claude Desktop (Windows) - uv</b></summary>
 
 Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
@@ -77,7 +126,28 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 </details>
 
 <details>
-<summary><b>Claude Desktop (Linux)</b></summary>
+<summary><b>Claude Desktop (Windows) - Anaconda</b></summary>
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "C:\\PASTE\\YOUR\\CONDA\\PYTHON\\PATH\\HERE\\python.exe",
+      "args": ["-m", "src.server"],
+      "cwd": "C:\\PASTE\\YOUR\\HWPX-MCP\\PATH\\HERE"
+    }
+  }
+}
+```
+
+> Example Python path: `C:\Users\username\anaconda3\envs\hwpx-mcp\python.exe`
+
+</details>
+
+<details>
+<summary><b>Claude Desktop (Linux) - uv</b></summary>
 
 Edit `~/.config/Claude/claude_desktop_config.json`:
 
@@ -95,7 +165,28 @@ Edit `~/.config/Claude/claude_desktop_config.json`:
 </details>
 
 <details>
-<summary><b>Cursor</b></summary>
+<summary><b>Claude Desktop (Linux) - Anaconda</b></summary>
+
+Edit `~/.config/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+      "args": ["-m", "src.server"],
+      "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+    }
+  }
+}
+```
+
+> Example Python path: `/home/username/anaconda3/envs/hwpx-mcp/bin/python`
+
+</details>
+
+<details>
+<summary><b>Cursor - uv</b></summary>
 
 Edit `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Windows):
 
@@ -113,7 +204,26 @@ Edit `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Win
 </details>
 
 <details>
-<summary><b>VS Code (Copilot)</b></summary>
+<summary><b>Cursor - Anaconda</b></summary>
+
+Edit `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+      "args": ["-m", "src.server"],
+      "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot) - uv</b></summary>
 
 Add to your VS Code `settings.json`:
 
@@ -124,6 +234,27 @@ Add to your VS Code `settings.json`:
       "hwpx-mcp": {
         "command": "uv",
         "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot) - Anaconda</b></summary>
+
+Add to your VS Code `settings.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "hwpx-mcp": {
+        "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+        "args": ["-m", "src.server"],
+        "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
       }
     }
   }

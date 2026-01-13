@@ -18,10 +18,28 @@
 
 ### 1. 설치
 
+<details>
+<summary><b>uv 사용 (권장)</b></summary>
+
 ```bash
 git clone https://github.com/Topabaem05/hwpx-mcp.git
 cd hwpx-mcp && uv pip install -e .
 ```
+
+</details>
+
+<details>
+<summary><b>Anaconda/Conda 사용</b></summary>
+
+```bash
+git clone https://github.com/Topabaem05/hwpx-mcp.git
+cd hwpx-mcp
+conda create -n hwpx-mcp python=3.11 -y
+conda activate hwpx-mcp
+pip install -e .
+```
+
+</details>
 
 ### 2. 설치 경로 확인
 
@@ -36,12 +54,22 @@ pwd           # Linux (수동으로 복사)
 (Get-Location).Path | clip
 ```
 
+**Anaconda 사용자**는 Python 경로도 확인하세요:
+
+```bash
+# macOS/Linux
+which python | pbcopy  # conda activate hwpx-mcp 실행 후
+
+# Windows (PowerShell)
+(Get-Command python).Source | clip
+```
+
 ### 3. MCP 클라이언트 설정
 
 2단계에서 얻은 경로를 아래 설정에 붙여넣으세요:
 
 <details>
-<summary><b>Claude Desktop (macOS)</b></summary>
+<summary><b>Claude Desktop (macOS) - uv</b></summary>
 
 `~/Library/Application Support/Claude/claude_desktop_config.json` 편집:
 
@@ -59,7 +87,28 @@ pwd           # Linux (수동으로 복사)
 </details>
 
 <details>
-<summary><b>Claude Desktop (Windows)</b></summary>
+<summary><b>Claude Desktop (macOS) - Anaconda</b></summary>
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` 편집:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+      "args": ["-m", "src.server"],
+      "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+    }
+  }
+}
+```
+
+> 예시 Python 경로: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python`
+
+</details>
+
+<details>
+<summary><b>Claude Desktop (Windows) - uv</b></summary>
 
 `%APPDATA%\Claude\claude_desktop_config.json` 편집:
 
@@ -77,7 +126,28 @@ pwd           # Linux (수동으로 복사)
 </details>
 
 <details>
-<summary><b>Claude Desktop (Linux)</b></summary>
+<summary><b>Claude Desktop (Windows) - Anaconda</b></summary>
+
+`%APPDATA%\Claude\claude_desktop_config.json` 편집:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "C:\\PASTE\\YOUR\\CONDA\\PYTHON\\PATH\\HERE\\python.exe",
+      "args": ["-m", "src.server"],
+      "cwd": "C:\\PASTE\\YOUR\\HWPX-MCP\\PATH\\HERE"
+    }
+  }
+}
+```
+
+> 예시 Python 경로: `C:\Users\username\anaconda3\envs\hwpx-mcp\python.exe`
+
+</details>
+
+<details>
+<summary><b>Claude Desktop (Linux) - uv</b></summary>
 
 `~/.config/Claude/claude_desktop_config.json` 편집:
 
@@ -95,7 +165,28 @@ pwd           # Linux (수동으로 복사)
 </details>
 
 <details>
-<summary><b>Cursor</b></summary>
+<summary><b>Claude Desktop (Linux) - Anaconda</b></summary>
+
+`~/.config/Claude/claude_desktop_config.json` 편집:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+      "args": ["-m", "src.server"],
+      "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+    }
+  }
+}
+```
+
+> 예시 Python 경로: `/home/username/anaconda3/envs/hwpx-mcp/bin/python`
+
+</details>
+
+<details>
+<summary><b>Cursor - uv</b></summary>
 
 `~/.cursor/mcp.json` (macOS/Linux) 또는 `%USERPROFILE%\.cursor\mcp.json` (Windows) 편집:
 
@@ -113,7 +204,26 @@ pwd           # Linux (수동으로 복사)
 </details>
 
 <details>
-<summary><b>VS Code (Copilot)</b></summary>
+<summary><b>Cursor - Anaconda</b></summary>
+
+`~/.cursor/mcp.json` (macOS/Linux) 또는 `%USERPROFILE%\.cursor\mcp.json` (Windows) 편집:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+      "args": ["-m", "src.server"],
+      "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot) - uv</b></summary>
 
 VS Code `settings.json`에 추가:
 
@@ -124,6 +234,27 @@ VS Code `settings.json`에 추가:
       "hwpx-mcp": {
         "command": "uv",
         "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot) - Anaconda</b></summary>
+
+VS Code `settings.json`에 추가:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "hwpx-mcp": {
+        "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
+        "args": ["-m", "src.server"],
+        "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
       }
     }
   }

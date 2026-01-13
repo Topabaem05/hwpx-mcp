@@ -14,56 +14,125 @@
 - **표 조작**: 표 생성, 편집, 서식 지정의 전체 기능
 - **서식 제어**: 문자 및 문단 서식 지정
 
-## 설치 방법
+## 빠른 시작 (복사 & 붙여넣기)
+
+### 1. 설치
 
 ```bash
-# 저장소 클론
 git clone https://github.com/Topabaem05/hwpx-mcp.git
-cd hwpx-mcp
-
-# 의존성 설치
-pip install -e .
-
-# 또는 uv 사용 (권장)
-uv pip install -e .
+cd hwpx-mcp && uv pip install -e .
 ```
 
-## MCP 클라이언트 설정
+### 2. 설치 경로 확인
 
-### Claude Desktop (macOS/Linux)
+`hwpx-mcp` 디렉토리에서 아래 명령어를 실행하여 경로를 복사하세요:
 
-`claude_desktop_config.json`에 추가:
+```bash
+# macOS/Linux
+pwd | pbcopy  # macOS (클립보드에 복사)
+pwd           # Linux (수동으로 복사)
+
+# Windows (PowerShell)
+(Get-Location).Path | clip
+```
+
+### 3. MCP 클라이언트 설정
+
+2단계에서 얻은 경로를 아래 설정에 붙여넣으세요:
+
+<details>
+<summary><b>Claude Desktop (macOS)</b></summary>
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` 편집:
 
 ```json
 {
   "mcpServers": {
     "hwpx-mcp": {
       "command": "uv",
-      "args": [
-        "--directory",
-        "/path/to/hwpx-mcp",
-        "run",
-        "hwpx-mcp"
-      ]
+      "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
     }
   }
 }
 ```
 
-### Claude Desktop (Windows)
+</details>
+
+<details>
+<summary><b>Claude Desktop (Windows)</b></summary>
+
+`%APPDATA%\Claude\claude_desktop_config.json` 편집:
 
 ```json
 {
   "mcpServers": {
     "hwpx-mcp": {
       "command": "cmd",
-      "args": [
-        "/c",
-        "uv --directory C:\\path\\to\\hwpx-mcp run hwpx-mcp"
-      ]
+      "args": ["/c", "uv --directory C:\\PASTE\\YOUR\\PATH\\HERE run hwpx-mcp"]
     }
   }
 }
+```
+
+</details>
+
+<details>
+<summary><b>Claude Desktop (Linux)</b></summary>
+
+`~/.config/Claude/claude_desktop_config.json` 편집:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+`~/.cursor/mcp.json` (macOS/Linux) 또는 `%USERPROFILE%\.cursor\mcp.json` (Windows) 편집:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot)</b></summary>
+
+VS Code `settings.json`에 추가:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "hwpx-mcp": {
+        "command": "uv",
+        "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+      }
+    }
+  }
+}
+```
+
+</details>
+
+### 4. MCP 클라이언트를 재시작하고 HWP 도구를 사용하세요!
 ```
 
 ## 사용 가능한 도구

@@ -14,56 +14,125 @@ A Model Context Protocol (MCP) server for creating and editing HWP/HWPX document
 - **Table Operations**: Full table manipulation (create, edit, format)
 - **Formatting Control**: Character and paragraph formatting
 
-## Installation
+## Quick Start (Copy & Paste)
+
+### 1. Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/Topabaem05/hwpx-mcp.git
-cd hwpx-mcp
-
-# Install dependencies
-pip install -e .
-
-# Or using uv (recommended)
-uv pip install -e .
+cd hwpx-mcp && uv pip install -e .
 ```
 
-## MCP Client Configuration
+### 2. Get Your Install Path
 
-### Claude Desktop (macOS/Linux)
+Run this in the `hwpx-mcp` directory to copy the path:
 
-Add to `claude_desktop_config.json`:
+```bash
+# macOS/Linux
+pwd | pbcopy  # macOS (copies to clipboard)
+pwd           # Linux (copy manually)
+
+# Windows (PowerShell)
+(Get-Location).Path | clip
+```
+
+### 3. Configure Your MCP Client
+
+Use the path from step 2 in the config below:
+
+<details>
+<summary><b>Claude Desktop (macOS)</b></summary>
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "hwpx-mcp": {
       "command": "uv",
-      "args": [
-        "--directory",
-        "/path/to/hwpx-mcp",
-        "run",
-        "hwpx-mcp"
-      ]
+      "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
     }
   }
 }
 ```
 
-### Claude Desktop (Windows)
+</details>
+
+<details>
+<summary><b>Claude Desktop (Windows)</b></summary>
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "hwpx-mcp": {
       "command": "cmd",
-      "args": [
-        "/c",
-        "uv --directory C:\\path\\to\\hwpx-mcp run hwpx-mcp"
-      ]
+      "args": ["/c", "uv --directory C:\\PASTE\\YOUR\\PATH\\HERE run hwpx-mcp"]
     }
   }
 }
+```
+
+</details>
+
+<details>
+<summary><b>Claude Desktop (Linux)</b></summary>
+
+Edit `~/.config/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+Edit `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (Copilot)</b></summary>
+
+Add to your VS Code `settings.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "hwpx-mcp": {
+        "command": "uv",
+        "args": ["--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"]
+      }
+    }
+  }
+}
+```
+
+</details>
+
+### 4. Restart your MCP client and start using HWP tools!
 ```
 
 ## Available Tools

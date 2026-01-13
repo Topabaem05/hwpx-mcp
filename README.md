@@ -103,7 +103,9 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-> Example Python path: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python`
+> Example paths:
+> - Python: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python`
+> - cwd: `/Users/username/projects/hwpx-mcp`
 
 </details>
 
@@ -142,7 +144,9 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 }
 ```
 
-> Example Python path: `C:\Users\username\anaconda3\envs\hwpx-mcp\python.exe`
+> Example paths:
+> - Python: `C:\Users\username\anaconda3\envs\hwpx-mcp\python.exe`
+> - cwd: `C:\Users\username\projects\hwpx-mcp`
 
 </details>
 
@@ -181,7 +185,9 @@ Edit `~/.config/Claude/claude_desktop_config.json`:
 }
 ```
 
-> Example Python path: `/home/username/anaconda3/envs/hwpx-mcp/bin/python`
+> Example paths:
+> - Python: `/home/username/anaconda3/envs/hwpx-mcp/bin/python`
+> - cwd: `/home/username/projects/hwpx-mcp`
 
 </details>
 

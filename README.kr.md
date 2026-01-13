@@ -103,7 +103,9 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
 }
 ```
 
-> 예시 Python 경로: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python`
+> 예시 경로:
+> - Python: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python`
+> - cwd: `/Users/username/projects/hwpx-mcp`
 
 </details>
 
@@ -142,7 +144,9 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
 }
 ```
 
-> 예시 Python 경로: `C:\Users\username\anaconda3\envs\hwpx-mcp\python.exe`
+> 예시 경로:
+> - Python: `C:\Users\username\anaconda3\envs\hwpx-mcp\python.exe`
+> - cwd: `C:\Users\username\projects\hwpx-mcp`
 
 </details>
 
@@ -181,7 +185,9 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
 }
 ```
 
-> 예시 Python 경로: `/home/username/anaconda3/envs/hwpx-mcp/bin/python`
+> 예시 경로:
+> - Python: `/home/username/anaconda3/envs/hwpx-mcp/bin/python`
+> - cwd: `/home/username/projects/hwpx-mcp`
 
 </details>
 

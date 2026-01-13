@@ -96,7 +96,7 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
   "mcpServers": {
     "hwpx-mcp": {
       "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
     }
   }
@@ -137,7 +137,7 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
   "mcpServers": {
     "hwpx-mcp": {
       "command": "C:\\PASTE\\YOUR\\CONDA\\PYTHON\\PATH\\HERE\\python.exe",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "C:\\PASTE\\YOUR\\HWPX-MCP\\PATH\\HERE"
     }
   }
@@ -178,7 +178,7 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
   "mcpServers": {
     "hwpx-mcp": {
       "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
     }
   }
@@ -219,7 +219,7 @@ which python | pbcopy  # conda activate hwpx-mcp 실행 후
   "mcpServers": {
     "hwpx-mcp": {
       "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
     }
   }
@@ -259,7 +259,7 @@ VS Code `settings.json`에 추가:
     "servers": {
       "hwpx-mcp": {
         "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-        "args": ["-m", "src.server"],
+        "args": ["-m", "hwpx_mcp.server"],
         "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
       }
     }
@@ -548,7 +548,7 @@ pip install -e ".[dev]"
 pytest src/tests/ -v
 
 # 서버 실행
-python -m src.server
+python -m hwpx_mcp.server
 ```
 
 ## 라이선스

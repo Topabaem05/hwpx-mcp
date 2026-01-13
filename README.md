@@ -96,7 +96,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "hwpx-mcp": {
       "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
     }
   }
@@ -137,7 +137,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
   "mcpServers": {
     "hwpx-mcp": {
       "command": "C:\\PASTE\\YOUR\\CONDA\\PYTHON\\PATH\\HERE\\python.exe",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "C:\\PASTE\\YOUR\\HWPX-MCP\\PATH\\HERE"
     }
   }
@@ -178,7 +178,7 @@ Edit `~/.config/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "hwpx-mcp": {
       "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
     }
   }
@@ -219,7 +219,7 @@ Edit `~/.cursor/mcp.json` (macOS/Linux) or `%USERPROFILE%\.cursor\mcp.json` (Win
   "mcpServers": {
     "hwpx-mcp": {
       "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-      "args": ["-m", "src.server"],
+      "args": ["-m", "hwpx_mcp.server"],
       "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
     }
   }
@@ -259,7 +259,7 @@ Add to your VS Code `settings.json`:
     "servers": {
       "hwpx-mcp": {
         "command": "/PASTE/YOUR/CONDA/PYTHON/PATH/HERE",
-        "args": ["-m", "src.server"],
+        "args": ["-m", "hwpx_mcp.server"],
         "cwd": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
       }
     }
@@ -548,7 +548,7 @@ pip install -e ".[dev]"
 pytest src/tests/ -v
 
 # Run the server
-python -m src.server
+python -m hwpx_mcp.server
 ```
 
 ## License

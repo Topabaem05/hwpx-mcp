@@ -44,17 +44,20 @@ all = [
 ]
 
 [project.scripts]
-hwpx-mcp = "src.server:main"
+hwpx-mcp = "hwpx_mcp.server:main"
 
 [tool.pdm]
 distribution = true
 
+[tool.pdm.build]
+includes = ["hwpx_mcp"]
+
 [tool.pdm.scripts]
-start = "python -m src.server"
-test = "pytest src/tests/ -v"
+start = "python -m hwpx_mcp.server"
+test = "pytest hwpx_mcp/tests/ -v"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["src/tests"]
+testpaths = ["hwpx_mcp/tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]

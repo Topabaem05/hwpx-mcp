@@ -43,6 +43,9 @@ all = [
     "pywin32>=300",
 ]
 
+[project.scripts]
+hwpx-mcp = "src.server:main"
+
 [tool.pdm]
 distribution = true
 

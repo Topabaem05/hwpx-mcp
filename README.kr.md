@@ -133,7 +133,6 @@ VS Code `settings.json`에 추가:
 </details>
 
 ### 4. MCP 클라이언트를 재시작하고 HWP 도구를 사용하세요!
-```
 
 ## 사용 가능한 도구
 

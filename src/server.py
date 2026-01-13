@@ -627,10 +627,15 @@ def hwp_get_capabilities() -> dict:
     }
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for hwpx-mcp command."""
     logger.info("Starting HWP Extended MCP Server (pyhwp-based)...")
     try:
         mcp.run(transport="stdio")
     except Exception as e:
         logger.error(f"Error running server: {e}")
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

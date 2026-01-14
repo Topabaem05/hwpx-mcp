@@ -3,7 +3,7 @@ Tests for chart tools
 """
 
 import pytest
-from src.tools.chart_tools import ChartData, ChartDataset, CreateChartInput
+from hwpx_mcp.tools.chart_tools import ChartData, ChartDataset, CreateChartInput
 
 
 class TestChartSchemas:
@@ -49,7 +49,7 @@ class TestChartSchemas:
 class TestChartGenerator:
     def test_chart_types(self):
         """Test supported chart types"""
-        from src.tools.chart_tools import register_chart_tools
+        from hwpx_mcp.tools.chart_tools import register_chart_tools
 
         # This test verifies the function can be imported
         assert register_chart_tools is not None

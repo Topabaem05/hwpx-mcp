@@ -10,12 +10,13 @@ from typing import Optional, Dict, Any, Callable
 from pydantic import BaseModel, Field
 
 # HWP (Binary) Adapter & Fallback HWPX tools
-from src.tools.pyhwp_adapter import extract_text_from_hwpx, get_hwpx_info
+from hwpx_mcp.tools.pyhwp_adapter import extract_text_from_hwpx, get_hwpx_info
 
 # HWPX (XML) Library (Preferred)
 try:
     from hwpx.tools.text_extractor import TextExtractor
     from hwpx.document import HwpxDocument
+
     HAS_PYTHON_HWPX = True
 except ImportError:
     HAS_PYTHON_HWPX = False
@@ -68,10 +69,10 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
                     try:
                         with TextExtractor(path) as extractor:
                             text = extractor.extract_text()
-                        
+
                         doc = HwpxDocument.open(path)
                         paragraphs_count = len(doc.paragraphs)
-                        
+
                         return {
                             "status": "success",
                             "text": text,
@@ -82,16 +83,19 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
                                 "paragraphs_count": paragraphs_count,
                                 "text_length": len(text),
                             },
-                            "preview": text[:1000] + ("..." if len(text) > 1000 else ""),
+                            "preview": text[:1000]
+                            + ("..." if len(text) > 1000 else ""),
                         }
                     except Exception as e:
-                        logger.warning(f"python-hwpx failed, falling back to manual parsing: {e}")
-                
+                        logger.warning(
+                            f"python-hwpx failed, falling back to manual parsing: {e}"
+                        )
+
                 # Priority 2: Manual XML parsing (Fallback)
                 try:
                     text = extract_text_from_hwpx(path)
                     info = get_hwpx_info(path) or {}
-                    
+
                     return {
                         "status": "success",
                         "text": text,
@@ -105,7 +109,10 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
                         "preview": text[:1000] + ("..." if len(text) > 1000 else ""),
                     }
                 except Exception as e:
-                    return {"status": "error", "error": f"Failed to read HWPX: {str(e)}"}
+                    return {
+                        "status": "error",
+                        "error": f"Failed to read HWPX: {str(e)}",
+                    }
 
             # --- HWP Handling (pyhwp) ---
             adapter = get_pyhwp_adapter()
@@ -172,32 +179,29 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
                 read_result = hwp_read_document(path)
                 if read_result.get("status") != "success":
                     return {"status": "error", "error": read_result.get("error")}
-                
+
                 text = read_result.get("text", "")
                 lines = text.splitlines()
                 found_count = 0
                 matches = []
-                
+
                 for i, line in enumerate(lines):
                     if found_count >= max_results:
                         break
-                        
+
                     line_to_check = line if case_sensitive else line.lower()
                     query_to_check = query if case_sensitive else query.lower()
-                    
+
                     if query_to_check in line_to_check:
                         found_count += 1
-                        matches.append({
-                            "line": i + 1,
-                            "text": line.strip()
-                        })
-                
+                        matches.append({"line": i + 1, "text": line.strip()})
+
                 return {
                     "status": "success" if found_count > 0 else "not_found",
                     "query": query,
                     "found_count": found_count,
                     "matches": matches,
-                    "file_type": "HWPX"
+                    "file_type": "HWPX",
                 }
 
             # --- HWP Handling ---
@@ -227,7 +231,7 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
     @mcp.tool()
     def hwp_get_document_info(path: Optional[str] = None) -> Dict[str, Any]:
         """Get detailed document information."""
-        return hwp_read_document(path) # Reuse unified reader
+        return hwp_read_document(path)  # Reuse unified reader
 
     @mcp.tool()
     def hwp_get_paragraphs(
@@ -237,9 +241,9 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
         try:
             if path and not os.path.exists(path):
                 return {"status": "error", "error": f"File not found: {path}"}
-            
+
             ext = os.path.splitext(path)[1].lower() if path else ""
-            
+
             if ext == ".hwpx" and HAS_PYTHON_HWPX:
                 doc = HwpxDocument.open(path)
                 paragraphs = [p.text for p in doc.paragraphs[:max_count]]
@@ -247,7 +251,7 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
                     "status": "success",
                     "paragraphs": paragraphs,
                     "total_count": len(paragraphs),
-                    "file_type": "HWPX"
+                    "file_type": "HWPX",
                 }
 
             adapter = get_pyhwp_adapter()
@@ -276,22 +280,28 @@ def register_document_tools(mcp, get_pyhwp_adapter: Callable) -> None:
         try:
             if path and not os.path.exists(path):
                 return {"status": "error", "error": f"File not found: {path}"}
-                
+
             ext = os.path.splitext(path)[1].lower() if path else ""
-            
+
             if ext == ".hwpx":
                 # HWPX image extraction (manual zip scan)
                 import zipfile
+
                 images = []
                 try:
-                    with zipfile.ZipFile(path, 'r') as zf:
+                    with zipfile.ZipFile(path, "r") as zf:
                         for name in zf.namelist():
-                            if name.startswith('BinData/') and any(name.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.bmp', '.gif']):
-                                images.append({
-                                    "name": name,
-                                    "size": zf.getinfo(name).file_size,
-                                    "type": "image"
-                                })
+                            if name.startswith("BinData/") and any(
+                                name.lower().endswith(ext)
+                                for ext in [".png", ".jpg", ".jpeg", ".bmp", ".gif"]
+                            ):
+                                images.append(
+                                    {
+                                        "name": name,
+                                        "size": zf.getinfo(name).file_size,
+                                        "type": "image",
+                                    }
+                                )
                     return {"status": "success", "images": images, "count": len(images)}
                 except Exception as e:
                     return {"status": "error", "error": str(e)}

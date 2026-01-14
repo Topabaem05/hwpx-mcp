@@ -1,14 +1,14 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.tools.controller_factory import (
+from hwpx_mcp.tools.controller_factory import (
     get_controller,
     reset_controller,
     get_platform_info,
     check_capability,
     get_capability_matrix,
 )
-from src.tools.hwp_controller_base import Platform, Capability
+from hwpx_mcp.tools.hwp_controller_base import Platform, Capability
 
 
 class TestGetPlatformInfo:

@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from src.tools.cross_platform_controller import (
+from hwpx_mcp.tools.cross_platform_controller import (
     CrossPlatformHwpxController,
     CROSS_PLATFORM_CAPABILITIES,
 )
-from src.tools.hwp_controller_base import (
+from hwpx_mcp.tools.hwp_controller_base import (
     Platform,
     Capability,
     NotSupportedError,

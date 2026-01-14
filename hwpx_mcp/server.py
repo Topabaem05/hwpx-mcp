@@ -59,16 +59,16 @@ except ImportError as e:
     sys.exit(1)
 
 try:
-    from src.tools.chart_tools import register_chart_tools
-    from src.tools.equation_tools import register_equation_tools
-    from src.tools.document_tools import register_document_tools
-    from src.tools.template_tools import register_template_tools
-    from src.tools.hwpx_builder import create_hwpx_from_text, HwpxBuilder
-    from src.tools.pyhwp_adapter import (
+    from hwpx_mcp.tools.chart_tools import register_chart_tools
+    from hwpx_mcp.tools.equation_tools import register_equation_tools
+    from hwpx_mcp.tools.document_tools import register_document_tools
+    from hwpx_mcp.tools.template_tools import register_template_tools
+    from hwpx_mcp.tools.hwpx_builder import create_hwpx_from_text, HwpxBuilder
+    from hwpx_mcp.tools.pyhwp_adapter import (
         PyhwpAdapter,
         HAS_PYHWP,
     )
-    from src.tools.unified_tools import register_unified_tools
+    from hwpx_mcp.tools.unified_tools import register_unified_tools
 
     logger.info("All tool modules imported successfully")
 except ImportError as e:
@@ -78,11 +78,11 @@ except ImportError as e:
 _windows_controller = None
 if IS_WINDOWS:
     try:
-        from src.tools.windows_hwp_controller import (
+        from hwpx_mcp.tools.windows_hwp_controller import (
             WindowsHwpController,
             get_hwp_controller as _get_windows_hwp_controller,
         )
-        from src.tools.hwp_table_tools import (
+        from hwpx_mcp.tools.hwp_table_tools import (
             HwpTableTools,
             get_table_tools as _get_table_tools,
         )
@@ -149,8 +149,8 @@ def initialize_server() -> None:
 def register_windows_tools(mcp) -> None:
     """Register Windows-specific tools with MCP server."""
     try:
-        from src.tools.windows_hwp_controller import get_hwp_controller
-        from src.tools.hwp_table_tools import get_table_tools
+        from hwpx_mcp.tools.windows_hwp_controller import get_hwp_controller
+        from hwpx_mcp.tools.hwp_table_tools import get_table_tools
 
         def get_windows_controller():
             controller = get_hwp_controller()

@@ -7,7 +7,7 @@ import os
 import logging
 from typing import Optional, Dict, Any, Callable, List
 
-from src.tools.hwpx_template_engine import HwpxTemplateEngine
+from hwpx_mcp.tools.hwpx_template_engine import HwpxTemplateEngine
 
 logger = logging.getLogger("hwp-mcp-extended.templates")
 
@@ -41,6 +41,7 @@ DEFAULT_TEMPLATES = [
     # ... other templates ...
 ]
 
+
 def register_template_tools(mcp, get_pyhwp_adapter: Callable) -> None:
     """Register template tools to MCP server"""
 
@@ -53,7 +54,7 @@ def register_template_tools(mcp, get_pyhwp_adapter: Callable) -> None:
         """
         Create document from template.
         Supports both built-in text templates and external .hwpx template files.
-        
+
         Args:
             template_id: Template ID (built-in) or path to .hwpx file
             data: Data to fill
@@ -63,19 +64,24 @@ def register_template_tools(mcp, get_pyhwp_adapter: Callable) -> None:
             # 1. External HWPX Template File
             if template_id.lower().endswith(".hwpx") and os.path.exists(template_id):
                 if not save_path:
-                    return {"status": "error", "error": "save_path is required for file templates"}
-                
+                    return {
+                        "status": "error",
+                        "error": "save_path is required for file templates",
+                    }
+
                 # Use HWPX Engine
                 result = _hwpx_engine.fill_template(template_id, save_path, data)
                 return {
                     "status": "success",
                     "message": f"Created document from HWPX template: {save_path}",
-                    "file_path": save_path
+                    "file_path": save_path,
                 }
 
             # 2. Built-in Text Template (Legacy)
-            template = next((t for t in DEFAULT_TEMPLATES if t["id"] == template_id), None)
-            
+            template = next(
+                (t for t in DEFAULT_TEMPLATES if t["id"] == template_id), None
+            )
+
             if not template:
                 return {
                     "status": "error",
@@ -110,7 +116,7 @@ def register_template_tools(mcp, get_pyhwp_adapter: Callable) -> None:
         return {
             "status": "success",
             "templates": DEFAULT_TEMPLATES,
-            "count": len(DEFAULT_TEMPLATES)
+            "count": len(DEFAULT_TEMPLATES),
         }
 
     # Re-export engine methods for explicit usage

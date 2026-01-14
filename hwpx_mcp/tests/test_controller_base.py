@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 import sys
 
-from src.tools.hwp_controller_base import (
+from hwpx_mcp.tools.hwp_controller_base import (
     HwpControllerBase,
     Platform,
     Capability,
@@ -96,14 +96,14 @@ class TestGetCurrentPlatform:
 
     @patch("platform.system", return_value="Windows")
     def test_windows_detection(self, mock_system):
-        from src.tools.hwp_controller_base import get_current_platform
+        from hwpx_mcp.tools.hwp_controller_base import get_current_platform
 
         result = get_current_platform()
         assert result == Platform.WINDOWS
 
     @patch("platform.system", return_value="Darwin")
     def test_macos_detection(self, mock_system):
-        from src.tools.hwp_controller_base import get_current_platform
+        from hwpx_mcp.tools.hwp_controller_base import get_current_platform
 
         result = get_current_platform()
         assert result == Platform.CROSS_PLATFORM

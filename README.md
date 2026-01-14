@@ -269,6 +269,54 @@ Add to your VS Code `settings.json`:
 
 </details>
 
+<details>
+<summary><b>OpenCode - uv</b></summary>
+
+Create or edit `opencode.json` in your project root (or `~/.config/opencode/opencode.json` for global config):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "hwpx-mcp": {
+      "type": "local",
+      "command": ["uv", "--directory", "/PASTE/YOUR/PATH/HERE", "run", "hwpx-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>OpenCode - Anaconda</b></summary>
+
+Create or edit `opencode.json` in your project root (or `~/.config/opencode/opencode.json` for global config):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "hwpx-mcp": {
+      "type": "local",
+      "command": ["/PASTE/YOUR/CONDA/PYTHON/PATH/HERE", "-m", "hwpx_mcp.server"],
+      "enabled": true,
+      "environment": {
+        "PYTHONPATH": "/PASTE/YOUR/HWPX-MCP/PATH/HERE"
+      }
+    }
+  }
+}
+```
+
+> Example paths:
+> - Python: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python` (macOS/Linux)
+> - Python: `C:\\Users\\username\\anaconda3\\envs\\hwpx-mcp\\python.exe` (Windows)
+> - PYTHONPATH: `/Users/username/projects/hwpx-mcp`
+
+</details>
+
 ### 4. Restart your MCP client and start using HWP tools!
 
 ## Available Tools

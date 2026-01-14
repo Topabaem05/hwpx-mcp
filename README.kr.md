@@ -269,6 +269,54 @@ VS Code `settings.json`에 추가:
 
 </details>
 
+<details>
+<summary><b>OpenCode - uv</b></summary>
+
+프로젝트 루트에 `opencode.json` 생성 또는 편집 (전역 설정: `~/.config/opencode/opencode.json`):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "hwpx-mcp": {
+      "type": "local",
+      "command": ["uv", "--directory", "/여기에/경로/붙여넣기", "run", "hwpx-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>OpenCode - Anaconda</b></summary>
+
+프로젝트 루트에 `opencode.json` 생성 또는 편집 (전역 설정: `~/.config/opencode/opencode.json`):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "hwpx-mcp": {
+      "type": "local",
+      "command": ["/여기에/콘다/파이썬/경로/붙여넣기", "-m", "hwpx_mcp.server"],
+      "enabled": true,
+      "environment": {
+        "PYTHONPATH": "/여기에/HWPX-MCP/경로/붙여넣기"
+      }
+    }
+  }
+}
+```
+
+> 예시 경로:
+> - Python: `/Users/username/anaconda3/envs/hwpx-mcp/bin/python` (macOS/Linux)
+> - Python: `C:\\Users\\username\\anaconda3\\envs\\hwpx-mcp\\python.exe` (Windows)
+> - PYTHONPATH: `/Users/username/projects/hwpx-mcp`
+
+</details>
+
 ### 4. MCP 클라이언트를 재시작하고 HWP 도구를 사용하세요!
 
 ## 사용 가능한 도구

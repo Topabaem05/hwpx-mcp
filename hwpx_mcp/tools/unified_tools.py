@@ -2769,4 +2769,292 @@ def register_unified_tools(mcp) -> None:
         except Exception as e:
             return {"success": False, "message": str(e)}
 
+    # === Template Management Tools ===
+
+    @mcp.tool()
+    def hwp_list_templates() -> dict:
+        """List all available HWPX templates with their descriptions.
+
+        Returns a list of templates that can be used with hwp_use_template.
+        Each template has metadata including name, description, and category.
+
+        Returns:
+            dict with keys:
+                - success: bool
+                - templates: list of template metadata
+                - count: number of available templates
+        """
+        try:
+            import json
+
+            templates_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
+            )
+            index_path = os.path.join(templates_dir, "template_index.json")
+
+            if not os.path.exists(index_path):
+                return {
+                    "success": False,
+                    "message": f"Template index not found: {index_path}",
+                }
+
+            with open(index_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            templates = []
+            for t in data.get("templates", []):
+                templates.append(
+                    {
+                        "id": t["id"],
+                        "name_ko": t["name_ko"],
+                        "name_en": t["name_en"],
+                        "category": t["category"],
+                        "description_ko": t["description_ko"],
+                        "description_en": t["description_en"],
+                    }
+                )
+
+            return {
+                "success": True,
+                "templates": templates,
+                "count": len(templates),
+                "categories": data.get("categories", {}),
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    @mcp.tool()
+    def hwp_recommend_template(request: str, language: str = "auto") -> dict:
+        """Recommend templates based on user requirements.
+
+        Analyzes the user's request and returns matching templates sorted by relevance.
+        Uses keyword matching against template descriptions and keywords.
+
+        Args:
+            request: User's description of what they need (e.g., "이력서", "resume", "보고서 작성")
+            language: Response language - "ko", "en", or "auto" (detect from request)
+
+        Returns:
+            dict with keys:
+                - success: bool
+                - recommendations: list of matching templates with scores
+                - best_match: the most suitable template
+        """
+        try:
+            import json
+            import re
+
+            templates_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
+            )
+            index_path = os.path.join(templates_dir, "template_index.json")
+
+            if not os.path.exists(index_path):
+                return {
+                    "success": False,
+                    "message": f"Template index not found: {index_path}",
+                }
+
+            with open(index_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            if language == "auto":
+                has_korean = bool(re.search(r"[가-힣]", request))
+                language = "ko" if has_korean else "en"
+
+            request_lower = request.lower()
+            request_words = set(re.findall(r"\w+", request_lower))
+
+            scored_templates = []
+            for t in data.get("templates", []):
+                score = 0
+
+                for keyword in t.get("keywords", []):
+                    if keyword.lower() in request_lower:
+                        score += 10
+                    if keyword.lower() in request_words:
+                        score += 5
+
+                if (
+                    t["name_ko"].lower() in request_lower
+                    or t["name_en"].lower() in request_lower
+                ):
+                    score += 20
+
+                desc = t["description_ko"] + " " + t["description_en"]
+                for word in request_words:
+                    if len(word) > 1 and word in desc.lower():
+                        score += 3
+
+                if t["category"].lower() in request_lower:
+                    score += 15
+
+                if score > 0:
+                    scored_templates.append(
+                        {
+                            "id": t["id"],
+                            "filename": t["filename"],
+                            "name": t["name_ko"] if language == "ko" else t["name_en"],
+                            "description": t["description_ko"]
+                            if language == "ko"
+                            else t["description_en"],
+                            "category": t["category"],
+                            "score": score,
+                        }
+                    )
+
+            scored_templates.sort(key=lambda x: x["score"], reverse=True)
+            recommendations = scored_templates[:5]
+
+            if not recommendations:
+                return {
+                    "success": True,
+                    "recommendations": [],
+                    "best_match": None,
+                    "message": "No matching templates found. Try different keywords or use hwp_list_templates to see all available templates.",
+                }
+
+            return {
+                "success": True,
+                "recommendations": recommendations,
+                "best_match": recommendations[0] if recommendations else None,
+                "language": language,
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    @mcp.tool()
+    def hwp_use_template(template_id: str, output_path: str) -> dict:
+        """Clone a template and open the copy for editing.
+
+        Creates a copy of the specified template at the output path and opens it
+        for editing. The original template remains unchanged.
+
+        Args:
+            template_id: Template ID (e.g., "h02_design_resume") or filename (e.g., "h02_design_resume.hwpx")
+            output_path: Path where the cloned template will be saved.
+                        Must be an absolute path ending with .hwpx
+
+        Returns:
+            dict with keys:
+                - success: bool
+                - output_path: path to the cloned file
+                - template_id: the template that was used
+                - message: status message
+
+        Example:
+            hwp_use_template("h02_design_resume", "/Users/name/Documents/my_resume.hwpx")
+        """
+        try:
+            import shutil
+            import json
+
+            templates_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
+            )
+            index_path = os.path.join(templates_dir, "template_index.json")
+
+            template_filename = None
+            if os.path.exists(index_path):
+                with open(index_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                for t in data.get("templates", []):
+                    if t["id"] == template_id or t["filename"] == template_id:
+                        template_filename = t["filename"]
+                        break
+
+            if not template_filename:
+                if template_id.endswith(".hwpx"):
+                    template_filename = template_id
+                else:
+                    template_filename = template_id + ".hwpx"
+
+            template_path = os.path.join(templates_dir, template_filename)
+
+            if not os.path.exists(template_path):
+                return {
+                    "success": False,
+                    "message": f"Template not found: {template_filename}. Use hwp_list_templates to see available templates.",
+                }
+
+            if not output_path.lower().endswith(".hwpx"):
+                output_path = output_path + ".hwpx"
+
+            output_dir = os.path.dirname(output_path)
+            if output_dir and not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            shutil.copy2(template_path, output_path)
+
+            controller = _get_controller()
+            success = controller.open_document(output_path)
+
+            if success:
+                return {
+                    "success": True,
+                    "output_path": output_path,
+                    "template_id": template_id,
+                    "message": f"Template cloned and opened: {output_path}",
+                }
+            else:
+                return {
+                    "success": False,
+                    "output_path": output_path,
+                    "template_id": template_id,
+                    "message": f"Template cloned to {output_path} but failed to open. You can open it manually.",
+                }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    @mcp.tool()
+    def hwp_get_template_info(template_id: str) -> dict:
+        """Get detailed information about a specific template.
+
+        Args:
+            template_id: Template ID (e.g., "h02_design_resume")
+
+        Returns:
+            dict with full template metadata including keywords and descriptions
+        """
+        try:
+            import json
+
+            templates_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
+            )
+            index_path = os.path.join(templates_dir, "template_index.json")
+
+            if not os.path.exists(index_path):
+                return {
+                    "success": False,
+                    "message": f"Template index not found: {index_path}",
+                }
+
+            with open(index_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            for t in data.get("templates", []):
+                if (
+                    t["id"] == template_id
+                    or t["filename"] == template_id
+                    or t["filename"] == template_id + ".hwpx"
+                ):
+                    template_path = os.path.join(templates_dir, t["filename"])
+                    return {
+                        "success": True,
+                        "template": {
+                            **t,
+                            "path": template_path,
+                            "exists": os.path.exists(template_path),
+                        },
+                    }
+
+            return {
+                "success": False,
+                "message": f"Template not found: {template_id}. Use hwp_list_templates to see available templates.",
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
     logger.info("Unified HWP tools registered")

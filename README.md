@@ -394,6 +394,10 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 |------|-------------|----------|
 | `hwp_create_from_template` | Create document from template file | All |
 | `hwp_fill_template` | Fill template fields with data | All |
+| `hwp_list_templates` | List all available HWPX templates with descriptions | All |
+| `hwp_recommend_template` | Recommend templates based on user requirements | All |
+| `hwp_use_template` | Clone a template and open the copy for editing | All |
+| `hwp_get_template_info` | Get detailed information about a specific template | All |
 
 ### Fields (Click-Here Fields)
 

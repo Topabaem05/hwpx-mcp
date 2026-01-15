@@ -394,6 +394,10 @@ VS Code `settings.json`에 추가:
 |------|------|--------|
 | `hwp_create_from_template` | 템플릿 파일에서 문서 생성 | 전체 |
 | `hwp_fill_template` | 템플릿 필드에 데이터 채우기 | 전체 |
+| `hwp_list_templates` | 사용 가능한 모든 HWPX 템플릿 목록 조회 | 전체 |
+| `hwp_recommend_template` | 사용자 요구에 맞는 템플릿 추천 | 전체 |
+| `hwp_use_template` | 템플릿 복제 후 복제본 열기 | 전체 |
+| `hwp_get_template_info` | 특정 템플릿 상세 정보 조회 | 전체 |
 
 ### 필드 (누름틀)
 

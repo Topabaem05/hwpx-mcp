@@ -586,6 +586,60 @@ hwp_toggle_bold()
 └─────────────────┘  └─────────────────────┘
 ```
 
+## 로드맵 및 예정된 기능
+
+[Office-Word-MCP-Server](https://github.com/GongRzhe/Office-Word-MCP-Server)의 기능과 [pyhwpx](https://github.com/martiniifun/pyhwpx) ([pywin32](https://github.com/mhammond/pywin32) 기반)의 고급 자동화 기능을 참고하여 HWPX-MCP의 기능을 확장할 계획입니다.
+
+### 1단계: 고급 서식 및 스타일
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| **문단 스타일** | 들여쓰기, 줄 간격, 정렬, 탭 설정 | 높음 |
+| **글자 스타일** | 글꼴, 크기, 색상, 형광펜, 자간 | 높음 |
+| **스타일 관리** | 이름 지정 스타일 적용/관리 (예: "제목 1", "본문") | 중간 |
+| **직접 서식** | 콘텐츠 생성 시 글꼴/크기/굵게/기울임 적용 | 높음 |
+
+### 2단계: 페이지 레이아웃 및 구역
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| **페이지 설정** | 용지 방향(가로/세로), 여백, 용지 크기 | 높음 |
+| **다단 설정** | 다단 레이아웃 생성 및 관리 | 중간 |
+| **머리말/꼬리말** | 머리말/꼬리말 편집, 쪽 번호 | 높음 |
+| **구역 제어** | 별도 레이아웃의 구역 관리 | 중간 |
+
+### 3단계: 고급 표 기능
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| **셀 병합** | 가로, 세로, 사각형 영역 병합 | 높음 |
+| **셀 정렬** | 가로/세로 위치 정렬 | 높음 |
+| **셀 여백** | 상하좌우 독립 제어 | 중간 |
+| **열 너비** | 포인트, 퍼센트, 자동 맞춤 | 중간 |
+| **줄무늬 행** | 교대 행 색상 적용 | 낮음 |
+| **헤더 강조** | 헤더 행 색상 지정 | 낮음 |
+
+### 4단계: 고급 개체 및 미디어
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| **이미지** | 정밀한 크기, 위치, 배치 스타일 | 높음 |
+| **도형 및 글상자** | 도형/글상자 삽입 및 서식 | 중간 |
+| **하이퍼링크** | 내부 책갈피, 외부 링크 | 중간 |
+| **OLE 개체** | 외부 개체 삽입 | 낮음 |
+
+### 5단계: 검토 및 협업 (Windows 전용)
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| **메모** | 메모 삽입, 읽기, 삭제 | 높음 |
+| **변경 내용 추적** | 추적 활성화/비활성화, 수락/거부 | 중간 |
+| **문서 보호** | 암호 보호, 편집 제한 | 낮음 |
+
+### 6단계: 문서 자동화
+| 기능 | 설명 | 우선순위 |
+|------|------|----------|
+| **메일 머지** | 고급 필드 매핑, 일괄 생성 | 중간 |
+| **차례(목차)** | 제목 기반 목차 자동 생성/업데이트 | 높음 |
+| **색인** | 색인 항목 생성 및 페이지 생성 | 낮음 |
+| **PDF 변환** | HWP/HWPX를 PDF로 변환 | 높음 |
+| **문서 병합** | 여러 문서 병합 | 중간 |
+
 ## 개발
 
 ```bash
@@ -593,7 +647,7 @@ hwp_toggle_bold()
 pip install -e ".[dev]"
 
 # 테스트 실행
-pytest src/tests/ -v
+pytest hwpx_mcp/tests/ -v
 
 # 서버 실행
 python -m hwpx_mcp.server
@@ -609,12 +663,22 @@ MIT 라이선스
 
 ## 참고 프로젝트
 
-이 프로젝트는 다음의 한글 HWP 라이브러리 및 MCP 서버에서 영감을 받아 개발되었습니다:
+이 프로젝트는 다음의 훌륭한 라이브러리들과 MCP 서버들을 참고하여 개발되었습니다:
 
-- **[hwplibsharp](https://github.com/rkttu/hwplibsharp)** - HWP 파일 형식을 위한 C# 라이브러리
-- **[hwplib](https://github.com/neolord0/hwplib)** - HWP 파일 형식을 위한 Java 라이브러리
-- **[pyhwpx](https://github.com/martiniifun/pyhwpx)** - HWP 자동화를 위한 Python 래퍼
-- **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - 한글 문서를 위한 MCP 서버
-- **[python-hwpx](https://github.com/airmang/python-hwpx)** - HWPX 파일 조작을 위한 Python 라이브러리
+### MCP 서버
+- **[Office-Word-MCP-Server](https://github.com/GongRzhe/Office-Word-MCP-Server)** - Microsoft Word용 MCP 서버. 문서 관리, 콘텐츠 생성, 표 서식, 댓글 등 포괄적인 도구 설계를 참고하여 HWP 문서에서도 동등한 사용자 경험을 제공합니다.
 
-HWP 생태계에 기여해 주신 개발자들에게 감사드립니다.
+### HWP 자동화 라이브러리
+- **[pyhwpx](https://github.com/martiniifun/pyhwpx)** - Windows용 HWP 자동화를 위한 포괄적인 Python 래퍼. pywin32 기반으로 텍스트 삽입, 문서 편집, 서식, 표 등의 고급 API를 제공합니다. 고급 기능 구현의 핵심 참조 자료.
+- **[pywin32](https://github.com/mhammond/pywin32)** - COM 자동화를 포함한 Windows API 접근을 제공하는 Python 확장. `win32com`을 통한 Windows HWP 자동화의 기반.
+- **[python-hwpx](https://github.com/airmang/python-hwpx)** - HWPX (Open XML) 파일 조작을 위한 Python 라이브러리. HWP 설치 없이 크로스 플랫폼 HWPX 생성에 사용.
+
+### HWP 파일 형식 라이브러리
+- **[hwplibsharp](https://github.com/rkttu/hwplibsharp)** - HWP 파일 형식 파싱을 위한 C# 라이브러리.
+- **[hwplib](https://github.com/neolord0/hwplib)** - HWP 파일 형식을 위한 Java 라이브러리.
+- **[pyhwp](https://github.com/mete0r/pyhwp)** - HWP 바이너리 파일 파싱을 위한 Python 도구.
+
+### 이전 프로젝트
+- **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - 이 확장 버전의 영감이 된 오리지널 HWP MCP 서버.
+
+HWP 생태계에 기여해 주신 이 프로젝트 개발자들에게 특별한 감사를 드립니다.

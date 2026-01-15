@@ -586,6 +586,60 @@ hwp_toggle_bold()
 └─────────────────┘  └─────────────────────┘
 ```
 
+## Roadmap & Planned Features
+
+We plan to expand the capabilities of HWPX-MCP by referencing [Office-Word-MCP-Server](https://github.com/GongRzhe/Office-Word-MCP-Server) and utilizing the advanced automation features of [pyhwpx](https://github.com/martiniifun/pyhwpx) (based on [pywin32](https://github.com/mhammond/pywin32)).
+
+### Phase 1: Advanced Formatting & Styles
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Paragraph Styles** | Indentation, line spacing, alignment, tab settings | High |
+| **Character Styles** | Font families, sizing, colors, highlights, spacing | High |
+| **Style Management** | Apply/manage named styles (e.g., "제목 1", "본문") | Medium |
+| **Direct Formatting** | Font/size/bold/italic during content creation | High |
+
+### Phase 2: Page Layout & Sections
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Page Setup** | Orientation (Portrait/Landscape), margins, paper size | High |
+| **Multi-Column** | Create and manage multi-column layouts | Medium |
+| **Headers & Footers** | Edit header/footer content, page numbering | High |
+| **Section Control** | Manage sections with distinct layouts | Medium |
+
+### Phase 3: Advanced Table Operations
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Cell Merging** | Horizontal, vertical, and rectangular merging | High |
+| **Cell Alignment** | Horizontal and vertical positioning | High |
+| **Cell Padding** | Independent control of all sides | Medium |
+| **Column Width** | Points, percentage, auto-fit | Medium |
+| **Alternating Rows** | Apply alternating row colors | Low |
+| **Header Highlighting** | Custom header row colors | Low |
+
+### Phase 4: Advanced Objects & Media
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Images** | Precise sizing, positioning, wrapping styles | High |
+| **Shapes & Text Boxes** | Insert/format geometric shapes, floating text boxes | Medium |
+| **Hyperlinks** | Internal bookmarks, external hyperlinks | Medium |
+| **OLE Objects** | Embed external objects | Low |
+
+### Phase 5: Review & Collaboration (Windows Only)
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Comments** | Insert, read, delete document comments | High |
+| **Track Changes** | Enable/disable revision tracking, accept/reject | Medium |
+| **Document Protection** | Password protection, restricted editing | Low |
+
+### Phase 6: Document Automation
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| **Mail Merge** | Enhanced field mapping, batch generation | Medium |
+| **Table of Contents** | Auto-generate/update TOC based on headings | High |
+| **Index** | Create index entries and generate pages | Low |
+| **PDF Conversion** | Convert HWP/HWPX to PDF | High |
+| **Document Merging** | Merge multiple documents | Medium |
+
 ## Development
 
 ```bash
@@ -593,7 +647,7 @@ hwp_toggle_bold()
 pip install -e ".[dev]"
 
 # Run tests
-pytest src/tests/ -v
+pytest hwpx_mcp/tests/ -v
 
 # Run the server
 python -m hwpx_mcp.server
@@ -609,12 +663,22 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## References
 
-This project was inspired and referenced by the following excellent HWP libraries and MCP servers:
+This project was inspired and referenced by the following excellent libraries and MCP servers:
 
-- **[hwplibsharp](https://github.com/rkttu/hwplibsharp)** - C# library for HWP file format
-- **[hwplib](https://github.com/neolord0/hwplib)** - Java library for HWP file format
-- **[pyhwpx](https://github.com/martiniifun/pyhwpx)** - Python wrapper for HWP automation
-- **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - MCP server for HWP documents
-- **[python-hwpx](https://github.com/airmang/python-hwpx)** - Python library for HWPX file manipulation
+### MCP Servers
+- **[Office-Word-MCP-Server](https://github.com/GongRzhe/Office-Word-MCP-Server)** - MCP server for Microsoft Word. We reference its comprehensive tool design (document management, content creation, table formatting, comments) to provide a comparable experience for HWP documents.
+
+### HWP Automation Libraries
+- **[pyhwpx](https://github.com/martiniifun/pyhwpx)** - A comprehensive Python wrapper for HWP automation (Windows). Built on pywin32, it provides high-level APIs for text insertion, document editing, formatting, tables, and more. Key reference for implementing advanced features.
+- **[pywin32](https://github.com/mhammond/pywin32)** - Python for Windows extensions providing access to Windows APIs including COM automation. The foundation for Windows HWP automation via `win32com`.
+- **[python-hwpx](https://github.com/airmang/python-hwpx)** - Python library for HWPX (Open XML) file manipulation. Used for cross-platform HWPX generation without requiring HWP installation.
+
+### HWP File Format Libraries
+- **[hwplibsharp](https://github.com/rkttu/hwplibsharp)** - C# library for HWP file format parsing.
+- **[hwplib](https://github.com/neolord0/hwplib)** - Java library for HWP file format.
+- **[pyhwp](https://github.com/mete0r/pyhwp)** - Python tools for parsing HWP binary files.
+
+### Previous Work
+- **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - The original MCP server for HWP documents that inspired this extended version.
 
 Special thanks to the developers of these projects for their contributions to the HWP ecosystem.

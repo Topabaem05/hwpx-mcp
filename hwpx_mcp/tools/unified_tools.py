@@ -4,6 +4,7 @@ Exposes all HWP capabilities through a consistent API that works across platform
 """
 
 import logging
+import os
 from typing import Optional, List, Dict, Any
 
 from .controller_factory import (
@@ -2690,6 +2691,81 @@ def register_unified_tools(mcp) -> None:
                     "message": "Spell check toggled" if success else "Failed",
                 }
             return {"success": False, "message": "Invalid controller type"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    # === Format Conversion ===
+
+    @mcp.tool()
+    def hwp_convert_hwp_to_hwpx(
+        input_path: str, output_path: Optional[str] = None
+    ) -> dict:
+        """Convert HWP binary file to HWPX (Open XML) format.
+
+        Opens an HWP file and saves it as HWPX format using the HWP application's
+        built-in conversion capability. This is useful for converting legacy HWP
+        files to the modern HWPX format.
+
+        Args:
+            input_path: Absolute path to the input .hwp file
+            output_path: Path for output .hwpx file (optional).
+                         Default: same directory and name with .hwpx extension
+
+        Returns:
+            dict with keys:
+                - success: bool
+                - output_path: str (path to converted file, if successful)
+                - message: str (error message if failed)
+
+        Platform Support:
+            - Windows: Full support via HWP application
+            - macOS/Linux: Not supported (HWP application required)
+        """
+        try:
+            if not os.path.exists(input_path):
+                return {
+                    "success": False,
+                    "message": f"Input file not found: {input_path}",
+                }
+
+            if not input_path.lower().endswith(".hwp"):
+                return {
+                    "success": False,
+                    "message": "Input file must be .hwp format",
+                }
+
+            if output_path is None:
+                output_path = os.path.splitext(input_path)[0] + ".hwpx"
+
+            controller = _get_controller()
+
+            if controller.platform != Platform.WINDOWS:
+                return {
+                    "success": False,
+                    "message": "HWP to HWPX conversion requires Windows with HWP application installed",
+                }
+
+            if not controller.open_document(input_path):
+                return {
+                    "success": False,
+                    "message": f"Failed to open input file: {input_path}",
+                }
+
+            success = controller.save_as(output_path, format="hwpx")
+            controller.close_document(save=False)
+
+            if success:
+                return {
+                    "success": True,
+                    "output_path": output_path,
+                    "message": f"Successfully converted to: {output_path}",
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Conversion failed during save_as operation",
+                }
+
         except Exception as e:
             return {"success": False, "message": str(e)}
 

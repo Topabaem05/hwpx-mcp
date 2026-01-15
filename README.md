@@ -586,60 +586,6 @@ hwp_toggle_bold()
 └─────────────────┘  └─────────────────────┘
 ```
 
-## Roadmap & Planned Features
-
-We plan to expand the capabilities of HWPX-MCP by referencing [Office-Word-MCP-Server](https://github.com/GongRzhe/Office-Word-MCP-Server) and utilizing the advanced automation features of [pyhwpx](https://github.com/martiniifun/pyhwpx) (based on [pywin32](https://github.com/mhammond/pywin32)).
-
-### Phase 1: Advanced Formatting & Styles
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Paragraph Styles** | Indentation, line spacing, alignment, tab settings | High |
-| **Character Styles** | Font families, sizing, colors, highlights, spacing | High |
-| **Style Management** | Apply/manage named styles (e.g., "제목 1", "본문") | Medium |
-| **Direct Formatting** | Font/size/bold/italic during content creation | High |
-
-### Phase 2: Page Layout & Sections
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Page Setup** | Orientation (Portrait/Landscape), margins, paper size | High |
-| **Multi-Column** | Create and manage multi-column layouts | Medium |
-| **Headers & Footers** | Edit header/footer content, page numbering | High |
-| **Section Control** | Manage sections with distinct layouts | Medium |
-
-### Phase 3: Advanced Table Operations
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Cell Merging** | Horizontal, vertical, and rectangular merging | High |
-| **Cell Alignment** | Horizontal and vertical positioning | High |
-| **Cell Padding** | Independent control of all sides | Medium |
-| **Column Width** | Points, percentage, auto-fit | Medium |
-| **Alternating Rows** | Apply alternating row colors | Low |
-| **Header Highlighting** | Custom header row colors | Low |
-
-### Phase 4: Advanced Objects & Media
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Images** | Precise sizing, positioning, wrapping styles | High |
-| **Shapes & Text Boxes** | Insert/format geometric shapes, floating text boxes | Medium |
-| **Hyperlinks** | Internal bookmarks, external hyperlinks | Medium |
-| **OLE Objects** | Embed external objects | Low |
-
-### Phase 5: Review & Collaboration (Windows Only)
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Comments** | Insert, read, delete document comments | High |
-| **Track Changes** | Enable/disable revision tracking, accept/reject | Medium |
-| **Document Protection** | Password protection, restricted editing | Low |
-
-### Phase 6: Document Automation
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| **Mail Merge** | Enhanced field mapping, batch generation | Medium |
-| **Table of Contents** | Auto-generate/update TOC based on headings | High |
-| **Index** | Create index entries and generate pages | Low |
-| **PDF Conversion** | Convert HWP/HWPX to PDF | High |
-| **Document Merging** | Merge multiple documents | Medium |
-
 ## Development
 
 ```bash

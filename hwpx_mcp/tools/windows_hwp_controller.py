@@ -1461,6 +1461,98 @@ class WindowsHwpController:
             logger.error(f"Failed to insert background: {e}")
             return False
 
+    def insert_bookmark(self, name: str) -> bool:
+        """Insert bookmark at cursor position (Ctrl+K, B).
+
+        Args:
+            name: Bookmark name
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "Bookmark", self.hwp.HParameterSet.HBookmark.HSet
+            )
+            self.hwp.HParameterSet.HBookmark.Title = name
+            self.hwp.HParameterSet.HBookmark.Command = 1  # Insert
+
+            self.hwp.HAction.Execute("Bookmark", self.hwp.HParameterSet.HBookmark.HSet)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert bookmark: {e}")
+            return False
+
+    def insert_hyperlink(self, url: str, display_text: Optional[str] = None) -> bool:
+        """Insert hyperlink at cursor position (Ctrl+K, H).
+
+        Args:
+            url: Target URL or path
+            display_text: Text to display (if None, applies to selection or uses url)
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "InsertHyperlink", self.hwp.HParameterSet.HHyperlink.HSet
+            )
+            self.hwp.HParameterSet.HHyperlink.Command = url
+
+            if display_text:
+                self.hwp.HParameterSet.HHyperlink.Text = display_text
+
+            self.hwp.HAction.Execute(
+                "InsertHyperlink", self.hwp.HParameterSet.HHyperlink.HSet
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert hyperlink: {e}")
+            return False
+
+    def table_split_cell(self, rows: int = 2, cols: int = 1) -> bool:
+        """Split current table cell.
+
+        Args:
+            rows: Number of rows to split into
+            cols: Number of columns to split into
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "TableSplitCell", self.hwp.HParameterSet.HTableSplitCell.HSet
+            )
+            self.hwp.HParameterSet.HTableSplitCell.Rows = rows
+            self.hwp.HParameterSet.HTableSplitCell.Cols = cols
+            self.hwp.HParameterSet.HTableSplitCell.Merge = 0
+
+            self.hwp.HAction.Execute(
+                "TableSplitCell", self.hwp.HParameterSet.HTableSplitCell.HSet
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to split cell: {e}")
+            return False
+
+    def table_merge_cells(self) -> bool:
+        """Merge selected table cells.
+
+        Returns:
+            bool: Success status
+        """
+        return self.run_action("TableMergeCell")
+
     def __enter__(self):
         """Context manager entry."""
         return self

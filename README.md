@@ -450,6 +450,10 @@ These tools provide access to advanced HWP SDK features from `Actions.h`, `Docum
 | `hwp_set_edit_mode` | Set document mode (edit, readonly, form) | Windows |
 | `hwp_manage_metatags` | Manage document metatags (hidden metadata) | Windows |
 | `hwp_insert_background` | Insert background image (tile, center, stretch, fit) | Windows |
+| `hwp_insert_bookmark` | Insert bookmark at cursor position | Windows |
+| `hwp_insert_hyperlink` | Insert hyperlink at cursor position | Windows |
+| `hwp_table_split_cell` | Split current table cell into rows and columns | Windows |
+| `hwp_table_merge_cells` | Merge selected table cells | Windows |
 
 ## Usage Examples
 
@@ -624,6 +628,17 @@ hwp_insert_background(
     embedded=True,
     fill_option="tile"  # tile, center, stretch, fit
 )
+
+# Insert bookmark and hyperlink
+hwp_insert_bookmark(name="section1")
+hwp_insert_hyperlink(url="https://example.com", display_text="Visit Website")
+
+# Table operations (split/merge)
+# Assume cursor is in a table cell
+hwp_table_split_cell(rows=2, cols=2)
+
+# Assume cells are selected
+hwp_table_merge_cells()
 
 hwp_save_as(path="advanced_document.hwp")
 ```

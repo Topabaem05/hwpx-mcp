@@ -329,6 +329,56 @@ def register_windows_tools(mcp) -> None:
                 }
             return {"success": False, "message": "No document open"}
 
+        @mcp.tool()
+        def hwp_insert_bookmark(name: str) -> dict:
+            """Insert bookmark at cursor position."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_bookmark(name)
+                return {
+                    "success": success,
+                    "message": f"Bookmark '{name}' inserted" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_hyperlink(url: str, display_text: str = None) -> dict:
+            """Insert hyperlink at cursor position."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_hyperlink(url, display_text)
+                return {
+                    "success": success,
+                    "message": "Hyperlink inserted" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_table_split_cell(rows: int = 2, cols: int = 1) -> dict:
+            """Split current table cell into rows and columns."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.table_split_cell(rows, cols)
+                return {
+                    "success": success,
+                    "message": f"Cell split into {rows}x{cols}"
+                    if success
+                    else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_table_merge_cells() -> dict:
+            """Merge selected table cells."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.table_merge_cells()
+                return {
+                    "success": success,
+                    "message": "Cells merged" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
         # ============================================================
         # HWP SDK Extended Tools (from Actions.h, Document.h, etc.)
         # ============================================================

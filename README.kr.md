@@ -450,6 +450,10 @@ VS Code `settings.json`에 추가:
 | `hwp_set_edit_mode` | 문서 모드 설정 (편집, 읽기 전용, 양식) | Windows |
 | `hwp_manage_metatags` | 문서 메타태그 관리 (숨겨진 메타데이터) | Windows |
 | `hwp_insert_background` | 배경 이미지 삽입 (바둑판식, 가운데, 늘이기, 맞춤) | Windows |
+| `hwp_insert_bookmark` | 커서 위치에 책갈피 삽입 | Windows |
+| `hwp_insert_hyperlink` | 커서 위치에 하이퍼링크 삽입 | Windows |
+| `hwp_table_split_cell` | 현재 셀을 행/열로 나누기 | Windows |
+| `hwp_table_merge_cells` | 선택한 셀 합치기 | Windows |
 
 ## 사용 예시
 
@@ -624,6 +628,17 @@ hwp_insert_background(
     embedded=True,
     fill_option="tile"  # tile, center, stretch, fit
 )
+
+# 책갈피 및 하이퍼링크 삽입
+hwp_insert_bookmark(name="section1")
+hwp_insert_hyperlink(url="https://example.com", display_text="웹사이트 방문")
+
+# 표 작업 (나누기/합치기)
+# 커서가 셀 안에 있다고 가정
+hwp_table_split_cell(rows=2, cols=2)
+
+# 셀이 선택되어 있다고 가정
+hwp_table_merge_cells()
 
 hwp_save_as(path="advanced_document.hwp")
 ```

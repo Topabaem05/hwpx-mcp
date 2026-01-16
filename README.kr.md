@@ -433,6 +433,24 @@ VS Code `settings.json`에 추가:
 | `hwp_get_line_widths` | 사용 가능한 선 두께 가져오기 | 전체 |
 | `hwp_get_number_formats` | 사용 가능한 숫자 형식 가져오기 | 전체 |
 
+### HWP SDK 확장 기능 (Windows)
+
+`Actions.h`, `Document.h` 등 SDK 헤더의 고급 HWP SDK 기능에 접근할 수 있는 도구들입니다.
+
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_run_action` | 800개 이상의 HWP 액션 ID 실행 (복사, 붙여넣기, 문서 끝으로 이동 등) | Windows |
+| `hwp_page_setup` | 페이지 레이아웃 설정 (여백, 방향, 용지 크기: A4, Letter 등) | Windows |
+| `hwp_insert_page_number` | 위치 및 형식 옵션으로 쪽 번호 삽입 | Windows |
+| `hwp_table_format_cell` | 표 셀 서식 지정 (테두리 종류/두께, 채우기 색상) | Windows |
+| `hwp_move_to` | 특정 위치로 커서 이동 (문서 시작, 문단 끝 등) | Windows |
+| `hwp_select_range` | 문단 및 위치 인덱스로 텍스트 범위 선택 | Windows |
+| `hwp_insert_header_footer` | 텍스트 내용으로 머리말 또는 꼬리말 삽입 | Windows |
+| `hwp_insert_note` | 각주 또는 미주 삽입 | Windows |
+| `hwp_set_edit_mode` | 문서 모드 설정 (편집, 읽기 전용, 양식) | Windows |
+| `hwp_manage_metatags` | 문서 메타태그 관리 (숨겨진 메타데이터) | Windows |
+| `hwp_insert_background` | 배경 이미지 삽입 (바둑판식, 가운데, 늘이기, 맞춤) | Windows |
+
 ## 사용 예시
 
 ### 기본 문서 생성
@@ -536,6 +554,80 @@ hwp_insert_text("이것은 본문 텍스트입니다.")
 hwp_toggle_bold()
 ```
 
+### HWP SDK 확장 기능 (Windows)
+
+```python
+hwp_connect()
+hwp_create()
+
+# Actions.h의 액션 실행 (800개 이상 사용 가능)
+hwp_run_action(action_id="CharShapeBold")  # 진하게 토글
+hwp_run_action(action_id="ParagraphShapeAlignCenter")  # 가운데 정렬
+
+# 페이지 설정 (A4, Letter, 여백, 방향)
+hwp_page_setup(
+    paper_type="a4",
+    orientation="portrait",
+    top_margin_mm=25,
+    bottom_margin_mm=25,
+    left_margin_mm=30,
+    right_margin_mm=30
+)
+
+# 쪽 번호 삽입
+hwp_insert_page_number(
+    position=4,  # 4=하단 가운데
+    number_format=0,  # 0=아라비아 숫자 (1, 2, 3...)
+    starting_number=1,
+    side_char="-"  # 결과: "- 1 -"
+)
+
+# 표 셀 서식 지정 (먼저 셀 선택 필요)
+hwp_table_format_cell(
+    fill_color=0xFFFF00,  # 노란색
+    border_type=1,  # 실선
+    border_width=5  # 0.5mm
+)
+
+# 정밀 커서 이동
+hwp_move_to(move_id="MoveDocEnd")  # 문서 끝으로 이동
+hwp_move_to(move_id="MoveParaBegin")  # 문단 시작으로 이동
+
+# 텍스트 범위 선택
+hwp_select_range(
+    start_para=0, start_pos=0,
+    end_para=0, end_pos=10
+)
+
+# 머리말/꼬리말 삽입
+hwp_insert_header_footer(
+    header_or_footer="header",
+    content="회사명 - 대외비"
+)
+
+# 각주 삽입
+hwp_insert_note(
+    note_type="footnote",
+    content="참고: HWP SDK 문서"
+)
+
+# 문서 모드 설정
+hwp_set_edit_mode(mode="readonly")  # readonly, edit, form
+
+# 메타태그 관리 (숨겨진 메타데이터)
+hwp_manage_metatags(action="set", tag_name="author", tag_value="AI Assistant")
+hwp_manage_metatags(action="list")  # 모든 태그 가져오기
+
+# 배경 이미지 삽입
+hwp_insert_background(
+    image_path="background.png",
+    embedded=True,
+    fill_option="tile"  # tile, center, stretch, fit
+)
+
+hwp_save_as(path="advanced_document.hwp")
+```
+
 ## 플랫폼별 차이점
 
 | 기능 | Windows (COM) | macOS/Linux (python-hwpx) |
@@ -547,6 +639,7 @@ hwp_toggle_bold()
 | 수식 | ✅ 모든 기능 | ✅ 생성만 |
 | 필드 | ✅ 전체 지원 | ❌ 미지원 |
 | 서식 | ✅ 전체 제어 | ✅ 기본 제어 |
+| SDK 확장 기능 (Actions, PageSetup 등) | ✅ 전체 지원 | ❌ 미지원 |
 
 ## 요구사항
 

@@ -1553,6 +1553,184 @@ class WindowsHwpController:
         """
         return self.run_action("TableMergeCell")
 
+    def setup_columns(
+        self, count: int = 1, same_size: bool = True, gap_mm: float = 10.0
+    ) -> bool:
+        """Configure page columns (MultiColumn).
+
+        Args:
+            count: Number of columns (1-4)
+            same_size: Use same width for all columns
+            gap_mm: Gap between columns in mm
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            # 1mm = 283.465 HwpUnit
+            MM_TO_HWPUNIT = 283.465
+
+            self.hwp.HAction.GetDefault(
+                "MultiColumn", self.hwp.HParameterSet.HColDef.HSet
+            )
+            self.hwp.HParameterSet.HColDef.Count = count
+            self.hwp.HParameterSet.HColDef.SameSize = 1 if same_size else 0
+            self.hwp.HParameterSet.HColDef.Gap = int(gap_mm * MM_TO_HWPUNIT)
+
+            self.hwp.HAction.Execute("MultiColumn", self.hwp.HParameterSet.HColDef.HSet)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to setup columns: {e}")
+            return False
+
+    def insert_dutmal(
+        self, main_text: str, sub_text: str, position: str = "top"
+    ) -> bool:
+        """Insert Dutmal (text with comment above/below).
+
+        Args:
+            main_text: Main text body
+            sub_text: Comment text (Dutmal)
+            position: 'top' (above) or 'bottom' (below)
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "DutmalChars", self.hwp.HParameterSet.HDutmal.HSet
+            )
+            self.hwp.HParameterSet.HDutmal.Text = main_text
+            self.hwp.HParameterSet.HDutmal.DutmalText = sub_text
+            self.hwp.HParameterSet.HDutmal.Position = 1 if position == "bottom" else 0
+
+            self.hwp.HAction.Execute("DutmalChars", self.hwp.HParameterSet.HDutmal.HSet)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert dutmal: {e}")
+            return False
+
+    def insert_index_mark(self, keyword1: str, keyword2: str = "") -> bool:
+        """Insert Index Mark.
+
+        Args:
+            keyword1: Primary keyword
+            keyword2: Secondary keyword
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "IndexMark", self.hwp.HParameterSet.HIndexMark.HSet
+            )
+            self.hwp.HParameterSet.HIndexMark.Key1 = keyword1
+            self.hwp.HParameterSet.HIndexMark.Key2 = keyword2
+
+            self.hwp.HAction.Execute(
+                "IndexMark", self.hwp.HParameterSet.HIndexMark.HSet
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert index mark: {e}")
+            return False
+
+    def set_page_hiding(
+        self,
+        hide_header: bool = False,
+        hide_footer: bool = False,
+        hide_page_num: bool = False,
+        hide_border: bool = False,
+        hide_background: bool = False,
+    ) -> bool:
+        """Hide page elements (header, footer, etc.) for current page.
+
+        Args:
+            hide_header: Hide header
+            hide_footer: Hide footer
+            hide_page_num: Hide page number
+            hide_border: Hide page border
+            hide_background: Hide page background
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "PageHiding", self.hwp.HParameterSet.HPageHiding.HSet
+            )
+            self.hwp.HParameterSet.HPageHiding.HideHeader = 1 if hide_header else 0
+            self.hwp.HParameterSet.HPageHiding.HideFooter = 1 if hide_footer else 0
+            self.hwp.HParameterSet.HPageHiding.HidePageNum = 1 if hide_page_num else 0
+            self.hwp.HParameterSet.HPageHiding.HideBorder = 1 if hide_border else 0
+            self.hwp.HParameterSet.HPageHiding.HideFill = 1 if hide_background else 0
+
+            self.hwp.HAction.Execute(
+                "PageHiding", self.hwp.HParameterSet.HPageHiding.HSet
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set page hiding: {e}")
+            return False
+
+    def insert_auto_number(
+        self, num_type: str = "page", number_format: int = 0, new_number: int = 0
+    ) -> bool:
+        """Insert Auto Number (e.g., Figure 1, Table 1).
+
+        Args:
+            num_type: 'page', 'footnote', 'endnote', 'picture', 'table', 'equation'
+            number_format: Number format code (0=Digit, 1=Circle, etc.)
+            new_number: Reset to new number (0 to continue sequence)
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            # Map string types to HWP codes (Action: InsertAutoNum, Param: HAutoNum)
+            code_map = {
+                "page": 0,
+                "footnote": 1,
+                "endnote": 2,
+                "picture": 3,
+                "table": 4,
+                "equation": 5,
+            }
+
+            if num_type.lower() not in code_map:
+                logger.error(f"Invalid auto number type: {num_type}")
+                return False
+
+            self.hwp.HAction.GetDefault(
+                "InsertAutoNum", self.hwp.HParameterSet.HAutoNum.HSet
+            )
+            self.hwp.HParameterSet.HAutoNum.NumType = code_map[num_type.lower()]
+            self.hwp.HParameterSet.HAutoNum.Format = number_format
+            self.hwp.HParameterSet.HAutoNum.NewNum = new_number
+
+            self.hwp.HAction.Execute(
+                "InsertAutoNum", self.hwp.HParameterSet.HAutoNum.HSet
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert auto number: {e}")
+            return False
+
     def __enter__(self):
         """Context manager entry."""
         return self

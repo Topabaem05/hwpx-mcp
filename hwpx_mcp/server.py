@@ -384,6 +384,90 @@ def register_windows_tools(mcp) -> None:
         # ============================================================
 
         @mcp.tool()
+        def hwp_setup_columns(
+            count: int = 1, same_size: bool = True, gap_mm: float = 10.0
+        ) -> dict:
+            """Configure page columns (MultiColumn)."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.setup_columns(count, same_size, gap_mm)
+                return {
+                    "success": success,
+                    "message": f"Set to {count} columns" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_dutmal(
+            main_text: str, sub_text: str, position: str = "top"
+        ) -> dict:
+            """Insert Dutmal (text with comment above/below)."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_dutmal(main_text, sub_text, position)
+                return {
+                    "success": success,
+                    "message": "Dutmal inserted" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_index_mark(keyword1: str, keyword2: str = "") -> dict:
+            """Insert Index Mark."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_index_mark(keyword1, keyword2)
+                return {
+                    "success": success,
+                    "message": f"Index mark '{keyword1}' inserted"
+                    if success
+                    else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_set_page_hiding(
+            hide_header: bool = False,
+            hide_footer: bool = False,
+            hide_page_num: bool = False,
+            hide_border: bool = False,
+            hide_background: bool = False,
+        ) -> dict:
+            """Hide page elements (header, footer, etc.) for current page."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.set_page_hiding(
+                    hide_header,
+                    hide_footer,
+                    hide_page_num,
+                    hide_border,
+                    hide_background,
+                )
+                return {
+                    "success": success,
+                    "message": "Page hiding settings applied" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_auto_number(
+            num_type: str = "page", number_format: int = 0, new_number: int = 0
+        ) -> dict:
+            """Insert Auto Number (e.g., Figure 1, Table 1). Types: page, footnote, endnote, picture, table, equation."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_auto_number(
+                    num_type, number_format, new_number
+                )
+                return {
+                    "success": success,
+                    "message": f"Auto number ({num_type}) inserted"
+                    if success
+                    else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
         def hwp_run_action(action_id: str) -> dict:
             """Execute any HWP action by ID (covers 800+ actions).
 

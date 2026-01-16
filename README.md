@@ -454,6 +454,11 @@ These tools provide access to advanced HWP SDK features from `Actions.h`, `Docum
 | `hwp_insert_hyperlink` | Insert hyperlink at cursor position | Windows |
 | `hwp_table_split_cell` | Split current table cell into rows and columns | Windows |
 | `hwp_table_merge_cells` | Merge selected table cells | Windows |
+| `hwp_setup_columns` | Configure page columns (count, same size, gap) | Windows |
+| `hwp_insert_dutmal` | Insert Dutmal (text with comment above/below) | Windows |
+| `hwp_insert_index_mark` | Insert Index Mark (keyword1, keyword2) | Windows |
+| `hwp_set_page_hiding` | Hide page elements (header, footer, page num, etc.) | Windows |
+| `hwp_insert_auto_number` | Insert Auto Number (Page, Figure, Table, etc.) | Windows |
 
 ## Usage Examples
 

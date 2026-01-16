@@ -454,6 +454,11 @@ VS Code `settings.json`에 추가:
 | `hwp_insert_hyperlink` | 커서 위치에 하이퍼링크 삽입 | Windows |
 | `hwp_table_split_cell` | 현재 셀을 행/열로 나누기 | Windows |
 | `hwp_table_merge_cells` | 선택한 셀 합치기 | Windows |
+| `hwp_setup_columns` | 다단 설정 (단 개수, 너비 동일, 간격) | Windows |
+| `hwp_insert_dutmal` | 덧말 넣기 (본말, 덧말, 위치) | Windows |
+| `hwp_insert_index_mark` | 찾아보기 표시 넣기 (키워드1, 키워드2) | Windows |
+| `hwp_set_page_hiding` | 현재 쪽 감추기 (머리말, 꼬리말, 쪽 번호 등) | Windows |
+| `hwp_insert_auto_number` | 자동 번호 넣기 (쪽, 그림, 표, 수식 등) | Windows |
 
 ## 사용 예시
 

@@ -643,6 +643,65 @@ hwp_table_merge_cells()
 hwp_save_as(path="advanced_document.hwp")
 ```
 
+### Advanced Automation Scenario
+
+This example demonstrates how to combine multiple features to create a structured report.
+
+```python
+hwp_connect()
+hwp_create()
+
+# 1. Setup Page
+hwp_page_setup(paper_type="a4", orientation="portrait", top_margin_mm=20)
+
+# 2. Add Title with Bookmark
+hwp_set_font(font_name="Malgun Gothic", size=24, bold=True)
+hwp_insert_text("Monthly Report\n")
+hwp_insert_bookmark(name="top")  # Bookmark for navigation
+hwp_insert_text("\n")
+
+# 3. Add Summary Section
+hwp_set_font(font_name="Malgun Gothic", size=14, bold=True)
+hwp_insert_text("1. Summary\n")
+hwp_set_font(font_name="Malgun Gothic", size=11, bold=False)
+hwp_insert_text("This report summarizes the key performance indicators.\n")
+hwp_insert_text("For more details, visit our ")
+hwp_insert_hyperlink(url="https://dashboard.example.com", display_text="Dashboard")
+hwp_insert_text(".\n\n")
+
+# 4. Create Data Table
+hwp_set_font(font_name="Malgun Gothic", size=14, bold=True)
+hwp_insert_text("2. Data Table\n")
+hwp_create_table(rows=4, cols=3)
+
+# Header
+hwp_set_cell_text(row=0, col=0, text="Metric")
+hwp_set_cell_text(row=0, col=1, text="Target")
+hwp_set_cell_text(row=0, col=2, text="Actual")
+
+# Format Header (Yellow background)
+# Note: Requires navigating to each cell
+hwp_goto_cell("A1")
+hwp_table_format_cell(fill_color=0xFFFF00)
+hwp_goto_cell("B1")
+hwp_table_format_cell(fill_color=0xFFFF00)
+hwp_goto_cell("C1")
+hwp_table_format_cell(fill_color=0xFFFF00)
+
+# 5. Split a cell for detailed notes
+hwp_move_to(move_id="MoveDocEnd")
+hwp_insert_text("\n\nNotes:\n")
+hwp_create_table(rows=1, cols=1)
+hwp_table_split_cell(rows=2, cols=1)  # Split single cell into two rows
+hwp_set_cell_text(row=0, col=0, text="Note 1: Market conditions stable.")
+hwp_set_cell_text(row=1, col=0, text="Note 2: Q3 projections updated.")
+
+# 6. Add Footer
+hwp_insert_header_footer(header_or_footer="footer", content="Confidential - Internal Use Only")
+
+hwp_save_as("monthly_report.hwp")
+```
+
 ## Platform Differences
 
 | Feature | Windows (COM) | macOS/Linux (python-hwpx) |

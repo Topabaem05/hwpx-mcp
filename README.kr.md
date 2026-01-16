@@ -643,6 +643,65 @@ hwp_table_merge_cells()
 hwp_save_as(path="advanced_document.hwp")
 ```
 
+### 고급 자동화 시나리오
+
+여러 기능을 결합하여 구조화된 보고서를 생성하는 예제입니다.
+
+```python
+hwp_connect()
+hwp_create()
+
+# 1. 페이지 설정
+hwp_page_setup(paper_type="a4", orientation="portrait", top_margin_mm=20)
+
+# 2. 제목 추가 및 책갈피 설정
+hwp_set_font(font_name="맑은 고딕", size=24, bold=True)
+hwp_insert_text("월간 보고서\n")
+hwp_insert_bookmark(name="top")  # 탐색용 책갈피
+hwp_insert_text("\n")
+
+# 3. 요약 섹션 추가
+hwp_set_font(font_name="맑은 고딕", size=14, bold=True)
+hwp_insert_text("1. 요약\n")
+hwp_set_font(font_name="맑은 고딕", size=11, bold=False)
+hwp_insert_text("이 보고서는 주요 성과 지표를 요약합니다.\n")
+hwp_insert_text("자세한 내용은 ")
+hwp_insert_hyperlink(url="https://dashboard.example.com", display_text="대시보드")
+hwp_insert_text("를 참조하세요.\n\n")
+
+# 4. 데이터 표 생성
+hwp_set_font(font_name="맑은 고딕", size=14, bold=True)
+hwp_insert_text("2. 데이터 표\n")
+hwp_create_table(rows=4, cols=3)
+
+# 헤더 작성
+hwp_set_cell_text(row=0, col=0, text="지표")
+hwp_set_cell_text(row=0, col=1, text="목표")
+hwp_set_cell_text(row=0, col=2, text="실적")
+
+# 헤더 서식 (노란색 배경)
+# 참고: 각 셀로 이동 필요
+hwp_goto_cell("A1")
+hwp_table_format_cell(fill_color=0xFFFF00)
+hwp_goto_cell("B1")
+hwp_table_format_cell(fill_color=0xFFFF00)
+hwp_goto_cell("C1")
+hwp_table_format_cell(fill_color=0xFFFF00)
+
+# 5. 셀 나누기를 통한 상세 메모
+hwp_move_to(move_id="MoveDocEnd")
+hwp_insert_text("\n\n비고:\n")
+hwp_create_table(rows=1, cols=1)
+hwp_table_split_cell(rows=2, cols=1)  # 셀을 2행으로 나누기
+hwp_set_cell_text(row=0, col=0, text="비고 1: 시장 상황 안정적.")
+hwp_set_cell_text(row=1, col=0, text="비고 2: 3분기 전망 업데이트됨.")
+
+# 6. 꼬리말 추가
+hwp_insert_header_footer(header_or_footer="footer", content="대외비 - 사내 열람용")
+
+hwp_save_as("monthly_report.hwp")
+```
+
 ## 플랫폼별 차이점
 
 | 기능 | Windows (COM) | macOS/Linux (python-hwpx) |

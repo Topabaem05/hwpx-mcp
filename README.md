@@ -319,54 +319,25 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 
 ### 4. Restart your MCP client and start using HWP tools!
 
-## Available Tools
+## Tool Reference
 
-### System & Connection
-
+### 1. Document Management
 | Tool | Description | Platform |
 |------|-------------|----------|
 | `hwp_connect` | Connect to HWP controller (auto-selects Windows COM or cross-platform) | All |
-| `hwp_disconnect` | Disconnect from HWP controller and release resources | All |
-| `hwp_platform_info` | Get current platform information and available HWP capabilities | All |
-| `hwp_capabilities` | Get the full capability matrix showing what's supported | All |
-
-### Document Lifecycle
-
-| Tool | Description | Platform |
-|------|-------------|----------|
 | `hwp_create` | Create a new HWP document | All |
 | `hwp_open` | Open an existing HWP/HWPX document | All |
 | `hwp_save` | Save the current document | All |
 | `hwp_save_as` | Save document in specified format (hwp, hwpx, pdf) | All |
 | `hwp_close` | Close the current document | All |
+| `hwp_disconnect` | Disconnect from HWP controller | All |
+| `hwp_set_edit_mode` | Set document mode (edit, readonly, form) | Windows |
 
-### Text & Editing
-
+### 2. Text & Formatting
 | Tool | Description | Platform |
 |------|-------------|----------|
 | `hwp_insert_text` | Insert text at current cursor position | All |
 | `hwp_get_text` | Get all text from the current document | All |
-| `hwp_find` | Find text in the document | All |
-| `hwp_find_replace` | Find and replace text (1 occurrence) | Windows |
-| `hwp_find_replace_all` | Find and replace all occurrences | Windows |
-| `hwp_find_advanced` | Advanced find with regex support | Windows |
-| `hwp_find_replace_advanced` | Advanced find/replace with regex | Windows |
-
-### Table Operations
-
-| Tool | Description | Platform |
-|------|-------------|----------|
-| `hwp_create_table` | Create a table with specified rows and columns | All |
-| `hwp_set_cell_text` | Set text in a specific cell (row, col) | All |
-| `hwp_get_cell_text` | Get text from a specific cell | All |
-| `hwp_goto_cell` | Go to a specific cell address (e.g., 'A1') | Windows |
-| `hwp_get_cell_addr` | Get current cell address (e.g., 'A1') | Windows |
-| `hwp_adjust_cellwidth` | Adjust column widths (ratio mode supported) | Windows |
-
-### Formatting
-
-| Tool | Description | Platform |
-|------|-------------|----------|
 | `hwp_set_font` | Set font name and size | All |
 | `hwp_set_charshape` | Set character shape (bold, italic, underline, color) | Windows |
 | `hwp_get_charshape` | Get current character shape info | Windows |
@@ -375,90 +346,90 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 | `hwp_toggle_italic` | Toggle italic formatting | Windows |
 | `hwp_toggle_underline` | Toggle underline formatting | Windows |
 | `hwp_toggle_strikethrough` | Toggle strikethrough formatting | Windows |
+| `hwp_insert_dutmal` | Insert Dutmal (text with comment above/below) | Windows |
 
-### Charts
-
+### 3. Tables
 | Tool | Description | Platform |
 |------|-------------|----------|
-| `hwp_create_chart` | Create a chart with data | All |
+| `hwp_create_table` | Create a table with specified rows and columns | All |
+| `hwp_set_cell_text` | Set text in a specific cell (row, col) | All |
+| `hwp_get_cell_text` | Get text from a specific cell | All |
+| `hwp_table_format_cell` | Format table cells (border type/width, fill color) | Windows |
+| `hwp_table_split_cell` | Split current table cell into rows and columns | Windows |
+| `hwp_table_merge_cells` | Merge selected table cells | Windows |
+| `hwp_goto_cell` | Go to a specific cell address (e.g., 'A1') | Windows |
+| `hwp_get_cell_addr` | Get current cell address (e.g., 'A1') | Windows |
+| `hwp_adjust_cellwidth` | Adjust column widths (ratio mode supported) | Windows |
 
-### Equations
-
+### 4. Page & Layout
 | Tool | Description | Platform |
 |------|-------------|----------|
-| `hwp_create_equation` | Create a mathematical equation | All |
-
-### Templates
-
-| Tool | Description | Platform |
-|------|-------------|----------|
-| `hwp_create_from_template` | Create document from template file | All |
-| `hwp_fill_template` | Fill template fields with data | All |
-| `hwp_list_templates` | List all available HWPX templates with descriptions | All |
-| `hwp_recommend_template` | Recommend templates based on user requirements | All |
-| `hwp_use_template` | Clone a template and open the copy for editing | All |
-| `hwp_get_template_info` | Get detailed information about a specific template | All |
-
-### Fields (Click-Here Fields)
-
-| Tool | Description | Platform |
-|------|-------------|----------|
-| `hwp_get_field_list` | Get list of all field names | Windows |
-| `hwp_put_field_text` | Set text in a field by name | Windows |
-| `hwp_get_field_text` | Get text from a field | Windows |
-| `hwp_field_exists` | Check if a field exists | Windows |
-| `hwp_create_field` | Create a new field | Windows |
-
-### Page & Navigation
-
-| Tool | Description | Platform |
-|------|-------------|----------|
+| `hwp_page_setup` | Set page layout (margins, orientation, paper size) | Windows |
+| `hwp_setup_columns` | Configure page columns (count, same size, gap) | Windows |
+| `hwp_insert_page_number` | Insert page numbering with position/format | Windows |
+| `hwp_insert_header_footer` | Insert header or footer with text content | Windows |
+| `hwp_set_page_hiding` | Hide page elements (header, footer, page num, etc.) | Windows |
+| `hwp_break_page` | Insert a page break | Windows |
+| `hwp_break_section` | Insert a section break | Windows |
 | `hwp_get_page_count` | Get total page count | All |
 | `hwp_goto_page` | Go to specific page (0-based) | All |
-| `hwp_move_to_start` | Move cursor to document start | Windows |
-| `hwp_move_to_end` | Move cursor to document end | Windows |
-| `hwp_get_page_text` | Get text from a specific page | Windows |
 
-### Utility Tools
-
+### 5. Navigation & Selection
 | Tool | Description | Platform |
 |------|-------------|----------|
-| `hwp_head_type` | Convert heading type string to HWP integer value | All |
-| `hwp_line_type` | Convert line type string to HWP integer value | All |
-| `hwp_line_width` | Convert line width string to HWP integer value | All |
-| `hwp_number_format` | Convert number format string to HWP integer | All |
+| `hwp_move_to` | Precise cursor movement (37+ targets: Main, CurList, Cells, etc.) | Windows |
+| `hwp_select_range` | Select text range by paragraph and position indices | Windows |
+| `hwp_insert_bookmark` | Insert bookmark at cursor position | Windows |
+| `hwp_move_to_start` | Move cursor to document start | Windows |
+| `hwp_move_to_end` | Move cursor to document end | Windows |
+| `hwp_find` | Find text in the document | All |
+| `hwp_find_replace` | Find and replace text (1 occurrence) | Windows |
+| `hwp_find_replace_all` | Find and replace all occurrences | Windows |
+| `hwp_find_advanced` | Advanced find with regex support | Windows |
+
+### 6. Objects & Inserts
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_insert_picture` | Insert an image at current cursor position | All |
+| `hwp_insert_background` | Insert background image (tile, center, stretch) | Windows |
+| `hwp_insert_hyperlink` | Insert hyperlink at cursor position | Windows |
+| `hwp_insert_note` | Insert footnote or endnote | Windows |
+| `hwp_insert_index_mark` | Insert Index Mark (keyword1, keyword2) | Windows |
+| `hwp_insert_auto_number` | Insert Auto Number (Page, Figure, Table, etc.) | Windows |
+| `hwp_create_chart` | Create a chart with data | All |
+| `hwp_create_equation` | Create a mathematical equation | All |
+
+### 7. Fields & Metadata
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_create_field` | Create a new field (Click-Here) | Windows |
+| `hwp_put_field_text` | Set text in a field by name | Windows |
+| `hwp_get_field_text` | Get text from a field | Windows |
+| `hwp_get_field_list` | Get list of all field names | Windows |
+| `hwp_field_exists` | Check if a field exists | Windows |
+| `hwp_manage_metatags` | Manage document metatags (hidden metadata) | Windows |
+
+### 8. Templates
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_list_templates` | List all available HWPX templates | All |
+| `hwp_create_from_template` | Create document from template file | All |
+| `hwp_fill_template` | Fill template fields with data | All |
+| `hwp_recommend_template` | Recommend templates based on requirements | All |
+| `hwp_use_template` | Clone a template and open for editing | All |
+| `hwp_get_template_info` | Get detailed information about a template | All |
+
+### 9. Advanced & Utility
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_run_action` | Execute any of 800+ HWP actions by ID | Windows |
+| `hwp_platform_info` | Get current platform information | All |
+| `hwp_capabilities` | Get full capability matrix | All |
 | `hwp_convert_unit` | Convert between HwpUnit and millimeters | All |
 | `hwp_get_head_types` | Get available heading types | All |
 | `hwp_get_line_types` | Get available line types | All |
 | `hwp_get_line_widths` | Get available line widths | All |
 | `hwp_get_number_formats` | Get available number formats | All |
-
-### HWP SDK Extended Features (Windows)
-
-These tools provide access to advanced HWP SDK features from `Actions.h`, `Document.h`, and other SDK headers.
-
-| Tool | Description | Platform |
-|------|-------------|----------|
-| `hwp_run_action` | Execute any of 800+ HWP actions by ID (Copy, Paste, MoveDocEnd, etc.) | Windows |
-| `hwp_page_setup` | Set page layout (margins, orientation, paper size: A4, Letter, etc.) | Windows |
-| `hwp_insert_page_number` | Insert page numbering with position and format options | Windows |
-| `hwp_table_format_cell` | Format table cells (border type/width, fill color) | Windows |
-| `hwp_move_to` | Move cursor to specific position (37+ targets: Main, CurList, TopOfFile, Cells, etc.) | Windows |
-| `hwp_select_range` | Select text range by paragraph and position indices | Windows |
-| `hwp_insert_header_footer` | Insert header or footer with text content | Windows |
-| `hwp_insert_note` | Insert footnote or endnote | Windows |
-| `hwp_set_edit_mode` | Set document mode (edit, readonly, form) | Windows |
-| `hwp_manage_metatags` | Manage document metatags (hidden metadata) | Windows |
-| `hwp_insert_background` | Insert background image (tile, center, stretch, fit) | Windows |
-| `hwp_insert_bookmark` | Insert bookmark at cursor position | Windows |
-| `hwp_insert_hyperlink` | Insert hyperlink at cursor position | Windows |
-| `hwp_table_split_cell` | Split current table cell into rows and columns | Windows |
-| `hwp_table_merge_cells` | Merge selected table cells | Windows |
-| `hwp_setup_columns` | Configure page columns (count, same size, gap) | Windows |
-| `hwp_insert_dutmal` | Insert Dutmal (text with comment above/below) | Windows |
-| `hwp_insert_index_mark` | Insert Index Mark (keyword1, keyword2) | Windows |
-| `hwp_set_page_hiding` | Hide page elements (header, footer, page num, etc.) | Windows |
-| `hwp_insert_auto_number` | Insert Auto Number (Page, Figure, Table, etc.) | Windows |
 
 ## Usage Examples
 

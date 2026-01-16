@@ -319,146 +319,117 @@ VS Code `settings.json`에 추가:
 
 ### 4. MCP 클라이언트를 재시작하고 HWP 도구를 사용하세요!
 
-## 사용 가능한 도구
+## 도구 참고서 (Tool Reference)
 
-### 시스템 및 연결
-
+### 1. 문서 관리 (Document Management)
 | 도구 | 설명 | 플랫폼 |
 |------|------|--------|
-| `hwp_connect` | HWP 컨트롤러에 연결 (Windows COM 또는 크로스 플랫폼 자동 선택) | 전체 |
-| `hwp_disconnect` | HWP 컨트롤러 연결 해제 및 리소스 정리 | 전체 |
-| `hwp_platform_info` | 현재 플랫폼 정보 및 사용 가능한 HWP 기능 확인 | 전체 |
-| `hwp_capabilities` | 지원되는 전체 기능 매트릭스 확인 | 전체 |
-
-### 문서 생명주기
-
-| 도구 | 설명 | 플랫폼 |
-|------|------|--------|
+| `hwp_connect` | HWP 컨트롤러 연결 (Windows COM 또는 크로스 플랫폼 자동 선택) | 전체 |
 | `hwp_create` | 새 HWP 문서 생성 | 전체 |
 | `hwp_open` | 기존 HWP/HWPX 문서 열기 | 전체 |
 | `hwp_save` | 현재 문서 저장 | 전체 |
-| `hwp_save_as` | 지정된 형식(hwp, hwpx, pdf)으로 문서 저장 | 전체 |
+| `hwp_save_as` | 문서를 지정된 형식(hwp, hwpx, pdf)으로 저장 | 전체 |
 | `hwp_close` | 현재 문서 닫기 | 전체 |
+| `hwp_disconnect` | HWP 컨트롤러 연결 해제 및 리소스 해제 | 전체 |
+| `hwp_set_edit_mode` | 문서 모드 설정 (편집, 읽기 전용, 양식) | Windows |
 
-### 텍스트 및 편집
-
+### 2. 텍스트 및 서식 (Text & Formatting)
 | 도구 | 설명 | 플랫폼 |
 |------|------|--------|
 | `hwp_insert_text` | 현재 커서 위치에 텍스트 삽입 | 전체 |
-| `hwp_get_text` | 현재 문서에서 전체 텍스트 가져오기 | 전체 |
-| `hwp_find` | 문서에서 텍스트 찾기 | 전체 |
-| `hwp_find_replace` | 텍스트 찾아 바꾸기 (1회) | Windows |
-| `hwp_find_replace_all` | 모든 occurrence 찾아 바꾸기 | Windows |
-| `hwp_find_advanced` | 정규식 지원 고급 검색 | Windows |
-| `hwp_find_replace_advanced` | 정규식 지원 고급 찾아 바꾸기 | Windows |
-
-### 표 조작
-
-| 도구 | 설명 | 플랫폼 |
-|------|------|--------|
-| `hwp_create_table` | 지정된 행과 열로 표 생성 | 전체 |
-| `hwp_set_cell_text` | 특정 셀(행, 열)에 텍스트 설정 | 전체 |
-| `hwp_get_cell_text` | 특정 셀에서 텍스트 가져오기 | 전체 |
-| `hwp_goto_cell` | 특정 셀 주소로 이동 (예: 'A1') | Windows |
-| `hwp_get_cell_addr` | 현재 셀 주소 가져오기 (예: 'A1') | Windows |
-| `hwp_adjust_cellwidth` | 열 너비 조정 (비율 모드 지원) | Windows |
-
-### 서식 지정
-
-| 도구 | 설명 | 플랫폼 |
-|------|------|--------|
+| `hwp_get_text` | 현재 문서의 모든 텍스트 가져오기 | 전체 |
 | `hwp_set_font` | 글꼴 이름 및 크기 설정 | 전체 |
-| `hwp_set_charshape` | 문자 모양 설정 (진하게, 기울임, 밑줄, 색상) | Windows |
-| `hwp_get_charshape` | 현재 문자 모양 정보 가져오기 | Windows |
+| `hwp_set_charshape` | 글자 모양 설정 (진하게, 기울임, 밑줄, 색상) | Windows |
+| `hwp_get_charshape` | 현재 글자 모양 정보 가져오기 | Windows |
 | `hwp_set_parashape` | 문단 모양 설정 (정렬, 줄 간격) | Windows |
 | `hwp_toggle_bold` | 진하게 서식 토글 | Windows |
 | `hwp_toggle_italic` | 기울임 서식 토글 | Windows |
 | `hwp_toggle_underline` | 밑줄 서식 토글 | Windows |
 | `hwp_toggle_strikethrough` | 취소선 서식 토글 | Windows |
+| `hwp_insert_dutmal` | 덧말 넣기 (본말, 덧말, 위치) | Windows |
 
-### 차트
-
+### 3. 표 작업 (Tables)
 | 도구 | 설명 | 플랫폼 |
 |------|------|--------|
+| `hwp_create_table` | 지정된 행과 열로 표 생성 | 전체 |
+| `hwp_set_cell_text` | 특정 셀(행, 열)에 텍스트 설정 | 전체 |
+| `hwp_get_cell_text` | 특정 셀의 텍스트 가져오기 | 전체 |
+| `hwp_table_format_cell` | 표 셀 서식 지정 (테두리 종류/두께, 채우기 색상) | Windows |
+| `hwp_table_split_cell` | 현재 셀을 행/열로 나누기 | Windows |
+| `hwp_table_merge_cells` | 선택한 셀 합치기 | Windows |
+| `hwp_goto_cell` | 특정 셀 주소(예: 'A1')로 이동 | Windows |
+| `hwp_get_cell_addr` | 현재 셀 주소 가져오기 (예: 'A1') | Windows |
+| `hwp_adjust_cellwidth` | 열 너비 조정 (비율 모드 지원) | Windows |
+
+### 4. 페이지 및 레이아웃 (Page & Layout)
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_page_setup` | 페이지 레이아웃 설정 (여백, 방향, 용지 크기) | Windows |
+| `hwp_setup_columns` | 다단 설정 (단 개수, 너비 동일, 간격) | Windows |
+| `hwp_insert_page_number` | 위치 및 형식 옵션으로 쪽 번호 삽입 | Windows |
+| `hwp_insert_header_footer` | 텍스트 내용으로 머리말 또는 꼬리말 삽입 | Windows |
+| `hwp_set_page_hiding` | 현재 쪽 감추기 (머리말, 꼬리말, 쪽 번호 등) | Windows |
+| `hwp_break_page` | 쪽 나누기 삽입 | Windows |
+| `hwp_break_section` | 구역 나누기 삽입 | Windows |
+| `hwp_get_page_count` | 전체 페이지 수 가져오기 | 전체 |
+| `hwp_goto_page` | 특정 페이지(0부터 시작)로 이동 | 전체 |
+
+### 5. 탐색 및 선택 (Navigation & Selection)
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_move_to` | 정밀 커서 이동 (37개 이상 타겟: 문서 시작, 문단, 셀 등) | Windows |
+| `hwp_select_range` | 문단 및 위치 인덱스로 텍스트 범위 선택 | Windows |
+| `hwp_insert_bookmark` | 커서 위치에 책갈피 삽입 | Windows |
+| `hwp_move_to_start` | 문서 시작으로 커서 이동 | Windows |
+| `hwp_move_to_end` | 문서 끝으로 커서 이동 | Windows |
+| `hwp_find` | 문서에서 텍스트 찾기 | 전체 |
+| `hwp_find_replace` | 텍스트 찾기 및 바꾸기 (1회) | Windows |
+| `hwp_find_replace_all` | 텍스트 모두 찾기 및 바꾸기 | Windows |
+| `hwp_find_advanced` | 정규식 지원 고급 찾기 | Windows |
+
+### 6. 개체 및 삽입 (Objects & Inserts)
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_insert_picture` | 현재 커서 위치에 이미지 삽입 | 전체 |
+| `hwp_insert_background` | 배경 이미지 삽입 (바둑판식, 가운데, 늘이기) | Windows |
+| `hwp_insert_hyperlink` | 커서 위치에 하이퍼링크 삽입 | Windows |
+| `hwp_insert_note` | 각주 또는 미주 삽입 | Windows |
+| `hwp_insert_index_mark` | 찾아보기 표시 넣기 | Windows |
+| `hwp_insert_auto_number` | 자동 번호 넣기 (쪽, 그림, 표 등) | Windows |
 | `hwp_create_chart` | 데이터로 차트 생성 | 전체 |
+| `hwp_create_equation` | 수학 수식 생성 | 전체 |
 
-### 수식
-
+### 7. 필드 및 메타데이터 (Fields & Metadata)
 | 도구 | 설명 | 플랫폼 |
 |------|------|--------|
-| `hwp_create_equation` | 수학 공식 생성 | 전체 |
-
-### 템플릿
-
-| 도구 | 설명 | 플랫폼 |
-|------|------|--------|
-| `hwp_create_from_template` | 템플릿 파일에서 문서 생성 | 전체 |
-| `hwp_fill_template` | 템플릿 필드에 데이터 채우기 | 전체 |
-| `hwp_list_templates` | 사용 가능한 모든 HWPX 템플릿 목록 조회 | 전체 |
-| `hwp_recommend_template` | 사용자 요구에 맞는 템플릿 추천 | 전체 |
-| `hwp_use_template` | 템플릿 복제 후 복제본 열기 | 전체 |
-| `hwp_get_template_info` | 특정 템플릿 상세 정보 조회 | 전체 |
-
-### 필드 (누름틀)
-
-| 도구 | 설명 | 플랫폼 |
-|------|------|--------|
-| `hwp_get_field_list` | 모든 필드 이름 목록 가져오기 | Windows |
+| `hwp_create_field` | 새 필드(누름틀) 생성 | Windows |
 | `hwp_put_field_text` | 이름으로 필드에 텍스트 설정 | Windows |
 | `hwp_get_field_text` | 필드에서 텍스트 가져오기 | Windows |
-| `hwp_field_exists` | 필드가 존재하는지 확인 | Windows |
-| `hwp_create_field` | 새 필드 생성 | Windows |
+| `hwp_get_field_list` | 모든 필드 이름 목록 가져오기 | Windows |
+| `hwp_field_exists` | 필드 존재 여부 확인 | Windows |
+| `hwp_manage_metatags` | 문서 메타태그 관리 (숨겨진 메타데이터) | Windows |
 
-### 페이지 및 탐색
-
+### 8. 템플릿 (Templates)
 | 도구 | 설명 | 플랫폼 |
 |------|------|--------|
-| `hwp_get_page_count` | 전체 페이지 수 가져오기 | 전체 |
-| `hwp_goto_page` | 특정 페이지로 이동 (0 기반) | 전체 |
-| `hwp_move_to_start` | 커서를 문서 시작 위치로 이동 | Windows |
-| `hwp_move_to_end` | 커서를 문서 끝 위치로 이동 | Windows |
-| `hwp_get_page_text` | 특정 페이지에서 텍스트 가져오기 | Windows |
+| `hwp_list_templates` | 사용 가능한 모든 HWPX 템플릿 나열 | 전체 |
+| `hwp_create_from_template` | 템플릿 파일에서 문서 생성 | 전체 |
+| `hwp_fill_template` | 데이터로 템플릿 필드 채우기 | 전체 |
+| `hwp_recommend_template` | 사용자 요구사항에 기반한 템플릿 추천 | 전체 |
+| `hwp_use_template` | 템플릿 복제 및 편집을 위해 열기 | 전체 |
+| `hwp_get_template_info` | 특정 템플릿에 대한 상세 정보 가져오기 | 전체 |
 
-### 유틸리티 도구
-
+### 9. 고급 및 유틸리티 (Advanced & Utility)
 | 도구 | 설명 | 플랫폼 |
 |------|------|--------|
-| `hwp_head_type` | 제목 유형 문자열을 HWP 정수 값으로 변환 | 전체 |
-| `hwp_line_type` | 선 유형 문자열을 HWP 정수 값으로 변환 | 전체 |
-| `hwp_line_width` | 선 두께 문자열을 HWP 정수 값으로 변환 | 전체 |
-| `hwp_number_format` | 숫자 형식 문자열을 HWP 정수로 변환 | 전체 |
-| `hwp_convert_unit` | HwpUnit과 mm 간 변환 | 전체 |
+| `hwp_run_action` | 800개 이상의 HWP 액션 ID 실행 | Windows |
+| `hwp_platform_info` | 현재 플랫폼 정보 가져오기 | 전체 |
+| `hwp_capabilities` | 전체 기능 지원표 가져오기 | 전체 |
+| `hwp_convert_unit` | HwpUnit과 밀리미터 간 변환 | 전체 |
 | `hwp_get_head_types` | 사용 가능한 제목 유형 가져오기 | 전체 |
 | `hwp_get_line_types` | 사용 가능한 선 유형 가져오기 | 전체 |
 | `hwp_get_line_widths` | 사용 가능한 선 두께 가져오기 | 전체 |
 | `hwp_get_number_formats` | 사용 가능한 숫자 형식 가져오기 | 전체 |
-
-### HWP SDK 확장 기능 (Windows)
-
-`Actions.h`, `Document.h` 등 SDK 헤더의 고급 HWP SDK 기능에 접근할 수 있는 도구들입니다.
-
-| 도구 | 설명 | 플랫폼 |
-|------|------|--------|
-| `hwp_run_action` | 800개 이상의 HWP 액션 ID 실행 (복사, 붙여넣기, 문서 끝으로 이동 등) | Windows |
-| `hwp_page_setup` | 페이지 레이아웃 설정 (여백, 방향, 용지 크기: A4, Letter 등) | Windows |
-| `hwp_insert_page_number` | 위치 및 형식 옵션으로 쪽 번호 삽입 | Windows |
-| `hwp_table_format_cell` | 표 셀 서식 지정 (테두리 종류/두께, 채우기 색상) | Windows |
-| `hwp_move_to` | 특정 위치로 커서 이동 (37개 이상 타겟: 문서 시작, 문단, 셀 이동 등) | Windows |
-| `hwp_select_range` | 문단 및 위치 인덱스로 텍스트 범위 선택 | Windows |
-| `hwp_insert_header_footer` | 텍스트 내용으로 머리말 또는 꼬리말 삽입 | Windows |
-| `hwp_insert_note` | 각주 또는 미주 삽입 | Windows |
-| `hwp_set_edit_mode` | 문서 모드 설정 (편집, 읽기 전용, 양식) | Windows |
-| `hwp_manage_metatags` | 문서 메타태그 관리 (숨겨진 메타데이터) | Windows |
-| `hwp_insert_background` | 배경 이미지 삽입 (바둑판식, 가운데, 늘이기, 맞춤) | Windows |
-| `hwp_insert_bookmark` | 커서 위치에 책갈피 삽입 | Windows |
-| `hwp_insert_hyperlink` | 커서 위치에 하이퍼링크 삽입 | Windows |
-| `hwp_table_split_cell` | 현재 셀을 행/열로 나누기 | Windows |
-| `hwp_table_merge_cells` | 선택한 셀 합치기 | Windows |
-| `hwp_setup_columns` | 다단 설정 (단 개수, 너비 동일, 간격) | Windows |
-| `hwp_insert_dutmal` | 덧말 넣기 (본말, 덧말, 위치) | Windows |
-| `hwp_insert_index_mark` | 찾아보기 표시 넣기 (키워드1, 키워드2) | Windows |
-| `hwp_set_page_hiding` | 현재 쪽 감추기 (머리말, 꼬리말, 쪽 번호 등) | Windows |
-| `hwp_insert_auto_number` | 자동 번호 넣기 (쪽, 그림, 표, 수식 등) | Windows |
 
 ## 사용 예시
 

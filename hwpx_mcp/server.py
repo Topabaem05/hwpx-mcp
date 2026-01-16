@@ -329,7 +329,213 @@ def register_windows_tools(mcp) -> None:
                 }
             return {"success": False, "message": "No document open"}
 
-        logger.info("Windows-specific tools registered")
+        # ============================================================
+        # HWP SDK Extended Tools (from Actions.h, Document.h, etc.)
+        # ============================================================
+
+        @mcp.tool()
+        def hwp_run_action(action_id: str) -> dict:
+            """Execute any HWP action by ID (covers 800+ actions).
+
+            Categories: Edit (Copy, Paste), View (ViewZoom), Formatting (CharShapeBold),
+            Navigation (MoveDocEnd), Table (TableDeleteRow), etc.
+            """
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.run_action(action_id)
+                return {
+                    "success": success,
+                    "message": f"Action '{action_id}' executed"
+                    if success
+                    else f"Action '{action_id}' failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_page_setup(
+            width_mm: float = 210,
+            height_mm: float = 297,
+            top_margin_mm: float = 20,
+            bottom_margin_mm: float = 20,
+            left_margin_mm: float = 20,
+            right_margin_mm: float = 20,
+            orientation: str = "portrait",
+            paper_type: str = "a4",
+        ) -> dict:
+            """Set page layout (margins, size, orientation)."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.page_setup(
+                    width_mm,
+                    height_mm,
+                    top_margin_mm,
+                    bottom_margin_mm,
+                    left_margin_mm,
+                    right_margin_mm,
+                    orientation,
+                    paper_type,
+                )
+                return {
+                    "success": success,
+                    "message": f"Page setup applied ({paper_type}, {orientation})"
+                    if success
+                    else "Failed to apply page setup",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_page_number(
+            position: int = 4,
+            number_format: int = 0,
+            starting_number: int = 1,
+            side_char: str = "",
+        ) -> dict:
+            """Insert page numbering. Positions: 4=BottomCenter, 2=TopCenter, etc."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_page_number(
+                    position, number_format, starting_number, side_char
+                )
+                return {
+                    "success": success,
+                    "message": "Page numbering inserted" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_table_format_cell(
+            fill_color: int = None,
+            border_type: int = 1,
+            border_width: int = 1,
+        ) -> dict:
+            """Format selected table cells (border and fill color)."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.format_cell(fill_color, border_type, border_width)
+                return {
+                    "success": success,
+                    "message": "Cell formatting applied" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_move_to(
+            move_id: str = "MoveDocEnd",
+            para: int = 0,
+            pos: int = 0,
+        ) -> dict:
+            """Move cursor to position. Options: MoveDocBegin, MoveDocEnd, MoveParaBegin, etc."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.move_to_pos(move_id, para, pos)
+                return {
+                    "success": success,
+                    "message": f"Moved to {move_id}" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_select_range(
+            start_para: int,
+            start_pos: int,
+            end_para: int,
+            end_pos: int,
+        ) -> dict:
+            """Select text range by paragraph and position indices."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.select_range(
+                    start_para, start_pos, end_para, end_pos
+                )
+                return {
+                    "success": success,
+                    "message": "Range selected" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_header_footer(
+            header_or_footer: str = "header",
+            content: str = "",
+        ) -> dict:
+            """Insert header or footer with text content."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_header_footer(header_or_footer, content)
+                return {
+                    "success": success,
+                    "message": f"{header_or_footer.title()} inserted"
+                    if success
+                    else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_note(
+            note_type: str = "footnote",
+            content: str = "",
+        ) -> dict:
+            """Insert footnote or endnote."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_note(note_type, content)
+                return {
+                    "success": success,
+                    "message": f"{note_type.title()} inserted" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_set_edit_mode(mode: str = "edit") -> dict:
+            """Set document mode: 'edit', 'readonly', or 'form'."""
+            controller = get_windows_controller()
+            if controller and controller.is_hwp_running:
+                success = controller.set_edit_mode(mode)
+                return {
+                    "success": success,
+                    "message": f"Edit mode set to '{mode}'" if success else "Failed",
+                }
+            return {"success": False, "message": "HWP not connected"}
+
+        @mcp.tool()
+        def hwp_manage_metatags(
+            action: str = "list",
+            tag_name: str = "",
+            tag_value: str = "",
+        ) -> dict:
+            """Manage document metatags. Actions: 'get', 'set', 'delete', 'list'."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                result = controller.manage_metatags(action, tag_name, tag_value)
+                if action in ("get", "list"):
+                    return {"success": True, "result": result}
+                return {
+                    "success": result,
+                    "message": f"Metatag {action} completed" if result else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        @mcp.tool()
+        def hwp_insert_background(
+            image_path: str,
+            embedded: bool = True,
+            fill_option: str = "tile",
+        ) -> dict:
+            """Insert background image. Fill options: 'tile', 'center', 'stretch', 'fit'."""
+            controller = get_windows_controller()
+            if controller and controller.is_document_open:
+                success = controller.insert_background(
+                    image_path, embedded, fill_option
+                )
+                return {
+                    "success": success,
+                    "message": "Background inserted" if success else "Failed",
+                }
+            return {"success": False, "message": "No document open"}
+
+        logger.info(
+            "Windows-specific tools registered (including SDK extended features)"
+        )
 
     except ImportError as e:
         logger.warning(f"Windows tools not available: {e}")

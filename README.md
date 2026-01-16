@@ -433,6 +433,24 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 | `hwp_get_line_widths` | Get available line widths | All |
 | `hwp_get_number_formats` | Get available number formats | All |
 
+### HWP SDK Extended Features (Windows)
+
+These tools provide access to advanced HWP SDK features from `Actions.h`, `Document.h`, and other SDK headers.
+
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_run_action` | Execute any of 800+ HWP actions by ID (Copy, Paste, MoveDocEnd, etc.) | Windows |
+| `hwp_page_setup` | Set page layout (margins, orientation, paper size: A4, Letter, etc.) | Windows |
+| `hwp_insert_page_number` | Insert page numbering with position and format options | Windows |
+| `hwp_table_format_cell` | Format table cells (border type/width, fill color) | Windows |
+| `hwp_move_to` | Move cursor to specific position (MoveDocBegin, MoveParaEnd, etc.) | Windows |
+| `hwp_select_range` | Select text range by paragraph and position indices | Windows |
+| `hwp_insert_header_footer` | Insert header or footer with text content | Windows |
+| `hwp_insert_note` | Insert footnote or endnote | Windows |
+| `hwp_set_edit_mode` | Set document mode (edit, readonly, form) | Windows |
+| `hwp_manage_metatags` | Manage document metatags (hidden metadata) | Windows |
+| `hwp_insert_background` | Insert background image (tile, center, stretch, fit) | Windows |
+
 ## Usage Examples
 
 ### Basic Document Creation
@@ -536,6 +554,80 @@ hwp_insert_text("This is the body text.")
 hwp_toggle_bold()
 ```
 
+### HWP SDK Extended Features (Windows)
+
+```python
+hwp_connect()
+hwp_create()
+
+# Execute any action from Actions.h (800+ available)
+hwp_run_action(action_id="CharShapeBold")  # Toggle bold
+hwp_run_action(action_id="ParagraphShapeAlignCenter")  # Center align
+
+# Page setup (A4, Letter, margins, orientation)
+hwp_page_setup(
+    paper_type="a4",
+    orientation="portrait",
+    top_margin_mm=25,
+    bottom_margin_mm=25,
+    left_margin_mm=30,
+    right_margin_mm=30
+)
+
+# Insert page numbering
+hwp_insert_page_number(
+    position=4,  # 4=BottomCenter
+    number_format=0,  # 0=Arabic (1, 2, 3...)
+    starting_number=1,
+    side_char="-"  # Results in "- 1 -"
+)
+
+# Format table cells (select cells first)
+hwp_table_format_cell(
+    fill_color=0xFFFF00,  # Yellow
+    border_type=1,  # Solid
+    border_width=5  # 0.5mm
+)
+
+# Precise cursor navigation
+hwp_move_to(move_id="MoveDocEnd")  # Go to document end
+hwp_move_to(move_id="MoveParaBegin")  # Go to paragraph start
+
+# Select text range
+hwp_select_range(
+    start_para=0, start_pos=0,
+    end_para=0, end_pos=10
+)
+
+# Insert header/footer
+hwp_insert_header_footer(
+    header_or_footer="header",
+    content="Company Name - Confidential"
+)
+
+# Insert footnote
+hwp_insert_note(
+    note_type="footnote",
+    content="Reference: HWP SDK Documentation"
+)
+
+# Set document mode
+hwp_set_edit_mode(mode="readonly")  # readonly, edit, form
+
+# Manage metatags (hidden metadata)
+hwp_manage_metatags(action="set", tag_name="author", tag_value="AI Assistant")
+hwp_manage_metatags(action="list")  # Get all tags
+
+# Insert background image
+hwp_insert_background(
+    image_path="background.png",
+    embedded=True,
+    fill_option="tile"  # tile, center, stretch, fit
+)
+
+hwp_save_as(path="advanced_document.hwp")
+```
+
 ## Platform Differences
 
 | Feature | Windows (COM) | macOS/Linux (python-hwpx) |
@@ -547,6 +639,7 @@ hwp_toggle_bold()
 | Equations | ✅ All features | ✅ Creation only |
 | Fields | ✅ Full support | ❌ Not supported |
 | Formatting | ✅ Full control | ✅ Basic control |
+| SDK Extended (Actions, PageSetup, etc.) | ✅ Full support | ❌ Not supported |
 
 ## Requirements
 

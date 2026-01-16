@@ -799,141 +799,6 @@ class WindowsHwpController:
             logger.error(f"Failed to insert memo: {e}")
             return False
 
-    def insert_image(
-        self, image_path: str, width: int = 0, height: int = 0, embedded: bool = True
-    ) -> bool:
-        """Insert image at cursor position.
-
-        Args:
-            image_path: Path to image file
-            width: Image width (mm), 0 for original size
-            height: Image height (mm), 0 for original size
-            embedded: Embed image in document
-
-        Returns:
-            bool: Success status
-        """
-        if not self.is_document_open:
-            return False
-
-        try:
-            abs_path = os.path.abspath(image_path)
-            if not os.path.exists(abs_path):
-                logger.error(f"Image file not found: {abs_path}")
-                return False
-
-            self.hwp.HAction.GetDefault(
-                "InsertPicture", self.hwp.HParameterSet.HInsertPicture.HSet
-            )
-            self.hwp.HParameterSet.HInsertPicture.FileName = abs_path
-            self.hwp.HParameterSet.HInsertPicture.Width = width
-            self.hwp.HParameterSet.HInsertPicture.Height = height
-            self.hwp.HParameterSet.HInsertPicture.Embed = 1 if embedded else 0
-
-            result = self.hwp.HAction.Execute(
-                "InsertPicture", self.hwp.HParameterSet.HInsertPicture.HSet
-            )
-
-            if not result:
-                logger.error("Failed to execute InsertPicture action")
-                return False
-
-            return True
-        except Exception as e:
-            logger.error(f"Failed to insert image: {e}")
-            return False
-
-    def put_field_text(self, field_list: str, text_list: str) -> bool:
-        """Put text into fields.
-
-        Args:
-            field_list: Field names separated by \x02
-            text_list: Text values separated by \x02
-
-        Returns:
-            bool: Success status
-        """
-        if not self.is_document_open:
-            return False
-
-        try:
-            self.hwp.PutFieldText(field_list, text_list)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to put field text: {e}")
-            return False
-
-    def get_field_text(self, field_list: str) -> str:
-        """Get text from fields.
-
-        Args:
-            field_list: Field names separated by \x02
-
-        Returns:
-            str: Field text values separated by \x02
-        """
-        if not self.is_document_open:
-            return ""
-
-        try:
-            return self.hwp.GetFieldText(field_list)
-        except Exception as e:
-            logger.error(f"Failed to get field text: {e}")
-            return ""
-
-    def create_page_image(
-        self,
-        output_path: str,
-        page_no: int = 0,
-        resolution: int = 96,
-        depth: int = 24,
-        fmt: str = "png",
-    ) -> bool:
-        """Create image from page.
-
-        Args:
-            output_path: Output image path
-            page_no: Page number (0-based)
-            resolution: DPI (default 96)
-            depth: Color depth (default 24)
-            fmt: Image format (bmp, gif, jpeg, png)
-
-        Returns:
-            bool: Success status
-        """
-        if not self.is_document_open:
-            return False
-
-        try:
-            abs_path = os.path.abspath(output_path)
-            return self.hwp.CreatePageImage(abs_path, page_no, resolution, depth, fmt)
-        except Exception as e:
-            logger.error(f"Failed to create page image: {e}")
-            return False
-
-    def insert_memo(
-        self, content: str, author: str = "Assistant", date_time: str = ""
-    ) -> bool:
-        """Insert memo at cursor position.
-
-        Args:
-            content: Memo content
-            author: Memo author
-            date_time: Memo date/time string
-
-        Returns:
-            bool: Success status
-        """
-        if not self.is_document_open:
-            return False
-
-        try:
-            self.hwp.InsertMemo(content, author, date_time)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to insert memo: {e}")
-            return False
-
     def insert_table(self, rows: int, cols: int) -> bool:
         """Insert table at cursor position."""
         if not self.is_document_open:
@@ -1115,6 +980,486 @@ class WindowsHwpController:
         except Exception as e:
             logger.error(f"Error creating complete document: {e}")
             return {"status": "error", "message": str(e)}
+
+    # ============================================================
+    # HWP SDK Extended Features (from Actions.h, Document.h, etc.)
+    # ============================================================
+
+    def run_action(self, action_id: str) -> bool:
+        """Execute any HWP action by ID (covers 800+ actions from Actions.h).
+
+        Common action categories:
+        - Edit: Copy, Cut, Paste, Delete, Undo, Redo, SelectAll
+        - View: ViewZoom, ViewOption*
+        - Formatting: CharShapeBold, CharShapeItalic, ParagraphShapeAlignCenter
+        - Navigation: MovePageUp, MoveLineEnd, MoveDocBegin, MoveDocEnd
+        - Table: TableDeleteRow, TableDeleteCol, TableDistributeCellWidth
+
+        Args:
+            action_id: HWP action ID string (e.g., "Copy", "MoveDocEnd")
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            result = self.hwp.HAction.Run(action_id)
+            return result if isinstance(result, bool) else True
+        except Exception as e:
+            logger.error(f"Failed to run action '{action_id}': {e}")
+            return False
+
+    def page_setup(
+        self,
+        width_mm: Optional[float] = None,
+        height_mm: Optional[float] = None,
+        top_margin_mm: Optional[float] = None,
+        bottom_margin_mm: Optional[float] = None,
+        left_margin_mm: Optional[float] = None,
+        right_margin_mm: Optional[float] = None,
+        orientation: str = "portrait",
+        paper_type: str = "custom",
+    ) -> bool:
+        """Set page layout (PageSetup action with ParameterSet).
+
+        Args:
+            width_mm: Page width in mm (default A4: 210mm)
+            height_mm: Page height in mm (default A4: 297mm)
+            top_margin_mm: Top margin in mm
+            bottom_margin_mm: Bottom margin in mm
+            left_margin_mm: Left margin in mm
+            right_margin_mm: Right margin in mm
+            orientation: 'portrait' or 'landscape'
+            paper_type: 'a4', 'letter', 'legal', 'b5', 'custom'
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            # Paper type presets (width x height in mm)
+            paper_sizes = {
+                "a4": (210, 297),
+                "letter": (216, 279),
+                "legal": (216, 356),
+                "b5": (182, 257),
+                "a3": (297, 420),
+            }
+
+            if paper_type.lower() in paper_sizes:
+                w, h = paper_sizes[paper_type.lower()]
+                width_mm = width_mm or w
+                height_mm = height_mm or h
+            else:
+                width_mm = width_mm or 210
+                height_mm = height_mm or 297
+
+            # Swap for landscape
+            if orientation.lower() == "landscape":
+                width_mm, height_mm = height_mm, width_mm
+
+            # Convert mm to HwpUnit (1mm = 283.46 HwpUnit)
+            MM_TO_HWPUNIT = 283.46
+
+            self.hwp.HAction.GetDefault(
+                "PageSetup", self.hwp.HParameterSet.HSecDef.HSet
+            )
+
+            self.hwp.HParameterSet.HSecDef.PageWidth = int(width_mm * MM_TO_HWPUNIT)
+            self.hwp.HParameterSet.HSecDef.PageHeight = int(height_mm * MM_TO_HWPUNIT)
+
+            if top_margin_mm is not None:
+                self.hwp.HParameterSet.HSecDef.TopMargin = int(
+                    top_margin_mm * MM_TO_HWPUNIT
+                )
+            if bottom_margin_mm is not None:
+                self.hwp.HParameterSet.HSecDef.BottomMargin = int(
+                    bottom_margin_mm * MM_TO_HWPUNIT
+                )
+            if left_margin_mm is not None:
+                self.hwp.HParameterSet.HSecDef.LeftMargin = int(
+                    left_margin_mm * MM_TO_HWPUNIT
+                )
+            if right_margin_mm is not None:
+                self.hwp.HParameterSet.HSecDef.RightMargin = int(
+                    right_margin_mm * MM_TO_HWPUNIT
+                )
+
+            self.hwp.HAction.Execute("PageSetup", self.hwp.HParameterSet.HSecDef.HSet)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set page setup: {e}")
+            return False
+
+    def insert_page_number(
+        self,
+        position: int = 4,
+        number_format: int = 0,
+        starting_number: int = 1,
+        side_char: str = "",
+    ) -> bool:
+        """Insert page numbering (PageNumPos action).
+
+        Args:
+            position: Position code (0=None, 1=TopLeft, 2=TopCenter, 3=TopRight,
+                     4=BottomCenter, 5=BottomLeft, 6=BottomRight, 7=OutsideTop,
+                     8=OutsideBottom, 9=InsideTop, 10=InsideBottom)
+            number_format: Format (0=Arabic, 1=UpperRoman, 2=LowerRoman,
+                          3=UpperAlpha, 4=LowerAlpha, 5=Circled, 6=Hangul)
+            starting_number: Starting page number
+            side_char: Side character (e.g., '-' for "- 1 -")
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            self.hwp.HAction.GetDefault(
+                "PageNumPos", self.hwp.HParameterSet.HPageNumPos.HSet
+            )
+
+            self.hwp.HParameterSet.HPageNumPos.DrawPos = position
+            self.hwp.HParameterSet.HPageNumPos.NumFormat = number_format
+            self.hwp.HParameterSet.HPageNumPos.NewNumber = starting_number
+
+            if side_char:
+                self.hwp.HParameterSet.HPageNumPos.SideChar = ord(side_char[0])
+
+            self.hwp.HAction.Execute(
+                "PageNumPos", self.hwp.HParameterSet.HPageNumPos.HSet
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert page number: {e}")
+            return False
+
+    def format_cell(
+        self,
+        fill_color: Optional[int] = None,
+        border_type: int = 1,
+        border_width: int = 1,
+        apply_to_selection: bool = True,
+    ) -> bool:
+        """Format table cell with border and fill (CellBorderFill action).
+
+        Args:
+            fill_color: RGB color as integer (e.g., 0xFFFF00 for yellow)
+            border_type: Border line type (0=None, 1=Solid, 2=Dash, etc.)
+            border_width: Border line width (1=0.1mm, 5=0.5mm, 10=1mm)
+            apply_to_selection: Apply to selected cells
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            if apply_to_selection:
+                self.hwp.Run("TableCellBlock")
+
+            self.hwp.HAction.GetDefault(
+                "CellBorderFill", self.hwp.HParameterSet.HCellBorderFill.HSet
+            )
+
+            # Set border for all sides
+            for side in ["Top", "Bottom", "Left", "Right"]:
+                setattr(
+                    self.hwp.HParameterSet.HCellBorderFill,
+                    f"BorderType{side}",
+                    border_type,
+                )
+                setattr(
+                    self.hwp.HParameterSet.HCellBorderFill,
+                    f"BorderWidth{side}",
+                    border_width,
+                )
+
+            # Set fill color if provided
+            if fill_color is not None:
+                # Create nested FillAttr ItemSet
+                fill_set = self.hwp.HParameterSet.HCellBorderFill.FillAttr
+                fill_set.SetItem("WinBrushFaceColor", fill_color)
+                fill_set.SetItem("WinBrushFaceStyle", -1)  # Solid fill
+
+            self.hwp.HAction.Execute(
+                "CellBorderFill", self.hwp.HParameterSet.HCellBorderFill.HSet
+            )
+
+            if apply_to_selection:
+                self.hwp.Run("Cancel")
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to format cell: {e}")
+            return False
+
+    def move_to_pos(
+        self,
+        move_id: str = "MoveDocEnd",
+        para: int = 0,
+        pos: int = 0,
+    ) -> bool:
+        """Move cursor to specific position (MovePos API).
+
+        Args:
+            move_id: Movement target. Options:
+                - 'MoveDocBegin', 'MoveDocEnd': Document start/end
+                - 'MoveParaBegin', 'MoveParaEnd': Paragraph start/end
+                - 'MoveLineBegin', 'MoveLineEnd': Line start/end
+                - 'MoveWordBegin', 'MoveWordEnd': Word start/end
+                - 'MoveCellBegin', 'MoveCellEnd': Cell start/end
+                - 'MoveTopOfField', 'MoveEndOfField': Field boundaries
+                - 'MovePos': Specific position (use para, pos params)
+            para: Paragraph index (only for 'MovePos')
+            pos: Position within paragraph (only for 'MovePos')
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            # Map string IDs to numeric MoveID constants
+            move_id_map = {
+                "MoveDocBegin": 0,
+                "MoveDocEnd": 1,
+                "MoveParaBegin": 2,
+                "MoveParaEnd": 3,
+                "MoveLineBegin": 4,
+                "MoveLineEnd": 5,
+                "MoveWordBegin": 6,
+                "MoveWordEnd": 7,
+                "MoveCellBegin": 8,
+                "MoveCellEnd": 9,
+                "MovePos": 10,
+            }
+
+            if move_id in move_id_map:
+                numeric_id = move_id_map[move_id]
+                if move_id == "MovePos":
+                    return self.hwp.MovePos(numeric_id, para, pos)
+                else:
+                    return self.hwp.MovePos(numeric_id, 0, 0)
+            else:
+                # Try as direct action
+                return self.run_action(move_id)
+        except Exception as e:
+            logger.error(f"Failed to move to position: {e}")
+            return False
+
+    def select_range(
+        self,
+        start_para: int,
+        start_pos: int,
+        end_para: int,
+        end_pos: int,
+    ) -> bool:
+        """Select text range (SelectText API).
+
+        Args:
+            start_para: Starting paragraph index
+            start_pos: Starting position within paragraph
+            end_para: Ending paragraph index
+            end_pos: Ending position within paragraph
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            result = self.hwp.SelectText(start_para, start_pos, end_para, end_pos)
+            return result if isinstance(result, bool) else True
+        except Exception as e:
+            logger.error(f"Failed to select range: {e}")
+            return False
+
+    def insert_header_footer(
+        self,
+        header_or_footer: str = "header",
+        content: str = "",
+        apply_to: str = "all",
+    ) -> bool:
+        """Insert header or footer.
+
+        Args:
+            header_or_footer: 'header' or 'footer'
+            content: Text content to insert
+            apply_to: 'all', 'odd', 'even', 'first'
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            action = "InsertHeader" if header_or_footer == "header" else "InsertFooter"
+            self.hwp.HAction.Run(action)
+
+            if content:
+                self._insert_text_direct(content)
+
+            # Exit header/footer editing mode
+            self.hwp.HAction.Run("CloseEx")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert {header_or_footer}: {e}")
+            return False
+
+    def insert_note(
+        self,
+        note_type: str = "footnote",
+        content: str = "",
+    ) -> bool:
+        """Insert footnote or endnote.
+
+        Args:
+            note_type: 'footnote' or 'endnote'
+            content: Note content
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            action = "InsertFootnote" if note_type == "footnote" else "InsertEndnote"
+            self.hwp.HAction.Run(action)
+
+            if content:
+                self._insert_text_direct(content)
+
+            # Return to main body
+            self.hwp.HAction.Run("CloseEx")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert {note_type}: {e}")
+            return False
+
+    def set_edit_mode(self, mode: str = "edit") -> bool:
+        """Set document edit mode.
+
+        Args:
+            mode: 'edit' (normal editing), 'readonly' (read-only), 'form' (form mode)
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_hwp_running:
+            return False
+
+        try:
+            mode_map = {
+                "edit": 0,
+                "readonly": 1,
+                "form": 2,
+            }
+            mode_value = mode_map.get(mode.lower(), 0)
+            self.hwp.EditMode = mode_value
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set edit mode: {e}")
+            return False
+
+    def manage_metatags(
+        self,
+        action: str = "get",
+        tag_name: str = "",
+        tag_value: str = "",
+    ) -> Any:
+        """Manage document metatags (hidden metadata).
+
+        Args:
+            action: 'get', 'set', 'delete', 'list'
+            tag_name: Tag name (for get/set/delete)
+            tag_value: Tag value (for set)
+
+        Returns:
+            Any: Tag value for 'get', list for 'list', bool for others
+        """
+        if not self.is_document_open:
+            return None if action in ("get", "list") else False
+
+        try:
+            if action == "get":
+                return self.hwp.GetMetatag(tag_name)
+            elif action == "set":
+                self.hwp.SetMetatag(tag_name, tag_value)
+                return True
+            elif action == "delete":
+                self.hwp.DeleteMetatag(tag_name)
+                return True
+            elif action == "list":
+                # Get all metatags
+                return self.hwp.GetMetatagList()
+            else:
+                logger.error(f"Unknown metatag action: {action}")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to manage metatags: {e}")
+            return None if action in ("get", "list") else False
+
+    def insert_background(
+        self,
+        image_path: str,
+        embedded: bool = True,
+        fill_option: str = "tile",
+    ) -> bool:
+        """Insert background image (InsertBackgroundPicture).
+
+        Args:
+            image_path: Path to background image
+            embedded: Embed image in document
+            fill_option: 'tile', 'center', 'stretch', 'fit'
+
+        Returns:
+            bool: Success status
+        """
+        if not self.is_document_open:
+            return False
+
+        try:
+            abs_path = os.path.abspath(image_path)
+            if not os.path.exists(abs_path):
+                logger.error(f"Background image not found: {abs_path}")
+                return False
+
+            fill_map = {
+                "tile": 0,
+                "center": 1,
+                "stretch": 2,
+                "fit": 3,
+            }
+            fill_value = fill_map.get(fill_option.lower(), 0)
+
+            self.hwp.HAction.GetDefault(
+                "InsertBackgroundPicture",
+                self.hwp.HParameterSet.HInsertBackgroundPicture.HSet,
+            )
+
+            self.hwp.HParameterSet.HInsertBackgroundPicture.FileName = abs_path
+            self.hwp.HParameterSet.HInsertBackgroundPicture.Embed = 1 if embedded else 0
+            self.hwp.HParameterSet.HInsertBackgroundPicture.FillArea = fill_value
+
+            self.hwp.HAction.Execute(
+                "InsertBackgroundPicture",
+                self.hwp.HParameterSet.HInsertBackgroundPicture.HSet,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert background: {e}")
+            return False
 
     def __enter__(self):
         """Context manager entry."""

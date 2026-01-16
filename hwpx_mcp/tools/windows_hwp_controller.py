@@ -1209,16 +1209,10 @@ class WindowsHwpController:
         """Move cursor to specific position (MovePos API).
 
         Args:
-            move_id: Movement target. Options:
-                - 'MoveDocBegin', 'MoveDocEnd': Document start/end
-                - 'MoveParaBegin', 'MoveParaEnd': Paragraph start/end
-                - 'MoveLineBegin', 'MoveLineEnd': Line start/end
-                - 'MoveWordBegin', 'MoveWordEnd': Word start/end
-                - 'MoveCellBegin', 'MoveCellEnd': Cell start/end
-                - 'MoveTopOfField', 'MoveEndOfField': Field boundaries
-                - 'MovePos': Specific position (use para, pos params)
-            para: Paragraph index (only for 'MovePos')
-            pos: Position within paragraph (only for 'MovePos')
+            move_id: Movement target ID (e.g., 'MoveDocBegin', 'MoveNextPara').
+                     See README for full list of 37+ IDs.
+            para: Paragraph index (for MoveMain, MoveCurList) or X coord (MoveScrPos)
+            pos: Position index (for MoveMain, MoveCurList) or Y coord (MoveScrPos)
 
         Returns:
             bool: Success status
@@ -1227,29 +1221,65 @@ class WindowsHwpController:
             return False
 
         try:
-            # Map string IDs to numeric MoveID constants
+            # Full MoveID map based on HWP SDK Document.h
             move_id_map = {
-                "MoveDocBegin": 0,
-                "MoveDocEnd": 1,
-                "MoveParaBegin": 2,
-                "MoveParaEnd": 3,
-                "MoveLineBegin": 4,
-                "MoveLineEnd": 5,
-                "MoveWordBegin": 6,
-                "MoveWordEnd": 7,
-                "MoveCellBegin": 8,
-                "MoveCellEnd": 9,
-                "MovePos": 10,
+                "MoveMain": 0,
+                "MoveCurList": 1,
+                "MoveTopOfFile": 2,
+                "MoveDocBegin": 2,  # Alias
+                "MoveBottomOfFile": 3,
+                "MoveDocEnd": 3,  # Alias
+                "MoveTopOfList": 4,
+                "MoveBottomOfList": 5,
+                "MoveStartOfPara": 6,
+                "MoveParaBegin": 6,  # Alias
+                "MoveEndOfPara": 7,
+                "MoveParaEnd": 7,  # Alias
+                "MoveStartOfWord": 8,
+                "MoveEndOfWord": 9,
+                "MoveNextPara": 10,
+                "MovePrevPara": 11,
+                "MoveNextPos": 12,
+                "MovePrevPos": 13,
+                "MoveNextPosEx": 14,
+                "MovePrevPosEx": 15,
+                "MoveNextChar": 16,
+                "MovePrevChar": 17,
+                "MoveNextWord": 18,
+                "MovePrevWord": 19,
+                "MoveNextLine": 20,
+                "MovePrevLine": 21,
+                "MoveStartOfLine": 22,
+                "MoveLineBegin": 22,  # Alias
+                "MoveEndOfLine": 23,
+                "MoveLineEnd": 23,  # Alias
+                "MoveParentList": 24,
+                "MoveTopLevelList": 25,
+                "MoveRootList": 26,
+                "MoveCurrentCaret": 27,
+                "MoveLeftOfCell": 100,
+                "MoveRightOfCell": 101,
+                "MoveUpOfCell": 102,
+                "MoveDownOfCell": 103,
+                "MoveStartOfCell": 104,
+                "MoveEndOfCell": 105,
+                "MoveTopOfCell": 106,
+                "MoveBottomOfCell": 107,
+                "MoveScrPos": 200,
+                "MoveScanPos": 201,
             }
 
+            # Normalize input (case-insensitive check could be added if needed,
+            # but strict mapping is safer for now)
             if move_id in move_id_map:
                 numeric_id = move_id_map[move_id]
-                if move_id == "MovePos":
+                # Pass para/pos only if relevant (0, 1, 200), otherwise 0
+                if numeric_id in (0, 1, 200):
                     return self.hwp.MovePos(numeric_id, para, pos)
                 else:
                     return self.hwp.MovePos(numeric_id, 0, 0)
             else:
-                # Try as direct action
+                # Try as direct action string if not in map
                 return self.run_action(move_id)
         except Exception as e:
             logger.error(f"Failed to move to position: {e}")

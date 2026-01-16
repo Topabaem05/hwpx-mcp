@@ -443,7 +443,7 @@ These tools provide access to advanced HWP SDK features from `Actions.h`, `Docum
 | `hwp_page_setup` | Set page layout (margins, orientation, paper size: A4, Letter, etc.) | Windows |
 | `hwp_insert_page_number` | Insert page numbering with position and format options | Windows |
 | `hwp_table_format_cell` | Format table cells (border type/width, fill color) | Windows |
-| `hwp_move_to` | Move cursor to specific position (MoveDocBegin, MoveParaEnd, etc.) | Windows |
+| `hwp_move_to` | Move cursor to specific position (37+ targets: Main, CurList, TopOfFile, Cells, etc.) | Windows |
 | `hwp_select_range` | Select text range by paragraph and position indices | Windows |
 | `hwp_insert_header_footer` | Insert header or footer with text content | Windows |
 | `hwp_insert_note` | Insert footnote or endnote | Windows |

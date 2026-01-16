@@ -443,7 +443,7 @@ VS Code `settings.json`에 추가:
 | `hwp_page_setup` | 페이지 레이아웃 설정 (여백, 방향, 용지 크기: A4, Letter 등) | Windows |
 | `hwp_insert_page_number` | 위치 및 형식 옵션으로 쪽 번호 삽입 | Windows |
 | `hwp_table_format_cell` | 표 셀 서식 지정 (테두리 종류/두께, 채우기 색상) | Windows |
-| `hwp_move_to` | 특정 위치로 커서 이동 (문서 시작, 문단 끝 등) | Windows |
+| `hwp_move_to` | 특정 위치로 커서 이동 (37개 이상 타겟: 문서 시작, 문단, 셀 이동 등) | Windows |
 | `hwp_select_range` | 문단 및 위치 인덱스로 텍스트 범위 선택 | Windows |
 | `hwp_insert_header_footer` | 텍스트 내용으로 머리말 또는 꼬리말 삽입 | Windows |
 | `hwp_insert_note` | 각주 또는 미주 삽입 | Windows |

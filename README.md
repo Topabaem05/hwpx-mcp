@@ -659,6 +659,43 @@ hwp_insert_header_footer(header_or_footer="footer", content="Confidential - Inte
 hwp_save_as("monthly_report.hwp")
 ```
 
+
+### Using Templates
+
+You can create documents from built-in HWPX templates.
+
+#### Template Gallery
+
+| ID | Name | Category | Description |
+|----|------|----------|-------------|
+| `h01_career_resume` | Career Resume | Resume | Resume and cover letter template |
+| `h02_basics_report1` | Basics Report1 | Report | Basic report/draft template |
+| `h03_hard_report2` | Hard Report2 | Report | Standard business report template |
+| `h04_very_hard_report3` | Very Hard Report3 | Report | Detailed in-depth report template |
+| `h05_dissertation` | Dissertation | Academic | Thesis/Academic paper template |
+| `h06_project_proposal` | Project Proposal | Proposal | Project planning/proposal template |
+
+#### Previewing Templates
+To see what a template looks like, you can export it to PDF or HTML:
+
+```python
+# Export template to PDF for preview
+hwp_export_pdf(source_path="templates/h01_career_resume.hwpx", output_path="preview.pdf")
+```
+
+#### Creating a Document
+```python
+# Create a resume from template
+hwp_create_from_template(
+    template_id="h01_career_resume",
+    save_path="my_resume.hwpx",
+    data={
+        "name": "John Doe",
+        "phone": "010-1234-5678",
+    }
+)
+```
+
 ## Platform Differences
 
 | Feature | Windows (COM) | macOS/Linux (python-hwpx) |
@@ -679,6 +716,11 @@ hwp_save_as("monthly_report.hwp")
 - fastmcp >= 0.2.0
 - pyhwp >= 0.1a (for HWP reading on non-Windows)
 - python-hwpx >= 1.9 (for HWPX creation)
+- lxml >= 5.0.0 (XML processing)
+- defusedxml >= 0.7.0 (XML security)
+- xmlschema >= 3.0.0 (Validation)
+- pydantic-xml >= 2.0.0 (Object mapping)
+- xmldiff >= 2.0.0 (Smart edit)
 - pandas >= 2.0.0 (for chart data)
 - matplotlib >= 3.7.0 (for chart rendering)
 

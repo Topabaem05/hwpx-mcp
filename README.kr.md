@@ -693,6 +693,43 @@ hwp_insert_header_footer(header_or_footer="footer", content="대외비 - 사내 
 hwp_save_as("monthly_report.hwp")
 ```
 
+
+### 템플릿 사용 (Using Templates)
+
+내장된 HWPX 템플릿을 사용하여 문서를 생성할 수 있습니다.
+
+#### 템플릿 갤러리
+
+| ID | 이름 | 카테고리 | 설명 |
+|----|------|----------|------|
+| `h01_career_resume` | Career Resume | 이력서 | 이력서 및 자기소개서 템플릿 |
+| `h02_basics_report1` | Basics Report1 | 보고서 | 기본 보고서/초안 템플릿 |
+| `h03_hard_report2` | Hard Report2 | 보고서 | 표준 비즈니스 보고서 템플릿 |
+| `h04_very_hard_report3` | Very Hard Report3 | 보고서 | 상세 심층 보고서 템플릿 |
+| `h05_dissertation` | Dissertation | 학술 | 논문/학술서 템플릿 |
+| `h06_project_proposal` | Project Proposal | 제안서 | 프로젝트 기획/제안서 템플릿 |
+
+#### 템플릿 미리보기
+템플릿 내용을 확인하려면 PDF나 HTML로 내보내어 볼 수 있습니다:
+
+```python
+# 템플릿을 PDF로 미리보기
+hwp_export_pdf(source_path="templates/h01_career_resume.hwpx", output_path="preview.pdf")
+```
+
+#### 문서 생성 예시
+```python
+# 템플릿으로 이력서 생성
+hwp_create_from_template(
+    template_id="h01_career_resume",
+    save_path="my_resume.hwpx",
+    data={
+        "name": "홍길동",
+        "phone": "010-1234-5678",
+    }
+)
+```
+
 ## 플랫폼별 차이점
 
 | 기능 | Windows (COM) | macOS/Linux (python-hwpx) |
@@ -713,6 +750,11 @@ hwp_save_as("monthly_report.hwp")
 - fastmcp >= 0.2.0
 - pyhwp >= 0.1a (비 Windows에서 HWP 읽기용)
 - python-hwpx >= 1.9 (HWPX 생성용)
+- lxml >= 5.0.0 (XML 처리)
+- defusedxml >= 0.7.0 (XML 보안)
+- xmlschema >= 3.0.0 (유효성 검사)
+- pydantic-xml >= 2.0.0 (객체 매핑)
+- xmldiff >= 2.0.0 (스마트 편집)
 - pandas >= 2.0.0 (차트 데이터용)
 - matplotlib >= 3.7.0 (차트 렌더링용)
 

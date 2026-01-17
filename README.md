@@ -683,11 +683,11 @@ You can create documents from built-in HWPX templates.
 
 | Career Resume | Basics Report1 | Hard Report2 |
 | :---: | :---: | :---: |
-| [![h01](templates/h01/h01_career_resume001.jpeg)](templates/h01/h01_career_resume001.jpeg) | [![h02](templates/h02/h02_basics_report1001.jpeg)](templates/h02/h02_basics_report1001.jpeg) | [![h03](templates/h03/h03_hard_report2001.jpeg)](templates/h03/h03_hard_report2001.jpeg) |
+| [![h01](templates/h01/h01_career_resume001.jpeg)](templates/h01) | [![h02](templates/h02/h02_basics_report1001.jpeg)](templates/h02) | [![h03](templates/h03/h03_hard_report2001.jpeg)](templates/h03) |
 
 | Very Hard Report3 | Dissertation | Project Proposal |
 | :---: | :---: | :---: |
-| [![h04](templates/h04/h04_very_hard_report3001.jpeg)](templates/h04/h04_very_hard_report3001.jpeg) | [![h05](templates/h05/h05_dissertation001.jpeg)](templates/h05/h05_dissertation001.jpeg) | [![h06](templates/h06/h06_project_proposal001.jpeg)](templates/h06/h06_project_proposal001.jpeg) |
+| [![h04](templates/h04/h04_very_hard_report3001.jpeg)](templates/h04) | [![h05](templates/h05/h05_dissertation001.jpeg)](templates/h05) | [![h06](templates/h06/h06_project_proposal001.jpeg)](templates/h06) |
 
 <details>
 <summary><b>📋 View Template Details (Table)</b></summary>

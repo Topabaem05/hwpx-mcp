@@ -9,12 +9,25 @@
       "description_ko": "이력서 및 자기소개서 작성을 위한 템플릿입니다.",
       "description_en": "Template for Career Resume.",
       "keywords": [
+        "cover letter",
+        "curriculum vitae",
+        "cv",
+        "job application",
+        "portfolio",
+        "profile",
+        "resume",
+        "경력",
+        "신입",
         "이력서",
-        "자소서",
+        "입사",
+        "자기소개",
         "자기소개서",
-        "취업",
+        "자소서",
         "지원",
-        "resume"
+        "채용",
+        "취업",
+        "포트폴리오",
+        "프로필"
       ]
     },
     {
@@ -26,12 +39,26 @@
       "description_ko": "간단한 보고서, 리포트, 초안 작성을 위한 기본 템플릿입니다.",
       "description_en": "Template for Basics Report1.",
       "keywords": [
-        "간단한 보고서",
+        "basic",
+        "document",
+        "draft",
+        "form",
+        "simple",
+        "summary",
+        "template",
+        "writing",
         "간단한 리포트",
-        "초안",
+        "간단한 보고서",
+        "간략",
+        "글",
+        "기본",
         "기본 보고서",
+        "문서",
+        "서식",
         "약식",
-        "draft"
+        "양식",
+        "요약",
+        "초안"
       ]
     },
     {
@@ -43,11 +70,24 @@
       "description_ko": "일반적인 보고서 및 리포트 작성을 위한 표준 템플릿입니다.",
       "description_en": "Template for Hard Report2.",
       "keywords": [
-        "보고서",
+        "assignment",
+        "business",
+        "homework",
+        "monthly",
+        "official document",
+        "report",
+        "standard",
+        "weekly",
+        "공문",
+        "과제",
         "리포트",
+        "보고서",
+        "비즈니스",
+        "숙제",
+        "월간보고",
         "일반 보고서",
-        "표준 보고서",
-        "report"
+        "주간보고",
+        "표준 보고서"
       ]
     },
     {
@@ -59,12 +99,26 @@
       "description_ko": "매우 자세한 내용의 보고서나 글을 작성하기 위한 상세 템플릿입니다.",
       "description_en": "Template for Very Hard Report3.",
       "keywords": [
-        "매우 자세한 보고서",
-        "매우 자세한 리포트",
+        "analysis",
+        "comprehensive",
+        "detailed",
+        "final report",
+        "in-depth",
+        "investigation",
+        "review",
+        "study",
+        "검토",
+        "결과보고",
+        "논의",
         "매우 자세한 글",
+        "매우 자세한 리포트",
+        "매우 자세한 보고서",
+        "분석",
         "상세 보고서",
         "심층 분석",
-        "detailed"
+        "심화",
+        "연구",
+        "조사"
       ]
     },
     {
@@ -76,12 +130,25 @@
       "description_ko": "논문, 실험 보고서, 계획서 작성을 위한 학술 템플릿입니다.",
       "description_en": "Template for Dissertation.",
       "keywords": [
-        "논문",
-        "실험 보고서",
+        "academic paper",
+        "degree",
+        "graduation",
+        "master",
+        "paper",
+        "phd",
+        "thesis",
+        "university",
         "계획서",
-        "학술",
+        "논문",
+        "논문작성",
+        "대학원",
+        "박사",
+        "석사",
+        "실험 보고서",
         "연구",
-        "thesis"
+        "졸업",
+        "학술",
+        "학위"
       ]
     },
     {
@@ -93,12 +160,26 @@
       "description_ko": "시험 문제 만들기, 회의록, 다기능 보고서 작성을 위한 템플릿입니다.",
       "description_en": "Template for Project Proposal.",
       "keywords": [
-        "시험 문제",
-        "회의록",
+        "business plan",
+        "exam",
+        "idea",
+        "meeting",
+        "minutes",
+        "planning",
+        "quiz",
+        "test",
+        "기록",
+        "기획",
+        "기획서",
         "다기능 보고서",
         "문제 출제",
-        "기록",
-        "exam"
+        "미팅",
+        "사업계획서",
+        "시험 문제",
+        "아이디어",
+        "의사록",
+        "제안",
+        "회의록"
       ]
     }
   ],

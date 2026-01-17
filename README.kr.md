@@ -397,6 +397,8 @@ VS Code `settings.json`에 추가:
 | `hwp_insert_index_mark` | 찾아보기 표시 넣기 | Windows |
 | `hwp_insert_auto_number` | 자동 번호 넣기 (쪽, 그림, 표 등) | Windows |
 | `hwp_create_chart` | 데이터로 차트 생성 | 전체 |
+| `hwp_create_equation` | HWP 수식 개체 삽입 (LaTeX 구문 사용 예: `\frac{a}{b}`) | Windows |
+| `hwp_create_chart` | 데이터로 차트 생성 | 전체 |
 | `hwp_create_equation` | 수학 수식 생성 | Windows |
 
 ### 7. 필드 및 메타데이터 (Fields & Metadata)
@@ -487,6 +489,19 @@ hwp_set_cell_text(row=2, col=1, text="200")
 
 # 저장
 hwp_save_as(path="table_example.hwpx")
+```
+
+
+### 수식 생성
+
+LaTeX 구문을 사용하여 수학 수식을 삽입할 수 있습니다.
+
+```python
+# 근의 공식 삽입
+hwp_create_equation("x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}")
+
+# 물리 공식 삽입
+hwp_create_equation("E = mc^2")
 ```
 
 ### 템플릿 사용

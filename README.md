@@ -396,6 +396,8 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 | `hwp_insert_note` | Insert footnote or endnote | Windows |
 | `hwp_insert_index_mark` | Insert Index Mark (keyword1, keyword2) | Windows |
 | `hwp_insert_auto_number` | Insert Auto Number (Page, Figure, Table, etc.) | Windows |
+| `hwp_create_chart` | Create a chart with data | All |
+| `hwp_create_equation` | Insert HWP Equation object (use LaTeX syntax like `\frac{a}{b}`) | Windows |
 
 ### 10. XML Processing & Security
 | Tool | Description | Platform |
@@ -453,6 +455,19 @@ hwp_set_cell_text(row=2, col=1, text="200")
 
 # Save
 hwp_save_as(path="table_example.hwpx")
+```
+
+
+### Creating Equations
+
+You can insert mathematical equations using LaTeX syntax.
+
+```python
+# Insert a quadratic formula
+hwp_create_equation("x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}")
+
+# Insert a physics formula
+hwp_create_equation("E = mc^2")
 ```
 
 ### Using Templates

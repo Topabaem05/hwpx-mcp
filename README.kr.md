@@ -736,17 +736,17 @@ hwp_save_as("monthly_report.hwp")
 | `h06_project_proposal` | Project Proposal | 제안서 | 프로젝트 기획/제안서 템플릿 |
 
 <details>
-<summary><b>👀 템플릿 미리보기 (PDF)</b></summary>
+<summary><b>👀 템플릿 미리보기 (이미지)</b></summary>
 
 
 | 템플릿 | 미리보기 링크 |
 |--------|---------------|
-| **이력서** (`h01`) | [PDF 보기](templates/h01/h01_career_resume001.jpeg) |
-| **기본 보고서** (`h02`) | [PDF 보기](templates/h02/h02_basics_report1001.jpeg) |
-| **표준 보고서** (`h03`) | [PDF 보기](templates/h03/h03_hard_report2001.jpeg) |
-| **상세 보고서** (`h04`) | [PDF 보기](templates/h04/h04_very_hard_report3001.jpeg) |
-| **논문** (`h05`) | [PDF 보기](templates/h05/h05_dissertation001.jpeg) |
-| **제안서** (`h06`) | [PDF 보기](templates/h06/h06_project_proposal001.jpeg) |
+| **이력서** (`h01`) | [미리보기](templates/h01/h01_career_resume001.jpeg) |
+| **기본 보고서** (`h02`) | [미리보기](templates/h02/h02_basics_report1001.jpeg) |
+| **표준 보고서** (`h03`) | [미리보기](templates/h03/h03_hard_report2001.jpeg) |
+| **상세 보고서** (`h04`) | [미리보기](templates/h04/h04_very_hard_report3001.jpeg) |
+| **논문** (`h05`) | [미리보기](templates/h05/h05_dissertation001.jpeg) |
+| **제안서** (`h06`) | [미리보기](templates/h06/h06_project_proposal001.jpeg) |
 
 </details>
 

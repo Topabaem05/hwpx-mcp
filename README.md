@@ -701,20 +701,6 @@ You can create documents from built-in HWPX templates.
 | `h05_dissertation` | Dissertation | Academic | Thesis/Academic paper template |
 | `h06_project_proposal` | Project Proposal | Proposal | Project planning/proposal template |
 
-<details>
-<summary><b>👀 View Template Previews (Image)</b></summary>
-
-
-| Template | Preview Link |
-|----------|--------------|
-| **Career Resume** (`h01`) | [View Preview](templates/h01/h01_career_resume001.jpeg) |
-| **Basics Report1** (`h02`) | [View Preview](templates/h02/h02_basics_report1001.jpeg) |
-| **Hard Report2** (`h03`) | [View Preview](templates/h03/h03_hard_report2001.jpeg) |
-| **Very Hard Report3** (`h04`) | [View Preview](templates/h04/h04_very_hard_report3001.jpeg) |
-| **Dissertation** (`h05`) | [View Preview](templates/h05/h05_dissertation001.jpeg) |
-| **Project Proposal** (`h06`) | [View Preview](templates/h06/h06_project_proposal001.jpeg) |
-
-</details>
 
 </details>
 

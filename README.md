@@ -13,6 +13,82 @@ A Model Context Protocol (MCP) server for creating and editing HWP/HWPX document
 - **Equation Support**: Insert mathematical equations (LaTeX/Script)
 - **Table Operations**: Full table manipulation (create, edit, format)
 - **Formatting Control**: Character and paragraph formatting
+- **Remote MCP Server**: Deploy as HTTP/SSE server via Docker
+
+## Docker Deployment (Remote MCP Server)
+
+Deploy hwpx-mcp as a remote MCP server accessible over HTTP.
+
+### Quick Start with Docker
+
+```bash
+# Build the image
+docker build -t hwpx-mcp .
+
+# Run with HTTP transport
+docker run -d -p 8000:8000 --name hwpx-mcp hwpx-mcp
+
+# Or use docker-compose
+docker-compose up -d
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRANSPORT` | `stdio` | Transport type: `stdio`, `http`, `sse`, `streamable-http` |
+| `MCP_HOST` | `0.0.0.0` | Host to bind (for HTTP transports) |
+| `MCP_PORT` | `8000` | Port to bind (for HTTP transports) |
+| `MCP_PATH` | `/mcp` | URL path for MCP endpoint |
+| `MCP_STATELESS` | `false` | Enable stateless HTTP mode |
+
+### Connect MCP Clients to Remote Server
+
+<details>
+<summary><b>Claude Desktop - Remote HTTP</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "hwpx-mcp": {
+      "url": "http://your-server:8000/mcp",
+      "transport": "streamable-http"
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>OpenCode - Remote HTTP</b></summary>
+
+```jsonc
+{
+  "mcp": {
+    "hwpx-mcp": {
+      "type": "remote",
+      "url": "http://your-server:8000/mcp",
+      "transport": "http-stream",
+      "enabled": true
+    }
+  }
+}
+```
+
+</details>
+
+### Limitations (Docker/Linux)
+
+When running in Docker (Linux container), the following features are **not available**:
+- Windows COM automation (pywin32)
+- Editing existing HWP files
+- Full HWP SDK features
+
+Available features in Docker:
+- HWPX file creation (via python-hwpx)
+- HWP file reading (via pyhwp)
+- All cross-platform tools
 
 ## Quick Start (Copy & Paste)
 

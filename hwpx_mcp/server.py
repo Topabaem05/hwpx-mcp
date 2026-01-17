@@ -37,18 +37,19 @@ logger = logging.getLogger("hwp-mcp-extended")
 # Platform detection
 IS_WINDOWS = platform.system() == "Windows"
 
+
 def get_windows_controller():
     if not IS_WINDOWS:
         return None
     try:
         from hwpx_mcp.tools.windows_hwp_controller import get_hwp_controller
+
         ctrl = get_hwp_controller()
         if ctrl and not ctrl.is_hwp_running:
             ctrl.connect()
         return ctrl
     except ImportError:
         return None
-
 
 
 def get_default_output_dir() -> Path:
@@ -1020,10 +1021,10 @@ def hwp_xml_parse_section(xml_content: str) -> dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
         return None
     try:
         from hwpx_mcp.tools.windows_hwp_controller import get_hwp_controller
+
         ctrl = get_hwp_controller()
         if ctrl and not ctrl.is_hwp_running:
             ctrl.connect()
@@ -1031,19 +1032,31 @@ def hwp_xml_parse_section(xml_content: str) -> dict:
     except ImportError:
         return None
 
+
 @mcp.tool()
 def hwp_smart_patch_xml(original_xml: str, modified_xml: str) -> dict:
     """Validate and patch HWPX XML with smart filtering."""
     result = HwpxSmartEditor.validate_edits(original_xml, modified_xml)
     if result["safe"]:
-        return {"success": True, "message": "Edits accepted", "patched_xml": modified_xml}
+        return {
+            "success": True,
+            "message": "Edits accepted",
+            "patched_xml": modified_xml,
+        }
     else:
-        return {"success": False, "error": result["message"], "unsafe_actions": result.get("unsafe_actions")}
+        return {
+            "success": False,
+            "error": result["message"],
+            "unsafe_actions": result.get("unsafe_actions"),
+        }
+
 
 @mcp.tool()
-def hwp_convert_format(source_path: str, target_format: str, output_path: str = None) -> dict:
+def hwp_convert_format(
+    source_path: str, target_format: str, output_path: str = None
+) -> dict:
     """Convert document format (HWP, HWPX, PDF, HTML)."""
-            controller = get_windows_controller()
+    controller = get_windows_controller()
     if not controller:
         return {"success": False, "error": "Conversion requires Windows Controller"}
     if not output_path:
@@ -1056,21 +1069,47 @@ def hwp_convert_format(source_path: str, target_format: str, output_path: str = 
     controller.close_document()
     return {"success": success, "output_path": output_path if success else None}
 
+
 @mcp.tool()
 def hwp_export_pdf(source_path: str, output_path: str = None) -> dict:
     """Export HWP/HWPX to PDF."""
     return hwp_convert_format(source_path, "PDF", output_path)
+
 
 @mcp.tool()
 def hwp_export_html(source_path: str, output_path: str = None) -> dict:
     """Export HWP/HWPX to HTML."""
     return hwp_convert_format(source_path, "HTML", output_path)
 
+
 def main():
     """Entry point for hwpx-mcp command."""
-    logger.info("Starting HWP Extended MCP Server (pyhwp-based)...")
+    from .config import get_config
+
     try:
-        mcp.run(transport="stdio")
+        config = get_config()
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+
+    logger.info(f"Starting HWP Extended MCP Server | {config}")
+
+    try:
+        if config.transport == "stdio":
+            mcp.run(transport="stdio")
+        elif config.transport in ("http", "streamable-http"):
+            import uvicorn
+
+            app = mcp.streamable_http_app()
+            uvicorn.run(app, host=config.host, port=config.port, log_level="info")
+        elif config.transport == "sse":
+            import uvicorn
+            import asyncio
+
+            asyncio.run(mcp.run_sse_async(mount_path=config.path))
+        else:
+            logger.error(f"Unsupported transport: {config.transport}")
+            sys.exit(1)
     except Exception as e:
         logger.error(f"Error running server: {e}")
         sys.exit(1)

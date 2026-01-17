@@ -397,7 +397,7 @@ VS Code `settings.json`에 추가:
 | `hwp_insert_index_mark` | 찾아보기 표시 넣기 | Windows |
 | `hwp_insert_auto_number` | 자동 번호 넣기 (쪽, 그림, 표 등) | Windows |
 | `hwp_create_chart` | 데이터로 차트 생성 | 전체 |
-| `hwp_create_equation` | 수학 수식 생성 | 전체 |
+| `hwp_create_equation` | 수학 수식 생성 | Windows |
 
 ### 7. 필드 및 메타데이터 (Fields & Metadata)
 | 도구 | 설명 | 플랫폼 |

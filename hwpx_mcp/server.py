@@ -23,6 +23,10 @@ import tempfile
 import base64
 from typing import Optional
 from pathlib import Path
+from .core.validator import XmlValidator
+from .core.xml_parser import SecureXmlParser
+from .features.query import HwpxQueryEngine
+from .models.owpml import HwpxSection
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -962,6 +966,51 @@ def hwp_get_capabilities() -> dict:
             },
         },
     }
+
+
+@mcp.tool()
+def hwp_xml_validate_content(xml_content: str) -> dict:
+    """Validate HWPX XML content structure."""
+    validator = XmlValidator()
+    # Check syntax first
+    valid_syntax = validator.validate_syntax(xml_content)
+    if not valid_syntax:
+        return {"valid": False, "message": "Invalid XML syntax"}
+
+    # Check schema (optional, if xsd loaded)
+    valid_schema = validator.validate_schema(xml_content)
+    return {
+        "valid": valid_schema,
+        "message": "Valid XML" if valid_schema else "Schema validation failed",
+    }
+
+
+@mcp.tool()
+def hwp_xml_xpath_query(xml_content: str, xpath_query: str) -> dict:
+    """Execute XPath query on HWPX XML content."""
+    try:
+        root = SecureXmlParser.parse_string(xml_content)
+        results = HwpxQueryEngine.execute_xpath(root, xpath_query)
+        # Convert results to string representation
+        serialized = []
+        for r in results:
+            if hasattr(r, "tag"):  # Element
+                serialized.append(SecureXmlParser.to_string(r))
+            else:
+                serialized.append(str(r))
+        return {"success": True, "count": len(results), "results": serialized}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@mcp.tool()
+def hwp_xml_parse_section(xml_content: str) -> dict:
+    """Parse HWPX Section XML into structured JSON."""
+    try:
+        section = HwpxSection.from_xml(xml_content)
+        return {"success": True, "data": section.model_dump()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 def main():

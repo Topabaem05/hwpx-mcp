@@ -396,40 +396,13 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 | `hwp_insert_note` | Insert footnote or endnote | Windows |
 | `hwp_insert_index_mark` | Insert Index Mark (keyword1, keyword2) | Windows |
 | `hwp_insert_auto_number` | Insert Auto Number (Page, Figure, Table, etc.) | Windows |
-| `hwp_create_chart` | Create a chart with data | All |
-| `hwp_create_equation` | Create a mathematical equation | All |
 
-### 7. Fields & Metadata
+### 10. XML Processing & Security
 | Tool | Description | Platform |
 |------|-------------|----------|
-| `hwp_create_field` | Create a new field (Click-Here) | Windows |
-| `hwp_put_field_text` | Set text in a field by name | Windows |
-| `hwp_get_field_text` | Get text from a field | Windows |
-| `hwp_get_field_list` | Get list of all field names | Windows |
-| `hwp_field_exists` | Check if a field exists | Windows |
-| `hwp_manage_metatags` | Manage document metatags (hidden metadata) | Windows |
-
-### 8. Templates
-| Tool | Description | Platform |
-|------|-------------|----------|
-| `hwp_list_templates` | List all available HWPX templates | All |
-| `hwp_create_from_template` | Create document from template file | All |
-| `hwp_fill_template` | Fill template fields with data | All |
-| `hwp_recommend_template` | Recommend templates based on requirements | All |
-| `hwp_use_template` | Clone a template and open for editing | All |
-| `hwp_get_template_info` | Get detailed information about a template | All |
-
-### 9. Advanced & Utility
-| Tool | Description | Platform |
-|------|-------------|----------|
-| `hwp_run_action` | Execute any of 800+ HWP actions by ID | Windows |
-| `hwp_platform_info` | Get current platform information | All |
-| `hwp_capabilities` | Get full capability matrix | All |
-| `hwp_convert_unit` | Convert between HwpUnit and millimeters | All |
-| `hwp_get_head_types` | Get available heading types | All |
-| `hwp_get_line_types` | Get available line types | All |
-| `hwp_get_line_widths` | Get available line widths | All |
-| `hwp_get_number_formats` | Get available number formats | All |
+| `hwp_xml_validate_content` | Validate HWPX XML syntax/schema | All |
+| `hwp_xml_xpath_query` | Execute XPath on HWPX XML (hp: namespaces) | All |
+| `hwp_xml_parse_section` | Parse Section XML into structured JSON | All |
 
 ## Usage Examples
 

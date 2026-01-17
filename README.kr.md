@@ -431,6 +431,21 @@ VS Code `settings.json`에 추가:
 | `hwp_get_line_widths` | 사용 가능한 선 두께 가져오기 | 전체 |
 | `hwp_get_number_formats` | 사용 가능한 숫자 형식 가져오기 | 전체 |
 
+### 10. XML 처리 및 보안 (XML Processing & Security)
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_xml_validate_content` | HWPX XML 문법/스키마 검증 | 전체 |
+| `hwp_xml_xpath_query` | HWPX XML에 대해 XPath 쿼리 실행 | 전체 |
+| `hwp_xml_parse_section` | 섹션 XML을 구조화된 JSON으로 파싱 | 전체 |
+| `hwp_smart_patch_xml` | 스마트 필터링으로 HWPX XML 검증 및 패치 | 전체 |
+
+### 11. 변환 및 내보내기 (Conversion & Export)
+| 도구 | 설명 | 플랫폼 |
+|------|------|--------|
+| `hwp_convert_format` | HWP, HWPX, PDF, HTML 간 포맷 변환 | Windows |
+| `hwp_export_pdf` | PDF로 내보내기 | Windows |
+| `hwp_export_html` | HTML로 내보내기 | Windows |
+
 ## 사용 예시
 
 ### 기본 문서 생성

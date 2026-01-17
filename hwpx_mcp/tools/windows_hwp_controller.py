@@ -296,6 +296,17 @@ class WindowsHwpController:
             logger.error(f"Failed to insert text: {e}")
             return False
 
+    def save_as_format(self, file_path: str, format_type: str) -> bool:
+        """Save document in specific format (HWP, HWPX, PDF, HTML)."""
+        if not self.is_document_open:
+            return False
+
+        try:
+            return self.hwp.SaveAs(file_path, format_type, "")
+        except Exception as e:
+            logger.error(f"Failed to save as {format_type}: {e}")
+            return False
+
     def _insert_text_direct(self, text: str) -> bool:
         """Insert text directly using HAction API.
 

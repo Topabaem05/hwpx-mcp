@@ -403,6 +403,14 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 | `hwp_xml_validate_content` | Validate HWPX XML syntax/schema | All |
 | `hwp_xml_xpath_query` | Execute XPath on HWPX XML (hp: namespaces) | All |
 | `hwp_xml_parse_section` | Parse Section XML into structured JSON | All |
+| `hwp_smart_patch_xml` | Validate and patch HWPX XML with smart filtering | All |
+
+### 11. Conversion & Export
+| Tool | Description | Platform |
+|------|-------------|----------|
+| `hwp_convert_format` | Convert between HWP, HWPX, PDF, HTML | Windows |
+| `hwp_export_pdf` | Export to PDF | Windows |
+| `hwp_export_html` | Export to HTML | Windows |
 
 ## Usage Examples
 

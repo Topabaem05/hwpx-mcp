@@ -681,6 +681,17 @@ You can create documents from built-in HWPX templates.
 
 #### Template Gallery
 
+| Career Resume | Basics Report1 | Hard Report2 |
+| :---: | :---: | :---: |
+| [![h01](templates/h01/h01_career_resume001.jpeg)](templates/h01/h01_career_resume001.jpeg) | [![h02](templates/h02/h02_basics_report1001.jpeg)](templates/h02/h02_basics_report1001.jpeg) | [![h03](templates/h03/h03_hard_report2001.jpeg)](templates/h03/h03_hard_report2001.jpeg) |
+
+| Very Hard Report3 | Dissertation | Project Proposal |
+| :---: | :---: | :---: |
+| [![h04](templates/h04/h04_very_hard_report3001.jpeg)](templates/h04/h04_very_hard_report3001.jpeg) | [![h05](templates/h05/h05_dissertation001.jpeg)](templates/h05/h05_dissertation001.jpeg) | [![h06](templates/h06/h06_project_proposal001.jpeg)](templates/h06/h06_project_proposal001.jpeg) |
+
+<details>
+<summary><b>📋 View Template Details (Table)</b></summary>
+
 | ID | Name | Category | Description |
 |----|------|----------|-------------|
 | `h01_career_resume` | Career Resume | Resume | Resume and cover letter template |
@@ -693,16 +704,17 @@ You can create documents from built-in HWPX templates.
 <details>
 <summary><b>👀 View Template Previews (PDF)</b></summary>
 
-> **Note**: If PDFs are missing, generate them on Windows using `python scripts/generate_previews.py`.
 
 | Template | Preview Link |
 |----------|--------------|
-| **Career Resume** (`h01`) | [View PDF](templates/previews/h01_career_resume.pdf) |
-| **Basics Report1** (`h02`) | [View PDF](templates/previews/h02_basics_report1.pdf) |
-| **Hard Report2** (`h03`) | [View PDF](templates/previews/h03_hard_report2.pdf) |
-| **Very Hard Report3** (`h04`) | [View PDF](templates/previews/h04_very_hard_report3.pdf) |
-| **Dissertation** (`h05`) | [View PDF](templates/previews/h05_dissertation.pdf) |
-| **Project Proposal** (`h06`) | [View PDF](templates/previews/h06_project_proposal.pdf) |
+| **Career Resume** (`h01`) | [View PDF](templates/h01/h01_career_resume001.jpeg) |
+| **Basics Report1** (`h02`) | [View PDF](templates/h02/h02_basics_report1001.jpeg) |
+| **Hard Report2** (`h03`) | [View PDF](templates/h03/h03_hard_report2001.jpeg) |
+| **Very Hard Report3** (`h04`) | [View PDF](templates/h04/h04_very_hard_report3001.jpeg) |
+| **Dissertation** (`h05`) | [View PDF](templates/h05/h05_dissertation001.jpeg) |
+| **Project Proposal** (`h06`) | [View PDF](templates/h06/h06_project_proposal001.jpeg) |
+
+</details>
 
 </details>
 

@@ -715,6 +715,17 @@ hwp_save_as("monthly_report.hwp")
 
 #### 템플릿 갤러리
 
+| 이력서 | 기본 보고서 | 표준 보고서 |
+| :---: | :---: | :---: |
+| [![h01](templates/h01/h01_career_resume001.jpeg)](templates/h01/h01_career_resume001.jpeg) | [![h02](templates/h02/h02_basics_report1001.jpeg)](templates/h02/h02_basics_report1001.jpeg) | [![h03](templates/h03/h03_hard_report2001.jpeg)](templates/h03/h03_hard_report2001.jpeg) |
+
+| 상세 보고서 | 논문 | 제안서 |
+| :---: | :---: | :---: |
+| [![h04](templates/h04/h04_very_hard_report3001.jpeg)](templates/h04/h04_very_hard_report3001.jpeg) | [![h05](templates/h05/h05_dissertation001.jpeg)](templates/h05/h05_dissertation001.jpeg) | [![h06](templates/h06/h06_project_proposal001.jpeg)](templates/h06/h06_project_proposal001.jpeg) |
+
+<details>
+<summary><b>📋 템플릿 상세 정보 (표)</b></summary>
+
 | ID | 이름 | 카테고리 | 설명 |
 |----|------|----------|------|
 | `h01_career_resume` | Career Resume | 이력서 | 이력서 및 자기소개서 템플릿 |
@@ -727,16 +738,17 @@ hwp_save_as("monthly_report.hwp")
 <details>
 <summary><b>👀 템플릿 미리보기 (PDF)</b></summary>
 
-> **참고**: PDF 파일이 보이지 않는 경우, Windows 환경에서 `python scripts/generate_previews.py`를 실행하여 생성해야 합니다.
 
 | 템플릿 | 미리보기 링크 |
 |--------|---------------|
-| **이력서** (`h01`) | [PDF 보기](templates/previews/h01_career_resume.pdf) |
-| **기본 보고서** (`h02`) | [PDF 보기](templates/previews/h02_basics_report1.pdf) |
-| **표준 보고서** (`h03`) | [PDF 보기](templates/previews/h03_hard_report2.pdf) |
-| **상세 보고서** (`h04`) | [PDF 보기](templates/previews/h04_very_hard_report3.pdf) |
-| **논문** (`h05`) | [PDF 보기](templates/previews/h05_dissertation.pdf) |
-| **제안서** (`h06`) | [PDF 보기](templates/previews/h06_project_proposal.pdf) |
+| **이력서** (`h01`) | [PDF 보기](templates/h01/h01_career_resume001.jpeg) |
+| **기본 보고서** (`h02`) | [PDF 보기](templates/h02/h02_basics_report1001.jpeg) |
+| **표준 보고서** (`h03`) | [PDF 보기](templates/h03/h03_hard_report2001.jpeg) |
+| **상세 보고서** (`h04`) | [PDF 보기](templates/h04/h04_very_hard_report3001.jpeg) |
+| **논문** (`h05`) | [PDF 보기](templates/h05/h05_dissertation001.jpeg) |
+| **제안서** (`h06`) | [PDF 보기](templates/h06/h06_project_proposal001.jpeg) |
+
+</details>
 
 </details>
 

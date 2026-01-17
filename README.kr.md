@@ -709,6 +709,22 @@ hwp_save_as("monthly_report.hwp")
 | `h05_dissertation` | Dissertation | 학술 | 논문/학술서 템플릿 |
 | `h06_project_proposal` | Project Proposal | 제안서 | 프로젝트 기획/제안서 템플릿 |
 
+<details>
+<summary><b>👀 템플릿 미리보기 (PDF)</b></summary>
+
+> **참고**: PDF 파일이 보이지 않는 경우, Windows 환경에서 `python scripts/generate_previews.py`를 실행하여 생성해야 합니다.
+
+| 템플릿 | 미리보기 링크 |
+|--------|---------------|
+| **이력서** (`h01`) | [PDF 보기](templates/previews/h01_career_resume.pdf) |
+| **기본 보고서** (`h02`) | [PDF 보기](templates/previews/h02_basics_report1.pdf) |
+| **표준 보고서** (`h03`) | [PDF 보기](templates/previews/h03_hard_report2.pdf) |
+| **상세 보고서** (`h04`) | [PDF 보기](templates/previews/h04_very_hard_report3.pdf) |
+| **논문** (`h05`) | [PDF 보기](templates/previews/h05_dissertation.pdf) |
+| **제안서** (`h06`) | [PDF 보기](templates/previews/h06_project_proposal.pdf) |
+
+</details>
+
 #### 템플릿 미리보기
 템플릿 내용을 확인하려면 PDF나 HTML로 내보내어 볼 수 있습니다:
 

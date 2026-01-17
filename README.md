@@ -675,6 +675,22 @@ You can create documents from built-in HWPX templates.
 | `h05_dissertation` | Dissertation | Academic | Thesis/Academic paper template |
 | `h06_project_proposal` | Project Proposal | Proposal | Project planning/proposal template |
 
+<details>
+<summary><b>👀 View Template Previews (PDF)</b></summary>
+
+> **Note**: If PDFs are missing, generate them on Windows using `python scripts/generate_previews.py`.
+
+| Template | Preview Link |
+|----------|--------------|
+| **Career Resume** (`h01`) | [View PDF](templates/previews/h01_career_resume.pdf) |
+| **Basics Report1** (`h02`) | [View PDF](templates/previews/h02_basics_report1.pdf) |
+| **Hard Report2** (`h03`) | [View PDF](templates/previews/h03_hard_report2.pdf) |
+| **Very Hard Report3** (`h04`) | [View PDF](templates/previews/h04_very_hard_report3.pdf) |
+| **Dissertation** (`h05`) | [View PDF](templates/previews/h05_dissertation.pdf) |
+| **Project Proposal** (`h06`) | [View PDF](templates/previews/h06_project_proposal.pdf) |
+
+</details>
+
 #### Previewing Templates
 To see what a template looks like, you can export it to PDF or HTML:
 

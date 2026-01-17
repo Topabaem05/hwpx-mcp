@@ -717,11 +717,11 @@ hwp_save_as("monthly_report.hwp")
 
 | 이력서 | 기본 보고서 | 표준 보고서 |
 | :---: | :---: | :---: |
-| [![h01](templates/h01/h01_career_resume001.jpeg)](templates/h01) | [![h02](templates/h02/h02_basics_report1001.jpeg)](templates/h02) | [![h03](templates/h03/h03_hard_report2001.jpeg)](templates/h03) |
+| [![h01](templates/h01/h01_career_resume001.jpeg)](templates/h01/README.md) | [![h02](templates/h02/h02_basics_report1001.jpeg)](templates/h02/README.md) | [![h03](templates/h03/h03_hard_report2001.jpeg)](templates/h03/README.md) |
 
 | 상세 보고서 | 논문 | 제안서 |
 | :---: | :---: | :---: |
-| [![h04](templates/h04/h04_very_hard_report3001.jpeg)](templates/h04) | [![h05](templates/h05/h05_dissertation001.jpeg)](templates/h05) | [![h06](templates/h06/h06_project_proposal001.jpeg)](templates/h06) |
+| [![h04](templates/h04/h04_very_hard_report3001.jpeg)](templates/h04/README.md) | [![h05](templates/h05/h05_dissertation001.jpeg)](templates/h05/README.md) | [![h06](templates/h06/h06_project_proposal001.jpeg)](templates/h06/README.md) |
 
 <details>
 <summary><b>📋 템플릿 상세 정보 (표)</b></summary>

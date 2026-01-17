@@ -172,7 +172,7 @@ def register_windows_tools(mcp) -> None:
 
         def get_windows_table_tools():
             tools = get_table_tools()
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller:
                 tools.set_controller(controller)
             return tools
@@ -197,7 +197,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_windows_create_document() -> dict:
             """Create new HWP document."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_hwp_running:
                 success = controller.create_new_document()
                 return {
@@ -211,7 +211,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_windows_insert_text(text: str) -> dict:
             """Insert text at cursor position."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_text(text)
                 return {
@@ -225,7 +225,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_windows_save_document(file_path: str) -> dict:
             """Save HWP document."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.save_document(file_path)
                 return {
@@ -284,7 +284,7 @@ def register_windows_tools(mcp) -> None:
             underline: bool = False,
         ) -> dict:
             """Set font style for current selection or next text."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.set_font_style(
                     font_name, font_size, bold, italic, underline
@@ -314,7 +314,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_windows_create_complete_document(document_spec: dict) -> dict:
             """Create complete document from specification dict."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller:
                 return controller.create_complete_document(document_spec)
             return {"success": False, "message": "HWP not connected"}
@@ -322,7 +322,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_windows_batch_operations(operations: list) -> dict:
             """Execute multiple HWP operations in batch."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 return controller.batch_operations(operations)
             return {"success": False, "message": "No document open"}
@@ -332,7 +332,7 @@ def register_windows_tools(mcp) -> None:
             text: str, preserve_linebreaks: bool = True
         ) -> dict:
             """Insert text with optional linebreak preservation."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_text(text, preserve_linebreaks)
                 return {
@@ -344,7 +344,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_insert_bookmark(name: str) -> dict:
             """Insert bookmark at cursor position."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_bookmark(name)
                 return {
@@ -356,7 +356,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_insert_hyperlink(url: str, display_text: str = None) -> dict:
             """Insert hyperlink at cursor position."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_hyperlink(url, display_text)
                 return {
@@ -368,7 +368,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_table_split_cell(rows: int = 2, cols: int = 1) -> dict:
             """Split current table cell into rows and columns."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.table_split_cell(rows, cols)
                 return {
@@ -382,7 +382,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_table_merge_cells() -> dict:
             """Merge selected table cells."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.table_merge_cells()
                 return {
@@ -400,7 +400,7 @@ def register_windows_tools(mcp) -> None:
             count: int = 1, same_size: bool = True, gap_mm: float = 10.0
         ) -> dict:
             """Configure page columns (MultiColumn)."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.setup_columns(count, same_size, gap_mm)
                 return {
@@ -414,7 +414,7 @@ def register_windows_tools(mcp) -> None:
             main_text: str, sub_text: str, position: str = "top"
         ) -> dict:
             """Insert Dutmal (text with comment above/below)."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_dutmal(main_text, sub_text, position)
                 return {
@@ -426,7 +426,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_insert_index_mark(keyword1: str, keyword2: str = "") -> dict:
             """Insert Index Mark."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_index_mark(keyword1, keyword2)
                 return {
@@ -446,7 +446,7 @@ def register_windows_tools(mcp) -> None:
             hide_background: bool = False,
         ) -> dict:
             """Hide page elements (header, footer, etc.) for current page."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.set_page_hiding(
                     hide_header,
@@ -466,7 +466,7 @@ def register_windows_tools(mcp) -> None:
             num_type: str = "page", number_format: int = 0, new_number: int = 0
         ) -> dict:
             """Insert Auto Number (e.g., Figure 1, Table 1). Types: page, footnote, endnote, picture, table, equation."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_auto_number(
                     num_type, number_format, new_number
@@ -486,7 +486,7 @@ def register_windows_tools(mcp) -> None:
             Categories: Edit (Copy, Paste), View (ViewZoom), Formatting (CharShapeBold),
             Navigation (MoveDocEnd), Table (TableDeleteRow), etc.
             """
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.run_action(action_id)
                 return {
@@ -509,7 +509,7 @@ def register_windows_tools(mcp) -> None:
             paper_type: str = "a4",
         ) -> dict:
             """Set page layout (margins, size, orientation)."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.page_setup(
                     width_mm,
@@ -537,7 +537,7 @@ def register_windows_tools(mcp) -> None:
             side_char: str = "",
         ) -> dict:
             """Insert page numbering. Positions: 4=BottomCenter, 2=TopCenter, etc."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_page_number(
                     position, number_format, starting_number, side_char
@@ -555,7 +555,7 @@ def register_windows_tools(mcp) -> None:
             border_width: int = 1,
         ) -> dict:
             """Format selected table cells (border and fill color)."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.format_cell(fill_color, border_type, border_width)
                 return {
@@ -571,7 +571,7 @@ def register_windows_tools(mcp) -> None:
             pos: int = 0,
         ) -> dict:
             """Move cursor to position. Options: MoveDocBegin, MoveDocEnd, MoveParaBegin, etc."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.move_to_pos(move_id, para, pos)
                 return {
@@ -588,7 +588,7 @@ def register_windows_tools(mcp) -> None:
             end_pos: int,
         ) -> dict:
             """Select text range by paragraph and position indices."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.select_range(
                     start_para, start_pos, end_para, end_pos
@@ -605,7 +605,7 @@ def register_windows_tools(mcp) -> None:
             content: str = "",
         ) -> dict:
             """Insert header or footer with text content."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_header_footer(header_or_footer, content)
                 return {
@@ -622,7 +622,7 @@ def register_windows_tools(mcp) -> None:
             content: str = "",
         ) -> dict:
             """Insert footnote or endnote."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_note(note_type, content)
                 return {
@@ -634,7 +634,7 @@ def register_windows_tools(mcp) -> None:
         @mcp.tool()
         def hwp_set_edit_mode(mode: str = "edit") -> dict:
             """Set document mode: 'edit', 'readonly', or 'form'."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_hwp_running:
                 success = controller.set_edit_mode(mode)
                 return {
@@ -650,7 +650,7 @@ def register_windows_tools(mcp) -> None:
             tag_value: str = "",
         ) -> dict:
             """Manage document metatags. Actions: 'get', 'set', 'delete', 'list'."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 result = controller.manage_metatags(action, tag_name, tag_value)
                 if action in ("get", "list"):
@@ -668,7 +668,7 @@ def register_windows_tools(mcp) -> None:
             fill_option: str = "tile",
         ) -> dict:
             """Insert background image. Fill options: 'tile', 'center', 'stretch', 'fit'."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
             if controller and controller.is_document_open:
                 success = controller.insert_background(
                     image_path, embedded, fill_option
@@ -1043,7 +1043,7 @@ def hwp_smart_patch_xml(original_xml: str, modified_xml: str) -> dict:
 @mcp.tool()
 def hwp_convert_format(source_path: str, target_format: str, output_path: str = None) -> dict:
     """Convert document format (HWP, HWPX, PDF, HTML)."""
-    controller = get_windows_controller()
+            controller = get_windows_controller()
     if not controller:
         return {"success": False, "error": "Conversion requires Windows Controller"}
     if not output_path:

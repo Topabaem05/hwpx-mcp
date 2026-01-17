@@ -1,5 +1,5 @@
 """
-Script to generate PDF previews for all templates.
+Script to generate PDF and Image previews for all templates.
 Requires Windows with Hancom Office installed.
 """
 import os
@@ -37,16 +37,24 @@ def main():
     
     for i, f in enumerate(files):
         src = os.path.abspath(os.path.join(TEMPLATE_DIR, f))
-        dst_name = os.path.splitext(f)[0] + ".pdf"
-        dst = os.path.abspath(os.path.join(PREVIEW_DIR, dst_name))
+        base_name = os.path.splitext(f)[0]
+        dst_pdf = os.path.abspath(os.path.join(PREVIEW_DIR, base_name + ".pdf"))
+        dst_png = os.path.abspath(os.path.join(PREVIEW_DIR, base_name + ".png"))
         
-        print(f"[{i+1}/{len(files)}] Converting {f} -> {dst_name}...")
+        print(f"[{i+1}/{len(files)}] Processing {f}...")
         
         if ctrl.open(src):
-            if ctrl.save_as_format(dst, "PDF"):
-                print("  Success")
-            else:
-                print("  Failed to save PDF")
+            # 1. Generate PDF
+            if not os.path.exists(dst_pdf):
+                print(f"  -> PDF")
+                ctrl.save_as_format(dst_pdf, "PDF")
+            
+            # 2. Generate PNG (Page 1)
+            if not os.path.exists(dst_png):
+                print(f"  -> PNG")
+                # create_page_image(path, page=0, dpi=96, depth=24, fmt='png')
+                ctrl.create_page_image(dst_png, 0, 150, 24, "png")
+                
             ctrl.close_document()
         else:
             print("  Failed to open")

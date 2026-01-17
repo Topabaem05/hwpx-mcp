@@ -848,3 +848,8 @@ MIT 라이선스
 - **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - 이 확장 버전의 영감이 된 오리지널 HWP MCP 서버.
 
 HWP 생태계에 기여해 주신 이 프로젝트 개발자들에게 특별한 감사를 드립니다.
+
+
+---
+
+<a href="https://buymeacoffee.com/choijjs83q" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>

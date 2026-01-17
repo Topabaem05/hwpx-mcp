@@ -814,3 +814,8 @@ This project was inspired and referenced by the following excellent libraries an
 - **[hwp-mcp](https://github.com/jkf87/hwp-mcp)** - The original MCP server for HWP documents that inspired this extended version.
 
 Special thanks to the developers of these projects for their contributions to the HWP ecosystem.
+
+
+---
+
+<a href="https://buymeacoffee.com/choijjs83q" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>

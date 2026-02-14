@@ -53,3 +53,8 @@ htmlcov/
 # Logs
 *.log
 .sisyphus/
+
+# Node/Electron
+node_modules/
+dist-*/
+.vite/

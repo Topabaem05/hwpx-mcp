@@ -874,6 +874,22 @@ pytest hwpx_mcp/tests/ -v
 python -m hwpx_mcp.server
 ```
 
+### Electron agent chat app
+
+```bash
+cd apps/agent-chat
+bun install
+bun run dev
+```
+
+```bash
+cd apps/agent-chat
+bun run typecheck
+bun run build
+```
+
+Note: some Linux environments require Electron to run with `--no-sandbox`.
+
 ## License
 
 MIT License

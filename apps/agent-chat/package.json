@@ -1,0 +1,27 @@
+{
+  "name": "agent-chat",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n renderer,electron \"bun run dev:renderer\" \"bun run dev:electron\"",
+    "dev:renderer": "vite --config vite.config.ts",
+    "dev:electron": "wait-on tcp:5173 && bun run build:electron && electron dist-electron/main.js",
+    "build": "bun run build:renderer && bun run build:electron",
+    "build:renderer": "vite build --config vite.config.ts",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "typecheck": "tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
+  },
+  "dependencies": {
+    "@material/web": "^2.4.1",
+    "electron": "^40.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "wait-on": "^9.0.4"
+  }
+}

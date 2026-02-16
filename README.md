@@ -861,6 +861,48 @@ hwp_create_from_template(
 └─────────────────┘  └─────────────────────┘
 ```
 
+## Project Survey (Repository Map)
+
+This repository is organized into a small Python MCP server core plus template/security assets:
+
+- `hwpx_mcp/`: MCP server entrypoint (`server.py`), runtime config (`config.py`), and package bootstrap (`__main__.py`).
+- `templates/`: built-in HWPX templates and preview JPEG pages used by template-related tools.
+- `security_module/`: Windows security DLL sample used for COM automation scenarios.
+- Root configs: packaging (`pyproject.toml`), dependencies (`requirements.txt`, `uv.lock`), and container deployment (`Dockerfile`, `docker-compose.yml`).
+
+This structure reflects a "server-first" design: Python code exposes MCP tools, while assets/templates provide reusable document generation resources.
+
+## Electron UI (Agent Chat App)
+
+The Electron client is described as `apps/agent-chat` in the development workflow. The UI below documents the intended screen layout in Markdown so it can be reviewed directly from this README.
+
+```mermaid
+flowchart TB
+    A[App Shell / Electron Window] --> B[Top Bar
+Server Status + Connection]
+    A --> C[Left Panel
+Session & Tool List]
+    A --> D[Center Panel
+Chat Timeline]
+    A --> E[Right Panel
+HWP Tool Arguments / Results]
+    D --> F[Composer
+Prompt Input + Send]
+    E --> G[Action Buttons
+Run Tool / Save Output]
+```
+
+### UI Explanation
+
+- **Top Bar**: Shows connection state to `hwpx-mcp` (local stdio or remote HTTP) and active workspace.
+- **Left Panel**: Displays chat sessions and optionally a categorized tool list (document, table, chart, XML).
+- **Center Panel (Chat Timeline)**: Main conversation area where user requests and agent responses appear in sequence.
+- **Composer**: Input area for prompts/commands; sends MCP requests through the selected transport.
+- **Right Panel (Tool Inspector)**: Structured form/results pane for tool calls (arguments, validation, execution result JSON).
+- **Action Buttons**: Quick controls for running a selected tool, exporting result artifacts, or reusing previous arguments.
+
+> Note: This section documents the Electron UI layout for README visibility. If your repository includes `apps/agent-chat`, keep this layout synchronized with the actual implementation.
+
 ## Development
 
 ```bash

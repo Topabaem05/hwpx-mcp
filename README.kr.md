@@ -319,6 +319,53 @@ VS Code `settings.json`에 추가:
 
 ### 4. MCP 클라이언트를 재시작하고 HWP 도구를 사용하세요!
 
+### 5. Electron UI 설치 방법
+
+Electron UI와 백엔드를 함께 실행하려면 먼저 아래를 수행하세요.
+
+1. 백엔드 의존성 한 번 설치
+
+```bash
+cd hwpx-mcp
+uv pip install -e .
+```
+
+2. Electron UI 의존성 설치
+
+```bash
+cd electron-ui
+npm install
+```
+
+3. 다음 중 하나로 실행
+
+```bash
+cd /path/to/hwpx-mcp/electron-ui
+npm run start-stack
+```
+
+```bash
+cd /path/to/hwpx-mcp
+./scripts/quick-start-bunx.sh
+```
+
+```powershell
+cd C:\path\to\hwpx-mcp
+./scripts/quick-start-bunx.ps1
+```
+
+`quick-start-bunx`는 Bun이 있을 때 백엔드/Electron 의존성(`uv/pip` + `bunx npm install`)을 한 번의 명령으로 설치하고 실행합니다.
+
+이 경로는 UI 우선 부트스트랩입니다. 의존성이 준비되면 MCP 백엔드와 Electron UI를 한 번에 함께 실행합니다.
+MCP 백엔드 자동 실행은 기본값이 `1`인 `HWPX_MCP_START_BACKEND`로 제어되며,
+이미 MCP를 별도로 실행해 둔 경우에는 `0`으로 두면 UI만 열립니다.
+에이전틱 게이트웨이는 별도 stdio 프로세스이므로 이 경로에서는 자동으로 실행되지 않습니다.
+필요 시 `MCP_TRANSPORT=stdio`로 `hwpx-mcp-gateway`를 별도 터미널에서 실행하세요.
+
+Linux/컨테이너에서 샌드박스 문제가 있는 환경은 `HWPX_ELECTRON_NO_SANDBOX=1`을 설정하세요.
+
+`npm run start-stack`에서 자동 설치를 막으려면 `HWPX_ELECTRON_AUTO_INSTALL=0`을 설정하세요.
+
 ### Electron UI (Open WebUI 스타일)
 
 이 저장소에는 Open WebUI 레이아웃을 참조한 경량 Electron 셸이 포함되어 있으며, MCP 엔드포인트 점검과 Open WebUI 바로가기 링크를 제공합니다.

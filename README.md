@@ -413,6 +413,52 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 
 ### 4. Restart your MCP client and start using HWP tools!
 
+### 5. Installation for Electron UI
+
+If you want the UI and backend to run together, do this before launching:
+
+1. Install backend dependencies once:
+
+```bash
+cd hwpx-mcp
+uv pip install -e .
+```
+
+2. Install Electron UI dependencies:
+
+```bash
+cd electron-ui
+npm install
+```
+
+3. Start with one of these options:
+
+```bash
+cd /path/to/hwpx-mcp/electron-ui
+npm run start-stack
+```
+
+```bash
+cd /path/to/hwpx-mcp
+./scripts/quick-start-bunx.sh
+```
+
+```powershell
+cd C:\path\to\hwpx-mcp
+./scripts/quick-start-bunx.ps1
+```
+
+`quick-start-bunx` handles both backend and Electron dependency install automatically (`uv/pip` + `bunx npm install`) when Bun is available.
+
+This path is UI-first: after dependencies are ready, it launches MCP backend + Electron UI in one command.
+MCP backend auto-start uses `HWPX_MCP_START_BACKEND` (defaults to `1`), so set it to `0` when your MCP is already running.
+The agentic gateway is a separate stdio process and is not started by this flow.
+When needed, run `hwpx-mcp-gateway` in its own terminal with `MCP_TRANSPORT=stdio`.
+
+If you need Linux/container compatibility, add `HWPX_ELECTRON_NO_SANDBOX=1`.
+
+To disable automatic dependency installation in `npm run start-stack`, set `HWPX_ELECTRON_AUTO_INSTALL=0`.
+
 ## Electron UI (Open WebUI-inspired)
 
 This repository now includes a minimal Electron UI shell modeled after the layout style of Open WebUI. It is a lightweight interface for:

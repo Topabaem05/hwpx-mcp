@@ -25,6 +25,7 @@ body {
 #newSession,
 #openWebUI,
 #checkGateway,
+#mcpHttpUrlInput,
 .primary-btn,
 .ghost-btn {
   font: inherit;
@@ -108,6 +109,45 @@ body {
 .status {
   color: var(--muted);
   font-size: 13px;
+}
+
+.settings-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.settings-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0c1324;
+  color: var(--text);
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.settings-btn {
+  padding: 8px 0;
 }
 
 .chat-area {

@@ -22,6 +22,17 @@
         <div class="section-title">Connection</div>
         <button id="openWebUI" type="button" class="ghost-btn">Open WebUI</button>
         <button id="checkGateway" type="button" class="ghost-btn">Check MCP endpoint</button>
+
+        <div class="section-title">Settings</div>
+        <div class="settings-card">
+          <label for="mcpHttpUrlInput" class="settings-label">MCP API URL</label>
+          <input id="mcpHttpUrlInput" class="settings-input" type="url" placeholder="http://127.0.0.1:8000/mcp" />
+          <div class="settings-actions">
+            <button id="saveSettings" type="button" class="primary-btn settings-btn">Save</button>
+            <button id="resetSettings" type="button" class="ghost-btn settings-btn">Reset</button>
+          </div>
+        </div>
+
         <p id="statusText" class="status">Gateway state unknown</p>
       </aside>
 

@@ -483,6 +483,34 @@ The bootstrap script:
 
 Open WebUI is optional and can be omitted. Configure `HWPX_MCP_HTTP_URL` for your running MCP streamable endpoint.
 
+The Electron settings panel includes an **MCP API URL** input so you can point the UI to a different streamable endpoint and persist it between restarts.
+
+### Workflow helpers
+
+Repository helper scripts are available for common local operations:
+
+```bash
+./scripts/commit-push.sh "Your commit message"
+./scripts/cleanup-workspace.sh
+```
+
+```powershell
+./scripts/commit-push.ps1 -CommitMessage "Your commit message"
+./scripts/cleanup-workspace.ps1
+```
+
+`commit-push` stages all changes, creates a commit, and pushes to the current branch on `origin` by default. You can pass remote and branch explicitly:
+
+```bash
+./scripts/commit-push.sh "Your commit message" upstream main
+```
+
+```powershell
+./scripts/commit-push.ps1 -CommitMessage "Your commit message" -Remote upstream -Branch main
+```
+
+`cleanup-workspace` removes generated artifacts and dependency directories for a clean local reset.
+
 ### Windows Quick Start (UI + MCP)
 
 This flow is intended for Windows and uses two terminals:

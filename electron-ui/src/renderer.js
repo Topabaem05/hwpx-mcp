@@ -1,6 +1,39 @@
-const config = window.hwpxUi?.getConfig?.() ?? {
+const CONFIG_STORAGE_KEY = "hwpxUi.config.v1";
+
+const defaultConfig = window.hwpxUi?.getConfig?.() ?? {
   openWebUIUrl: "http://localhost:3000",
   mcpHttpUrl: "http://127.0.0.1:8000/mcp",
+};
+
+const loadStoredConfig = () => {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return parsed;
+    }
+  } catch {
+    return {};
+  }
+
+  return {};
+};
+
+const ensureString = (value, fallback) =>
+  typeof value === "string" && value.trim() ? value.trim() : fallback;
+
+let config = {
+  ...defaultConfig,
+  ...loadStoredConfig(),
+};
+
+config = {
+  openWebUIUrl: ensureString(config.openWebUIUrl, defaultConfig.openWebUIUrl),
+  mcpHttpUrl: ensureString(config.mcpHttpUrl, defaultConfig.mcpHttpUrl),
 };
 
 const MCP_ACCEPT_HEADER = "application/json, text/event-stream";
@@ -15,6 +48,9 @@ const chatForm = document.getElementById("chatForm");
 const newSession = document.getElementById("newSession");
 const openWebUI = document.getElementById("openWebUI");
 const checkGateway = document.getElementById("checkGateway");
+const mcpHttpUrlInput = document.getElementById("mcpHttpUrlInput");
+const saveSettings = document.getElementById("saveSettings");
+const resetSettings = document.getElementById("resetSettings");
 
 let activeSession = "Session 1";
 
@@ -34,6 +70,26 @@ let nextRequestId = 1;
 let mcpSessionId = null;
 let mcpReady = false;
 let mcpProtocolVersion = MCP_PROTOCOL_VERSION;
+
+const renderConfigInputs = () => {
+  mcpHttpUrlInput.value = config.mcpHttpUrl;
+};
+
+const persistConfig = () => {
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+};
+
+const applyMcpConfig = (nextConfig = {}) => {
+  config = {
+    ...config,
+    ...nextConfig,
+    openWebUIUrl: ensureString(nextConfig.openWebUIUrl, defaultConfig.openWebUIUrl),
+    mcpHttpUrl: ensureString(nextConfig.mcpHttpUrl, defaultConfig.mcpHttpUrl),
+  };
+
+  persistConfig();
+  renderConfigInputs();
+};
 
 const updateStatus = (message) => {
   statusText.textContent = message;
@@ -331,6 +387,26 @@ const pingGateway = async () => {
   }
 };
 
+saveSettings.addEventListener("click", () => {
+  const nextUrl = ensureString(mcpHttpUrlInput.value, "");
+  if (!nextUrl) {
+    updateStatus("Please provide a valid MCP API URL.");
+    return;
+  }
+
+  applyMcpConfig({ mcpHttpUrl: nextUrl });
+  updateStatus(`MCP API updated: ${config.mcpHttpUrl}`);
+});
+
+resetSettings.addEventListener("click", () => {
+  localStorage.removeItem(CONFIG_STORAGE_KEY);
+  config = {
+    ...defaultConfig,
+  };
+  renderConfigInputs();
+  updateStatus(`Gateway target reset to: ${config.mcpHttpUrl}`);
+});
+
 newSession.addEventListener("click", createSession);
 
 openWebUI.addEventListener("click", () => {
@@ -373,4 +449,5 @@ chatForm.addEventListener("submit", (event) => {
 
 renderSessionList();
 renderMessages();
+renderConfigInputs();
 updateStatus(`Gateway target: ${config.mcpHttpUrl}`);

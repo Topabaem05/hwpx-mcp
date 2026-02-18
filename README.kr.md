@@ -384,6 +384,36 @@ HWPX_ELECTRON_AUTO_INSTALL=0 npm run start-stack
 
 `HWPX_MCP_BACKEND_COMMAND`, `OPEN_WEBUI_URL`, `MCP_TRANSPORT`, `MCP_HOST`, `MCP_PORT`, `MCP_PATH`, `HWPX_MCP_HTTP_URL` 같은 환경변수는 필요 시 오버라이드할 수 있습니다.
 
+Electron 설정 패널에서 MCP API URL을 바로 바꿔 저장할 수 있습니다. 변경한 값은 다음 실행 시에도 유지됩니다.
+
+### 작업 편의 스크립트
+
+로컬에서 자주 쓰는 작업을 한 번에 수행하려면 다음 스크립트를 사용하세요.
+
+```bash
+./scripts/commit-push.sh "커밋 메시지"
+./scripts/cleanup-workspace.sh
+```
+
+```powershell
+./scripts/commit-push.ps1 -CommitMessage "커밋 메시지"
+./scripts/cleanup-workspace.ps1
+```
+
+`commit-push`는 변경 사항을 모두 `git add`한 뒤 커밋하고, 기본값으로 현재 브랜치의 `origin` 원격에 푸시합니다.
+
+원격과 브랜치를 지정하려면:
+
+```bash
+./scripts/commit-push.sh "커밋 메시지" upstream main
+```
+
+```powershell
+./scripts/commit-push.ps1 -CommitMessage "커밋 메시지" -Remote upstream -Branch main
+```
+
+`cleanup-workspace`는 빌드/캐시/의존성 디렉터리를 지워 로컬 상태를 정리합니다.
+
 Windows 빠른 시작 (UI + MCP):
 
 ```bat

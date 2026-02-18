@@ -319,6 +319,159 @@ VS Code `settings.json`에 추가:
 
 ### 4. MCP 클라이언트를 재시작하고 HWP 도구를 사용하세요!
 
+### Electron UI (Open WebUI 스타일)
+
+이 저장소에는 Open WebUI 레이아웃을 참조한 경량 Electron 셸이 포함되어 있으며, MCP 엔드포인트 점검과 Open WebUI 바로가기 링크를 제공합니다.
+
+Electron 셸 실행:
+
+```bash
+cd /path/to/hwpx-mcp/electron-ui
+export OPEN_WEBUI_URL=http://localhost:3000
+# Electron UI는 streamable HTTP 전송을 사용해야 합니다.
+export MCP_TRANSPORT=streamable-http
+export HWPX_MCP_HTTP_URL=http://127.0.0.1:8000/mcp
+npm start
+```
+
+원클릭 백엔드 동시 실행(backend + Electron):
+
+```bash
+cd /path/to/hwpx-mcp/electron-ui
+npm run start-stack
+```
+
+Linux/컨테이너에서 샌드박스가 없을 때는 다음을 사용하세요:
+
+```bash
+HWPX_ELECTRON_NO_SANDBOX=1 npm run start-stack
+```
+
+의존성 자동 설치를 막고 누락된 Electron 설치에 대해 바로 실패시키려면:
+
+```bash
+HWPX_ELECTRON_AUTO_INSTALL=0 npm run start-stack
+```
+
+부트스트랩 스크립트는 다음을 수행합니다.
+
+- 백엔드 프로세스를 실행(기본값 `uv run hwpx-mcp`; `uv` 미설치 시 `python3 -m hwpx_mcp.server`로 대체)
+- MCP `/mcp` 엔드포인트가 준비될 때까지 대기
+  (`streamable` 마운트 특성상 `/mcp`에서 `307`, `/mcp/`에서 `404`가 나올 수 있음)
+- Electron 바이너리가 없으면 `electron-ui`에서 `npm install`을 자동으로 실행하며, `npm`이 없고 `bunx`가 있는 경우 `bunx npm install`로 동작합니다.
+- Electron 실행
+- 종료 시 두 프로세스 동시 종료
+
+`HWPX_MCP_BACKEND_COMMAND`, `OPEN_WEBUI_URL`, `MCP_TRANSPORT`, `MCP_HOST`, `MCP_PORT`, `MCP_PATH`, `HWPX_MCP_HTTP_URL` 같은 환경변수는 필요 시 오버라이드할 수 있습니다.
+
+Windows 빠른 시작 (UI + MCP):
+
+```bat
+:: 터미널 1
+cd /d C:\path\to\hwpx-mcp
+set MCP_TRANSPORT=streamable-http
+set MCP_HOST=127.0.0.1
+set MCP_PORT=8000
+set MCP_PATH=/mcp
+uv run hwpx-mcp
+REM uv 미설치 시:
+python3 -m hwpx_mcp.server
+```
+
+```powershell
+# 터미널 1
+Set-Location C:\path\to\hwpx-mcp
+$env:MCP_TRANSPORT = "streamable-http"
+$env:MCP_HOST = "127.0.0.1"
+$env:MCP_PORT = "8000"
+$env:MCP_PATH = "/mcp"
+uv run hwpx-mcp
+# uv 미설치 시:
+python -m hwpx_mcp.server
+```
+
+```bat
+:: 터미널 2
+cd /d C:\path\to\hwpx-mcp\electron-ui
+set OPEN_WEBUI_URL=http://localhost:3000
+set HWPX_MCP_HTTP_URL=http://127.0.0.1:8000/mcp
+npm start
+```
+
+```powershell
+# 터미널 2
+Set-Location C:\path\to\hwpx-mcp\electron-ui
+$env:OPEN_WEBUI_URL = "http://localhost:3000"
+$env:HWPX_MCP_HTTP_URL = "http://127.0.0.1:8000/mcp"
+npm start
+```
+
+원클릭 Windows 스타터:
+
+```bat
+rem Electron 의존성 설치 명령 강제 지정(npm 또는 bunx)
+set HWPX_ELECTRON_PKG_MANAGER=npm
+start-stack-windows.bat
+```
+
+```bat
+:: 또는 bunx 강제 지정
+set HWPX_ELECTRON_PKG_MANAGER=bunx
+start-stack-windows.bat
+```
+
+```powershell
+# Electron 의존성 설치 명령 강제 지정(npm 또는 bunx)
+$env:HWPX_ELECTRON_PKG_MANAGER = "npm"
+./start-stack-windows.ps1
+./start-stack-windows.ps1 -RunAgent  # gateway 터미널도 함께 실행
+```
+
+```powershell
+# 또는 bunx 강제 지정
+$env:HWPX_ELECTRON_PKG_MANAGER = "bunx"
+./start-stack-windows.ps1
+```
+
+`start-stack-windows.bat`와 `start-stack-windows.ps1`는 백엔드 실행 명령을 자동으로 해석합니다.
+- `HWPX_MCP_BACKEND_COMMAND`를 지정하면 해당 명령을 사용합니다.
+- `HWPX_MCP_BACKEND_EXE`가 설정되면 실행 파일 경로를 최우선으로 사용합니다. (절대 경로나 저장소 루트 기준 상대 경로 지원)
+- 미지정 시 기본값은 `uv run hwpx-mcp`이며, `uv`가 없으면 `python3 -m hwpx_mcp.server`(또는 `python -m hwpx_mcp.server`)로 대체됩니다.
+- `HWPX_MCP_START_BACKEND=0`으로 설정하면 이미 실행 중인 백엔드가 있더라도 스크립트는 UI만 시작합니다.
+
+또한 Electron 내부에서 바로 `npm run start-stack`을 실행해 동일한 부트스트랩을 사용할 수 있습니다.
+
+```powershell
+cd /d C:\path\to\hwpx-mcp\electron-ui
+npm run start-stack
+```
+
+`HWPX_MCP_START_BACKEND=0`으로 설정하면 UI만 시작합니다.
+
+필수 선행 조건:
+
+- Python 의존성 설치 (`uv pip install -e .` 또는 `pip install -e .`)
+- Electron UI 의존성 설치 (`electron-ui`에서 `npm install` 또는 `bunx npm install`) 또는 `npm run start-stack`에서 최초 실행 시 자동 설치
+- 필요한 경우 `HWPX_ELECTRON_PKG_MANAGER`를 `npm` 또는 `bunx`로 설정해 설치 방식을 강제할 수 있습니다.
+- Hancom HWP가 설치되어야 Windows COM 기능이 정상 동작합니다.
+
+크로스플랫폼 배포 전략은 `DISTRIBUTION_PRD.md`를 기준 문서로 사용합니다.
+
+- **Track A(현재 기준선):** `npm run start-stack`(또는 `start-stack-windows.*`) 한 번 실행으로 로컬 부트스트랩 가능. 단, Python 런타임과 백엔드 설치(`uv pip install -e .` 또는 `pip install -e .`)가 별도로 필요합니다.
+- **Track B(패키징 확장):** Electron 설치 프로그램(`npm run build:win`) 및 향후 백엔드 번들링을 통해 비기술 사용자 설정 부담을 줄이는 방향입니다.
+- UI 경로는 streamable HTTP 전송을 사용하고, 에이전틱 게이트웨이(`hwpx-mcp-gateway`)는 독립적인 stdio 전용 프로세스입니다.
+
+Windows별 구현 순서와 리스크는 `WINDOWS_DISTRIBUTION_PRD.md`를 참고하세요.
+
+문제 해결:
+
+- `HWPX_MCP_BACKEND_EXE` 경로가 유효하지 않음: 절대 경로이거나 저장소 루트 기준 상대 경로인지 확인하고 실제 실행 파일 경로로 설정
+- `uv` 명령을 찾을 수 없음: `uv`를 설치하거나 `HWPX_MCP_BACKEND_COMMAND`를 직접 실행 가능한 명령으로 설정
+- `npm install`이 불가능할 때는 `HWPX_ELECTRON_PKG_MANAGER=bunx`를 설정해 `bunx npm install`을 사용하세요.
+- 포트 충돌: `MCP_PORT`를 변경
+- UI가 백엔드에 연결되지 않음: `MCP_TRANSPORT=streamable-http` 및 `HWPX_MCP_HTTP_URL` 값이 동일한지 확인. `streamable` 마운트 동작상 `/mcp`에서 `307`, `/mcp/`에서 `404`가 나타날 수 있습니다.
+- Linux/컨테이너에서 electron 샌드박스 문제로 실행이 실패(`SIGTRAP`)할 경우: `HWPX_ELECTRON_NO_SANDBOX=1 npm run start-stack`
+
 ## 도구 참고서 (Tool Reference)
 
 ### 1. 문서 관리 (Document Management)

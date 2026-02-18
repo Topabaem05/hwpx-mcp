@@ -1,0 +1,6 @@
+{"query":"export current document to pdf","expected_group":"export_convert","expected_tools":["hwp_export_pdf","hwp_convert_format"]}
+{"query":"insert heading text and make it bold","expected_group":"text_insertion","expected_tools":["hwp_insert_text","hwp_set_font","hwp_toggle_bold"]}
+{"query":"find and replace all numbers","expected_group":"find_replace","expected_tools":["hwp_find_replace_all","hwp_find_advanced"]}
+{"query":"create a 3 by 2 table","expected_group":"table_chart","expected_tools":["hwp_create_table"]}
+{"query":"validate hwpx xml using xpath","expected_group":"xml_direct","expected_tools":["hwp_xml_validate_content","hwp_xml_xpath_query"]}
+{"query":"show server capabilities","expected_group":"util_debug","expected_tools":["hwp_get_capabilities","hwp_ping"]}

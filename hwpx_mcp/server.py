@@ -1100,7 +1100,15 @@ def main():
         elif config.transport in ("http", "streamable-http"):
             import uvicorn
 
-            app = mcp.streamable_http_app()
+            mcp_app = mcp.streamable_http_app()
+            if config.path and config.path not in {"", "/"}:
+                from starlette.applications import Starlette
+                from starlette.routing import Mount
+
+                app = Starlette(routes=[Mount(config.path, app=mcp_app)])
+            else:
+                app = mcp_app
+
             uvicorn.run(app, host=config.host, port=config.port, log_level="info")
         elif config.transport == "sse":
             import uvicorn

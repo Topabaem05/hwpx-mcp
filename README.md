@@ -14,6 +14,24 @@ A Model Context Protocol (MCP) server for creating and editing HWP/HWPX document
 - **Table Operations**: Full table manipulation (create, edit, format)
 - **Formatting Control**: Character and paragraph formatting
 - **Remote MCP Server**: Deploy as HTTP/SSE server via Docker
+- **Agentic Gateway (Phase 1)**: Deterministic Tool-RAG routing gateway to reduce exposed tool surface
+
+## Agentic Gateway (Phase 1)
+
+The gateway exposes a smaller MCP tool surface (`tool_search`, `tool_describe`,
+`tool_call`, `route_and_call`) while internally routing to existing backend tools.
+
+Run gateway (stdio):
+
+```bash
+hwpx-mcp-gateway
+```
+
+Run offline routing eval (no paid LLM keys):
+
+```bash
+hwpx-mcp-eval --queries hwpx_mcp/eval/queries.jsonl --top-k 5
+```
 
 ## Docker Deployment (Remote MCP Server)
 
@@ -394,6 +412,192 @@ Create or edit `opencode.json` in your project root (or `~/.config/opencode/open
 </details>
 
 ### 4. Restart your MCP client and start using HWP tools!
+
+## Electron UI (Open WebUI-inspired)
+
+This repository now includes a minimal Electron UI shell modeled after the layout style of Open WebUI. It is a lightweight interface for:
+
+- Session-style workspace layout
+- Quick gateway endpoint check
+- Open WebUI launch shortcut
+
+### Run the Electron shell
+
+```bash
+cd /path/to/hwpx-mcp/electron-ui
+export OPEN_WEBUI_URL=http://localhost:3000
+# Streamable HTTP transport is required for the Electron UI
+export MCP_TRANSPORT=streamable-http
+export HWPX_MCP_HTTP_URL=http://127.0.0.1:8000/mcp
+npm start
+```
+
+For a one-command local bootstrap (backend + Electron stack):
+
+```bash
+cd /path/to/hwpx-mcp/electron-ui
+npm run start-stack
+```
+
+On Linux or container environments without Electron sandbox support, add:
+
+```bash
+HWPX_ELECTRON_NO_SANDBOX=1 npm run start-stack
+```
+
+If you want startup to fail fast instead of installing dependencies automatically, set:
+
+```bash
+HWPX_ELECTRON_AUTO_INSTALL=0 npm run start-stack
+```
+
+The bootstrap script:
+
+- launches the backend (defaults to `uv run hwpx-mcp`) with streamable HTTP
+- you can override the backend launcher with `HWPX_MCP_BACKEND_COMMAND`
+- if `uv` is not installed, `start-stack` falls back to `python3 -m hwpx_mcp.server`
+- waits until `/mcp` responds (or `/mcp/` equivalent redirect/404 behavior from streamable mount is observed)
+- auto-installs Electron UI dependencies (`npm install`, or `bunx npm install` when npm is not available and bunx is installed)
+- starts Electron
+- tears down both processes together on exit
+
+Open WebUI is optional and can be omitted. Configure `HWPX_MCP_HTTP_URL` for your running MCP streamable endpoint.
+
+### Windows Quick Start (UI + MCP)
+
+This flow is intended for Windows and uses two terminals:
+
+1. Start MCP server with streamable transport.
+
+```bat
+:: Terminal 1
+cd /d C:\path\to\hwpx-mcp
+set MCP_TRANSPORT=streamable-http
+set MCP_HOST=127.0.0.1
+set MCP_PORT=8000
+set MCP_PATH=/mcp
+uv run hwpx-mcp
+rem if uv is not available:
+python3 -m hwpx_mcp.server
+```
+
+```powershell
+# Terminal 1
+Set-Location C:\path\to\hwpx-mcp
+$env:MCP_TRANSPORT = "streamable-http"
+$env:MCP_HOST = "127.0.0.1"
+$env:MCP_PORT = "8000"
+$env:MCP_PATH = "/mcp"
+uv run hwpx-mcp
+# if uv is not available:
+python -m hwpx_mcp.server
+```
+
+2. Start Electron UI and point it at the MCP endpoint.
+
+```bat
+:: Terminal 2
+cd /d C:\path\to\hwpx-mcp\electron-ui
+set OPEN_WEBUI_URL=http://localhost:3000
+set HWPX_MCP_HTTP_URL=http://127.0.0.1:8000/mcp
+npm start
+```
+
+```powershell
+# Terminal 2
+Set-Location C:\path\to\hwpx-mcp\electron-ui
+npm install
+$env:OPEN_WEBUI_URL = "http://localhost:3000"
+$env:HWPX_MCP_HTTP_URL = "http://127.0.0.1:8000/mcp"
+npm start
+```
+
+Optional agentic gateway (stdio; separate process for agent workflows):
+
+```bat
+:: Terminal 3
+cd /d C:\path\to\hwpx-mcp
+set MCP_TRANSPORT=stdio
+hwpx-mcp-gateway
+```
+
+```powershell
+# Terminal 3
+Set-Location C:\path\to\hwpx-mcp
+$env:MCP_TRANSPORT = "stdio"
+hwpx-mcp-gateway
+```
+
+### One-command Windows starter
+
+From repository root:
+
+```bat
+rem Optional: force package manager for Electron dependency install (npm or bunx)
+set HWPX_ELECTRON_PKG_MANAGER=npm
+start-stack-windows.bat
+```
+
+```bat
+:: Or force bunx
+set HWPX_ELECTRON_PKG_MANAGER=bunx
+start-stack-windows.bat
+```
+
+```powershell
+# Optional: force package manager for Electron dependency install (npm or bunx)
+$env:HWPX_ELECTRON_PKG_MANAGER = "npm"
+./start-stack-windows.ps1
+./start-stack-windows.ps1 -RunAgent   # also starts gateway terminal
+```
+
+```powershell
+# Or force bunx
+$env:HWPX_ELECTRON_PKG_MANAGER = "bunx"
+./start-stack-windows.ps1
+```
+
+`start-stack-windows.bat` and `start-stack-windows.ps1` also auto-resolve the backend launcher:
+- if `HWPX_MCP_BACKEND_COMMAND` is set, they use that command
+- if `HWPX_MCP_BACKEND_EXE` is set, it takes precedence as a direct executable path (absolute or relative to repository root)
+- otherwise they default to `uv run hwpx-mcp`, then fall back to `python3 -m hwpx_mcp.server` (or `python -m hwpx_mcp.server`) when `uv` is missing
+- Set `HWPX_MCP_START_BACKEND=0` to skip backend launch in these scripts when you already run MCP elsewhere.
+
+You can also launch from Electron UI with the same one-command bootstrap:
+
+```powershell
+cd /d C:\path\to\hwpx-mcp\electron-ui
+npm run start-stack
+```
+
+Set `HWPX_MCP_START_BACKEND=0` to open only the UI.
+
+Prerequisite notes:
+
+- Install Python dependencies first (`uv pip install -e .` or `pip install -e .`).
+- Install Node dependencies for Electron by running `npm install` inside `electron-ui` once, or let `npm run start-stack` install them automatically on first run (`npm install` or `bunx npm install`).
+- If needed, set `HWPX_ELECTRON_PKG_MANAGER` to `npm` or `bunx` before first launch to force which installer is used.
+- Hancom HWP (Windows COM features) must be installed for full Windows feature parity.
+
+### Distribution Strategy
+
+Use `DISTRIBUTION_PRD.md` for the cross-platform delivery plan. It defines:
+
+- **Track A (current baseline):** `npm run start-stack` (or `start-stack-windows.*`) as the one-command local bootstrap; this path still requires Python runtime availability and backend install (`uv pip install -e .` or `pip install -e .`).
+- **Track B (packaged installer):** Electron installer flow (`npm run build:win`) and a future backend-bundling strategy to reduce manual setup for end users.
+- Hard constraint separation: Electron/UI path uses streamable HTTP, while the agentic gateway path is separate and stdio-only (`hwpx-mcp-gateway`).
+
+For a Windows-specific rollout, implementation sequence and risk notes, see `WINDOWS_DISTRIBUTION_PRD.md`.
+
+### Quick Troubleshooting
+
+- `HWPX_MCP_BACKEND_EXE` is set but not found: verify the path is absolute or valid relative to repo root, and point it to an executable binary.
+- `uv is not found`: install `uv`, or set `HWPX_MCP_BACKEND_COMMAND` to a local launcher command.
+- Port already in use: pick another `MCP_PORT` before starting.
+- UI cannot connect but backend is running: confirm `MCP_TRANSPORT=streamable-http` and `HWPX_MCP_HTTP_URL` point to the same endpoint. Streamable mount can return `307` on `/mcp` and `404` on `/mcp/` depending on server behavior.
+- Hancom HWP feature limitations: expected without Windows COM components.
+- `electron` exits with SIGTRAP during launch: set `HWPX_ELECTRON_NO_SANDBOX=1` for non-sandbox environments (typically Linux CI/headless).
+- If `npm install` is unavailable, set `HWPX_ELECTRON_PKG_MANAGER=bunx` to use `bunx npm install` for Electron dependency install.
 
 ## Tool Reference
 

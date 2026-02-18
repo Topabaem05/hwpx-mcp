@@ -56,6 +56,8 @@ all = [
 
 [project.scripts]
 hwpx-mcp = "hwpx_mcp.server:main"
+hwpx-mcp-gateway = "hwpx_mcp.gateway_server:main"
+hwpx-mcp-eval = "hwpx_mcp.eval.run_eval:main"
 
 [tool.pdm]
 distribution = true

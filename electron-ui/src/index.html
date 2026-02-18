@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HWPX MCP UI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-title">HWPX Console</div>
+          <div class="brand-sub">Open WebUI inspired workspace</div>
+        </div>
+
+        <button id="newSession" type="button" class="primary-btn">New Session</button>
+
+        <div class="section-title">Sessions</div>
+        <div id="sessionList" class="session-list"></div>
+
+        <div class="section-title">Connection</div>
+        <button id="openWebUI" type="button" class="ghost-btn">Open WebUI</button>
+        <button id="checkGateway" type="button" class="ghost-btn">Check MCP endpoint</button>
+        <p id="statusText" class="status">Gateway state unknown</p>
+      </aside>
+
+      <main class="chat-area">
+        <header class="header">
+          <h1>Document Workbench</h1>
+          <p class="muted">Design direction aligned with open-webui style cards and spaced layout.</p>
+        </header>
+
+        <section id="chatLog" class="chat-log"></section>
+
+        <form id="chatForm" class="composer" autocomplete="off">
+          <textarea id="messageInput" placeholder="Write a command for HWPX MCP..." rows="2"></textarea>
+          <button type="submit" class="primary-btn">Send</button>
+        </form>
+      </main>
+    </div>
+
+    <script type="module" src="renderer.js"></script>
+  </body>
+</html>

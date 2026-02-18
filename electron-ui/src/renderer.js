@@ -1,0 +1,376 @@
+const config = window.hwpxUi?.getConfig?.() ?? {
+  openWebUIUrl: "http://localhost:3000",
+  mcpHttpUrl: "http://127.0.0.1:8000/mcp",
+};
+
+const MCP_ACCEPT_HEADER = "application/json, text/event-stream";
+const MCP_PROTOCOL_VERSION = "2024-11-05";
+const MCP_SESSION_RESET_STATUSES = new Set([400, 404, 409, 410]);
+
+const messageLog = document.getElementById("chatLog");
+const sessionList = document.getElementById("sessionList");
+const statusText = document.getElementById("statusText");
+const messageInput = document.getElementById("messageInput");
+const chatForm = document.getElementById("chatForm");
+const newSession = document.getElementById("newSession");
+const openWebUI = document.getElementById("openWebUI");
+const checkGateway = document.getElementById("checkGateway");
+
+let activeSession = "Session 1";
+
+const sessions = [
+  {
+    title: "Session 1",
+    history: [
+      {
+        role: "bot",
+        text: "Welcome. This interface mirrors open-webui layout patterns and can be connected to your MCP endpoint.",
+      },
+    ],
+  },
+];
+
+let nextRequestId = 1;
+let mcpSessionId = null;
+let mcpReady = false;
+let mcpProtocolVersion = MCP_PROTOCOL_VERSION;
+
+const updateStatus = (message) => {
+  statusText.textContent = message;
+};
+
+const renderSessionList = () => {
+  sessionList.innerHTML = "";
+  sessions.forEach((session) => {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = `session-item${session.title === activeSession ? " active" : ""}`;
+    el.textContent = session.title;
+    el.addEventListener("click", () => {
+      activeSession = session.title;
+      renderSessionList();
+      renderMessages();
+    });
+    sessionList.appendChild(el);
+  });
+};
+
+const activeHistory = () => sessions.find((session) => session.title === activeSession)?.history ?? [];
+
+const renderMessages = () => {
+  messageLog.innerHTML = "";
+  activeHistory().forEach((message) => {
+    const bubble = document.createElement("div");
+    bubble.className = `bubble ${message.role}`;
+    bubble.textContent = message.text;
+    messageLog.appendChild(bubble);
+  });
+  messageLog.scrollTop = messageLog.scrollHeight;
+};
+
+const appendMessage = (role, text) => {
+  const session = sessions.find((session) => session.title === activeSession);
+  if (!session) {
+    return;
+  }
+  session.history.push({ role, text });
+  renderMessages();
+};
+
+const parseCommand = (rawText) => {
+  const input = rawText.trim();
+  if (!input) {
+    return null;
+  }
+
+  const asJson = () => {
+    const payload = JSON.parse(input);
+    if (!payload || typeof payload !== "object" || !payload.tool) {
+      return null;
+    }
+
+    return {
+      tool: String(payload.tool),
+      arguments: payload.arguments && typeof payload.arguments === "object" ? payload.arguments : {},
+    };
+  };
+
+  let parsedJson = null;
+  try {
+    parsedJson = asJson();
+  } catch {
+    parsedJson = null;
+  }
+
+  if (parsedJson) {
+    return parsedJson;
+  }
+
+  const [toolName, ...argTokens] = input.split(/\s+/);
+  if (!toolName) {
+    return null;
+  }
+
+  const parsed = {};
+  for (const token of argTokens) {
+    const index = token.indexOf("=");
+    if (index <= 0) {
+      continue;
+    }
+
+    const key = token.slice(0, index);
+    const value = token.slice(index + 1);
+    const lower = value.toLowerCase();
+    if (key && lower === "true") {
+      parsed[key] = true;
+    } else if (key && lower === "false") {
+      parsed[key] = false;
+    } else if (key && /^-?\d+$/.test(value)) {
+      parsed[key] = Number(value);
+    } else {
+      parsed[key] = value.replace(/^['\"]|['\"]$/g, "");
+    }
+  }
+
+  return {
+    tool: toolName,
+    arguments: parsed,
+  };
+};
+
+const parseMcpEventPayload = async (response) => {
+  const raw = await response.text();
+
+  if (!raw.trim()) {
+    throw new Error("MCP response was empty");
+  }
+
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+
+  if (contentType.includes("application/json") || raw.trim().startsWith("{")) {
+    return JSON.parse(raw);
+  }
+
+  const sseLines = raw.split(/\r?\n/);
+  const messageLines = [];
+
+  for (const line of sseLines) {
+    if (line.startsWith("data:")) {
+      messageLines.push(line.slice(5).trimLeft());
+    }
+  }
+
+  if (messageLines.length === 0) {
+    throw new Error("MCP response did not include event data payload");
+  }
+
+  const last = messageLines[messageLines.length - 1];
+  return JSON.parse(last);
+};
+
+const looksLikeSessionResetError = (status) => {
+  return MCP_SESSION_RESET_STATUSES.has(status);
+};
+
+const decodeToolResultText = (result) => {
+  if (!result) {
+    return "No response payload";
+  }
+
+  if (typeof result === "string") {
+    return result;
+  }
+
+  if (result.content && Array.isArray(result.content)) {
+    const textParts = result.content
+      .map((chunk) => {
+        if (typeof chunk === "string") {
+          return chunk;
+        }
+        return chunk.text || chunk.content || "";
+      })
+      .filter((value) => value)
+      .join("\n");
+
+    if (textParts) {
+      return textParts;
+    }
+  }
+
+  try {
+    return JSON.stringify(result, null, 2);
+  } catch {
+    return String(result);
+  }
+};
+
+const sendMcpRequest = async (method, params = {}, retryAfterReset = false) => {
+  const headers = {
+    "content-type": "application/json",
+    accept: MCP_ACCEPT_HEADER,
+    ...(mcpSessionId ? { "mcp-session-id": mcpSessionId } : {}),
+    ...(mcpProtocolVersion ? { "MCP-Protocol-Version": mcpProtocolVersion } : {}),
+  };
+
+  const response = await fetch(config.mcpHttpUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: nextRequestId++,
+      method,
+      params,
+    }),
+  });
+
+  const nextSession = response.headers.get("mcp-session-id");
+  if (nextSession) {
+    mcpSessionId = nextSession;
+  }
+
+  if (!response.ok) {
+    const message = await response.text();
+    if (!retryAfterReset && looksLikeSessionResetError(response.status)) {
+      mcpSessionId = null;
+      mcpReady = false;
+      if (method === "initialize") {
+        return sendMcpRequest(method, params, true);
+      }
+
+      await ensureMcpSession();
+      return sendMcpRequest(method, params, true);
+    }
+    throw new Error(`${response.status}: ${response.statusText} ${message}`);
+  }
+
+  const payload = await parseMcpEventPayload(response);
+  if (payload.error) {
+    throw new Error(payload.error.message || JSON.stringify(payload.error));
+  }
+
+  return payload.result;
+};
+
+const ensureMcpSession = async () => {
+  if (mcpReady) {
+    return;
+  }
+
+  const result = await sendMcpRequest("initialize", {
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    capabilities: {},
+    clientInfo: { name: "hwpx-electron-ui", version: "0.1.0" },
+  });
+
+  if (!result || result.protocolVersion !== MCP_PROTOCOL_VERSION) {
+    throw new Error("Unexpected MCP initialize response");
+  }
+
+  mcpProtocolVersion = result.protocolVersion;
+
+  await sendMcpRequest("initialized", {});
+  mcpReady = true;
+  updateStatus(`MCP connected | protocol ${result.protocolVersion}`);
+};
+
+const callMcpTool = async (tool, toolArguments) => {
+  await ensureMcpSession();
+
+  if (!tool) {
+    return "No tool specified. Send JSON: {\"tool\": \"hwp_platform_info\", \"arguments\": {}}";
+  }
+
+  const result = await sendMcpRequest("tools/call", {
+    name: tool,
+    arguments: toolArguments || {},
+  });
+  return decodeToolResultText(result);
+};
+
+const createSession = () => {
+  const nextIndex = sessions.length + 1;
+  const title = `Session ${nextIndex}`;
+  sessions.push({
+    title,
+    history: [
+      {
+        role: "bot",
+        text: "A new workflow session is ready. Use this pane as a command draft room.",
+      },
+    ],
+  });
+  activeSession = title;
+  renderSessionList();
+  renderMessages();
+};
+
+const pingGateway = async () => {
+  updateStatus("Checking MCP endpoint...");
+  try {
+    const response = await fetch(config.mcpHttpUrl, {
+      method: "GET",
+      headers: {
+        accept: MCP_ACCEPT_HEADER,
+      },
+    });
+
+    mcpSessionId = response.headers.get("mcp-session-id");
+
+    if (!response.ok) {
+      if (response.status === 406) {
+        updateStatus("Endpoint rejected request (need streamable HTTP SSE headers)");
+      } else {
+        updateStatus(`Endpoint returned ${response.status}`);
+      }
+      return;
+    }
+
+    updateStatus("MCP endpoint is reachable");
+  } catch (error) {
+    updateStatus(`Endpoint unavailable: ${error.message}`);
+  }
+};
+
+newSession.addEventListener("click", createSession);
+
+openWebUI.addEventListener("click", () => {
+  window.hwpxUi?.openExternal?.(config.openWebUIUrl);
+});
+
+checkGateway.addEventListener("click", pingGateway);
+
+chatForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = messageInput.value.trim();
+  if (!text) {
+    return;
+  }
+
+  appendMessage("user", text);
+  messageInput.value = "";
+
+  (async () => {
+    const command = parseCommand(text);
+    if (!command || typeof command.tool !== "string") {
+      appendMessage(
+        "bot",
+        "Type a tool command, e.g. `hwp_platform_info` or JSON: {\"tool\": \"hwp_platform_info\", \"arguments\": {}}",
+      );
+      return;
+    }
+
+    try {
+      const reply = await callMcpTool(command.tool, command.arguments);
+      appendMessage("bot", reply);
+    } catch (error) {
+      appendMessage("bot", `Tool call failed: ${error.message}`);
+      if (!/MCP connected/.test(statusText.textContent)) {
+        updateStatus("MCP session not connected yet");
+      }
+    }
+  })();
+});
+
+renderSessionList();
+renderMessages();
+updateStatus(`Gateway target: ${config.mcpHttpUrl}`);

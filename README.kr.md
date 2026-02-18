@@ -341,6 +341,26 @@ cd /path/to/hwpx-mcp/electron-ui
 npm run start-stack
 ```
 
+Bun을 쓰는 경우에는 아래 한 번의 명령으로 백엔드 Python 의존성 설치 + bunx 기반 Electron 설치/실행까지 진행할 수 있습니다.
+
+```bash
+cd /path/to/hwpx-mcp
+./scripts/quick-start-bunx.sh
+```
+
+Windows에서는:
+
+```powershell
+cd C:\path\to\hwpx-mcp
+./scripts/quick-start-bunx.ps1
+```
+
+bunx 부트스트랩 스크립트 선행 조건:
+
+- `bunx` 명령이 있어야 합니다. (Bun 설치: https://bun.sh/)
+- 플랫폼에 맞는 쉘을 사용해야 합니다: `.sh`는 bash, `.ps1`은 PowerShell
+- Bun이 없으면 스크립트가 즉시 종료되며 설치 안내 메시지가 출력됩니다
+
 Linux/컨테이너에서 샌드박스가 없을 때는 다음을 사용하세요:
 
 ```bash

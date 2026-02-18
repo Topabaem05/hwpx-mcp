@@ -439,6 +439,26 @@ cd /path/to/hwpx-mcp/electron-ui
 npm run start-stack
 ```
 
+If you use Bun, run this one-command Bun flow to install backend deps and use `bunx npm install`:
+
+```bash
+cd /path/to/hwpx-mcp
+./scripts/quick-start-bunx.sh
+```
+
+On Windows:
+
+```powershell
+cd C:\path\to\hwpx-mcp
+./scripts/quick-start-bunx.ps1
+```
+
+Requirements for these Bun launchers:
+
+- `bunx` command must be available (install Bun first: https://bun.sh/)
+- shell environment must match platform: bash-compatible shell for `.sh`, PowerShell for `.ps1`
+- if Bun is not installed, the launcher exits immediately with installation guidance
+
 On Linux or container environments without Electron sandbox support, add:
 
 ```bash

@@ -673,6 +673,41 @@ Prerequisite notes:
 - If needed, set `HWPX_ELECTRON_PKG_MANAGER` to `npm` or `bunx` before first launch to force which installer is used.
 - Hancom HWP (Windows COM features) must be installed for full Windows feature parity.
 
+### Building Installers
+
+You can build a standalone installer that bundles the Python backend so end-users don't need Python installed.
+
+**Prerequisites:** Python 3.10+, Node.js 18+, npm
+
+**Full pipeline (backend + Electron installer):**
+
+```bash
+# Linux / macOS
+./scripts/build-installer.sh
+
+# Windows (PowerShell)
+./scripts/build-installer.ps1
+```
+
+**Step-by-step:**
+
+```bash
+# 1. Build backend binary (PyInstaller)
+./scripts/build-backend.sh          # Linux/macOS
+./scripts/build-backend.ps1         # Windows
+
+# 2. Build Electron installer (includes backend binary)
+cd electron-ui
+npm install
+npm run build:win    # Windows NSIS installer
+npm run build:mac    # macOS DMG
+npm run build:linux  # Linux AppImage + deb
+```
+
+Output goes to `dist/electron-installer/`.
+
+If you skip the backend build, the Electron app still works but requires Python/uv to be installed on the target machine (falls back to `uv run hwpx-mcp` or `python -m hwpx_mcp.server`).
+
 ### Distribution Strategy
 
 Use `DISTRIBUTION_PRD.md` for the cross-platform delivery plan. It defines:

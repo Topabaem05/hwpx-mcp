@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from starlette.applications import Starlette
-from starlette.testclient import TestClient
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from hwpx_mcp.agentic.http_api import DEFAULT_MODEL
 from hwpx_mcp.agentic.http_api import DEFAULT_PROVIDER
-from hwpx_mcp.agentic.http_api import build_agent_http_routes
+from hwpx_mcp.agentic.http_api import build_agent_http_router
+from hwpx_mcp.agentic.openrouter_agent import OpenRouterClient
+from hwpx_mcp.agentic.openrouter_agent import OpenRouterToolAgent
 
 
 class DummyTool:
@@ -50,6 +52,57 @@ class DummyBackend:
 def _create_client():
     calls: list[tuple[str, dict[str, object]]] = []
 
+    class FakeOpenRouterClient(OpenRouterClient):
+        def __init__(self):
+            super().__init__(api_key="sk-test")
+            self._step = 0
+
+        async def chat_completions(
+            self,
+            *,
+            model: str,
+            provider: str,
+            messages: list[dict[str, object]],
+            tools: list[dict[str, object]] | None,
+            tool_choice: str | None,
+        ) -> dict[str, object]:
+            _ = (model, provider, messages, tools, tool_choice)
+            self._step += 1
+
+            if self._step == 1:
+                return {
+                    "choices": [
+                        {
+                            "finish_reason": "tool_calls",
+                            "message": {
+                                "role": "assistant",
+                                "tool_calls": [
+                                    {
+                                        "id": "call_1",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "hwp_ping",
+                                            "arguments": "{}",
+                                        },
+                                    }
+                                ],
+                            },
+                        }
+                    ]
+                }
+
+            return {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "pong",
+                        },
+                    }
+                ]
+            }
+
     def ping_tool(**kwargs):
         calls.append(("hwp_ping", kwargs.copy()))
         return {"success": True, "message": "pong"}
@@ -63,7 +116,12 @@ def _create_client():
             )
         ]
     )
-    app = Starlette(routes=build_agent_http_routes(backend))
+    app = FastAPI()
+
+    def agent_factory(server):
+        return OpenRouterToolAgent(server, client=FakeOpenRouterClient(), max_rounds=2)
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
     return TestClient(app), backend, calls
 
 
@@ -88,11 +146,6 @@ def test_agent_chat_endpoint_runs_tool_only_agent_directly():
             json={
                 "message": "상태 확인해줘",
                 "session_id": "session-1",
-                "runtime": {
-                    "provider": "cerebras/fp16",
-                    "model": "openai/gpt-oss-120b",
-                    "api_key": "sk-test",
-                },
             },
         )
 
@@ -101,12 +154,12 @@ def test_agent_chat_endpoint_runs_tool_only_agent_directly():
     assert payload["success"] is True
     assert payload["selected_tool"] == "hwp_ping"
     assert payload["runtime"] == {
-        "provider": "cerebras/fp16",
-        "model": "openai/gpt-oss-120b",
-        "api_key_present": True,
+        "provider": DEFAULT_PROVIDER,
+        "model": DEFAULT_MODEL,
     }
-    assert calls == [("hwp_ping", {})]
-    assert backend.call_tool_calls == []
+    assert payload["reply"] == "pong"
+    assert calls == []
+    assert backend.call_tool_calls == [("hwp_ping", {})]
 
 
 def test_agent_chat_endpoint_requires_non_empty_message():
@@ -116,4 +169,4 @@ def test_agent_chat_endpoint_requires_non_empty_message():
         response = client.post("/agent/chat", json={"message": ""})
 
     assert response.status_code == 422
-    assert response.json()["error"] == "message_required"
+    assert response.json()["detail"] == "message_required"

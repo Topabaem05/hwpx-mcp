@@ -1,32 +1,29 @@
 # hwpx_mcp/
 
 ## Overview
-Main package: backend MCP server, transport config, agentic gateway, tools, and tests.
-
-## Structure
-```
-hwpx_mcp/
-├── server.py             # backend FastMCP server; registers tool modules
-├── config.py             # env-driven transport config
-├── gateway_server.py     # gateway stdio entrypoint
-├── agentic/              # deterministic routing gateway (Tool-RAG)
-├── tools/                # controllers + tool registration modules
-├── features/             # higher-level doc/query helpers
-├── core/                 # XML security/validation helpers
-└── tests/                # pytest suite
-```
+Python package containing backend runtime, deterministic gateway, tool modules, XML helpers, and test suite.
 
 ## Where To Look
 | Task | Location | Notes |
 |------|----------|-------|
-| Register tools | `hwpx_mcp/server.py` | `initialize_server()` imports/registers tool groups
-| Transport selection | `hwpx_mcp/config.py` | `ServerConfig.get_run_kwargs()` for FastMCP.run
-| Gateway entrypoint | `hwpx_mcp/gateway_server.py` | stdio-only gateway wrapper around backend server
-| XML safety/validation | `hwpx_mcp/core/xml_parser.py` + `hwpx_mcp/core/validator.py` | secure parsing + schema checks
+| Backend bootstrap | `server.py`, `config.py` | Runtime transport selection and server run path |
+| Gateway bootstrap | `gateway_server.py` | stdio-only gateway process for deterministic surface |
+| Tool APIs | `tools/` | Registration modules + platform controllers |
+| Routing internals | `agentic/` | Registry, grouping, retrieval, routing, gateway wrappers |
+| XML helpers | `core/`, `features/` | Secure parser/validator + smart query/edit |
+| Eval and tests | `eval/`, `tests/` | Offline routing eval + pytest regression suite |
 
 ## Conventions
-- Entry points are defined in `pyproject.toml` under `[project.scripts]`.
-- Backend server exposes a large tool surface; gateway reduces this surface to a few meta-tools.
+- `server.py` remains composition root; feature/tool logic should live outside it.
+- Script entrypoints are from `pyproject.toml` (`hwpx-mcp`, `hwpx-mcp-gateway`, `hwpx-mcp-eval`).
+- Async tests rely on pytest-asyncio with `asyncio_mode = auto`.
+
+## Local Boundaries
+- `tools/` owns capability-specific business logic and platform branching.
+- `agentic/` owns deterministic retrieval and route scoring; keep state-free and reproducible.
+- `core/` + `features/` own XML-level safety/transform/query utilities.
 
 ## Anti-Patterns
-- Don’t add new tools directly in `server.py` unless unavoidable; prefer adding a `register_*_tools()` in `hwpx_mcp/tools/` and calling it from `initialize_server()`.
+- Registering/implementing new tool logic directly in `server.py`.
+- Adding nondeterministic behavior to routing/retrieval paths.
+- Bypassing `core/xml_parser.py` for XML parse/edit operations.

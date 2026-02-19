@@ -19,8 +19,6 @@ import sys
 import os
 import platform
 import logging
-import tempfile
-import base64
 from typing import Optional
 from pathlib import Path
 from .core.validator import XmlValidator
@@ -897,7 +895,7 @@ def hwp_ping() -> dict:
     return {
         "status": "connected",
         "server": "HWP-Extended",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "platform": platform.system(),
         "is_windows": IS_WINDOWS,
         "pyhwp_status": pyhwp_status,
@@ -927,7 +925,7 @@ def hwp_get_capabilities() -> dict:
     """
     return {
         "server": "HWP-Extended",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "platform": platform.system(),
         "is_windows": IS_WINDOWS,
         "capabilities": {
@@ -1102,15 +1100,16 @@ def main():
             mcp.run(transport="stdio")
         elif config.transport in ("http", "streamable-http"):
             import uvicorn
+            from starlette.applications import Starlette
+            from starlette.routing import Mount
+
+            from .agentic.http_api import build_agent_http_routes
 
             mcp_app = mcp.streamable_http_app()
-            if config.path and config.path not in {"", "/"}:
-                from starlette.applications import Starlette
-                from starlette.routing import Mount
-
-                app = Starlette(routes=[Mount(config.path, app=mcp_app)])
-            else:
-                app = mcp_app
+            mount_path = config.path if config.path and config.path != "" else "/"
+            routes = build_agent_http_routes(mcp)
+            routes.append(Mount(mount_path, app=mcp_app))
+            app = Starlette(routes=routes)
 
             uvicorn.run(app, host=config.host, port=config.port, log_level="info")
         elif config.transport == "sse":

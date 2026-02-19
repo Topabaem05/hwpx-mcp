@@ -2,7 +2,8 @@ const CONFIG_KEY = "hwpxUi.config.v2";
 
 const defaultConfig = {
   openrouterKey: "",
-  model: "anthropic/claude-sonnet-4",
+  model: "openai/gpt-oss-120b",
+  provider: "cerebras/fp16",
   mcpHttpUrl: window.hwpxUi?.getConfig?.()?.mcpHttpUrl ?? "http://127.0.0.1:8000/mcp",
 };
 
@@ -230,6 +231,10 @@ const callOpenRouter = async (messages, tools, signal) => {
     model: config.model,
     messages,
     stream: false,
+    provider: {
+      order: [config.provider || defaultConfig.provider],
+      quantizations: [(config.provider || defaultConfig.provider).split("/")[1] || "fp16"],
+    },
   };
   if (tools && tools.length > 0) {
     body.tools = buildToolDefs(tools);

@@ -3,8 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
+import inspect
+from collections.abc import Callable
 import re
 from typing import Any
+from typing import Mapping
 from typing import Literal
 from typing import TypedDict
 
@@ -131,6 +134,9 @@ class ToolOnlyAgent:
     backend_server: BackendServer
     _gateway: AgenticGateway = field(init=False, repr=False)
     _graph: Any = field(init=False, repr=False)
+    _tool_callables: dict[str, Callable[..., object]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self._gateway = AgenticGateway(self.backend_server)
@@ -196,6 +202,7 @@ class ToolOnlyAgent:
 
     async def _node_prepare(self, state: AgentState) -> AgentState:
         await self._gateway.refresh_registry()
+        self._tool_callables = self._collect_tool_callables()
         tools_by_name = {
             record.name: record.tool_id for record in self._gateway.registry
         }
@@ -343,27 +350,121 @@ class ToolOnlyAgent:
                 continue
 
             normalized_args = self._normalize_arguments(name, candidate_args)
-            called = await self._gateway.tool_call(tool_id, normalized_args)
-            if called.get("success") is True:
-                return {
-                    "selected_tool_name": name,
-                    "selected_tool_id": tool_id,
-                    "arguments": normalized_args,
-                    "tool_result": called.get("result"),
-                }
+            direct_callable = self._tool_callables.get(name)
+            if direct_callable is not None:
+                try:
+                    result = direct_callable(**normalized_args)
+                    if inspect.isawaitable(result):
+                        result = await result
+                    return self._build_tool_state(
+                        name=name,
+                        tool_id=tool_id,
+                        arguments=normalized_args,
+                        result=result,
+                    )
+                except Exception as exc:
+                    return {
+                        "selected_tool_name": name,
+                        "selected_tool_id": tool_id,
+                        "arguments": normalized_args,
+                        "tool_result": {
+                            "success": False,
+                            "message": f"tool_call_failed: {exc}",
+                        },
+                        "error": f"tool_call_failed: {exc}",
+                    }
 
-            error_message = called.get("message", "tool_call_failed")
-            return {
-                "selected_tool_name": name,
-                "selected_tool_id": tool_id,
-                "arguments": normalized_args,
-                "tool_result": called,
-                "error": str(error_message),
-            }
+            called = await self._gateway.tool_call(tool_id, normalized_args)
+            return self._build_tool_state(
+                name=name,
+                tool_id=tool_id,
+                arguments=normalized_args,
+                result=called,
+                use_gateway_result=True,
+            )
 
         return {
             "error": "no_available_tool",
             "reply": "현재 케이스에서 실행 가능한 툴이 없습니다.",
+        }
+
+    def _collect_tool_callables(self) -> dict[str, Callable[..., object]]:
+        tool_manager = getattr(self.backend_server, "_tool_manager", None)
+        if not tool_manager:
+            return {}
+
+        raw_tools = getattr(tool_manager, "_tools", None)
+        if not isinstance(raw_tools, Mapping):
+            return {}
+
+        callables: dict[str, Callable[..., object]] = {}
+        for name, entry in raw_tools.items():
+            function = getattr(entry, "fn", None)
+            if callable(function):
+                callables[name] = function
+        return callables
+
+    @staticmethod
+    def _build_tool_state(
+        *,
+        name: str,
+        tool_id: str,
+        arguments: dict[str, JsonValue],
+        result: object,
+        use_gateway_result: bool = False,
+    ) -> AgentState:
+        if use_gateway_result:
+            if not isinstance(result, dict):
+                return {
+                    "selected_tool_name": name,
+                    "selected_tool_id": tool_id,
+                    "arguments": arguments,
+                    "tool_result": result,
+                    "error": "invalid_gateway_response",
+                }
+
+            if result.get("success") is False:
+                message = result.get("message", "tool_call_failed")
+                return {
+                    "selected_tool_name": name,
+                    "selected_tool_id": tool_id,
+                    "arguments": arguments,
+                    "tool_result": result,
+                    "error": str(message),
+                }
+
+            tool_result = result.get("result")
+            if tool_result is None and "result" not in result:
+                return {
+                    "selected_tool_name": name,
+                    "selected_tool_id": tool_id,
+                    "arguments": arguments,
+                    "tool_result": result,
+                    "error": "invalid_gateway_response",
+                }
+
+            return {
+                "selected_tool_name": name,
+                "selected_tool_id": tool_id,
+                "arguments": arguments,
+                "tool_result": tool_result,
+            }
+
+        if isinstance(result, dict) and result.get("success") is False:
+            message = result.get("message", "tool_call_failed")
+            return {
+                "selected_tool_name": name,
+                "selected_tool_id": tool_id,
+                "arguments": arguments,
+                "tool_result": result,
+                "error": str(message),
+            }
+
+        return {
+            "selected_tool_name": name,
+            "selected_tool_id": tool_id,
+            "arguments": arguments,
+            "tool_result": result,
         }
 
     @staticmethod

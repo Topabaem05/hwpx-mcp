@@ -1,13 +1,15 @@
 :root {
-  --panel-bg: #0e1321;
-  --panel-2: #151c2f;
-  --line: #24314a;
-  --text: #f5f7fb;
-  --muted: #8f9db3;
-  --accent: #6c8cff;
-  --accent-2: #5ad2ff;
-  --warn: #f4b400;
-  --sidebar-width: 300px;
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --surface-2: #f9fafb;
+  --line: #e5e8eb;
+  --text: #191f28;
+  --muted: #8b95a1;
+  --primary: #3182f6;
+  --primary-pressed: #1b64da;
+  --danger: #f04452;
+  --sidebar-width: 320px;
+  --shadow: 0 10px 30px rgba(2, 8, 23, 0.08);
 }
 
 * {
@@ -16,9 +18,10 @@
 
 body {
   margin: 0;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family: Pretendard, ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo",
+    "Noto Sans KR", "Segoe UI", Helvetica, Arial, sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at top left, #151d35, #090b14 55%);
+  background: var(--bg);
   height: 100vh;
 }
 
@@ -39,7 +42,7 @@ body {
 }
 
 .sidebar {
-  background: var(--panel-bg);
+  background: var(--surface);
   border-right: 1px solid var(--line);
   padding: 16px;
   display: flex;
@@ -68,7 +71,7 @@ body {
   display: none;
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   padding: 6px 8px;
   cursor: pointer;
@@ -80,14 +83,13 @@ body {
   margin-top: 8px;
   color: var(--muted);
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
 }
 
 .session-list {
-  background: var(--panel-2);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 8px;
   flex: 1;
   min-height: 120px;
@@ -95,10 +97,10 @@ body {
 }
 
 .session-item {
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
   margin-bottom: 8px;
-  background: #0b1221;
+  background: var(--surface-2);
   cursor: pointer;
   border: 1px solid transparent;
   color: var(--text);
@@ -108,21 +110,26 @@ body {
 }
 
 .session-item.active {
-  border-color: var(--accent);
+  border-color: rgba(49, 130, 246, 0.35);
+  box-shadow: 0 1px 0 rgba(49, 130, 246, 0.1);
 }
 
 .primary-btn,
 .ghost-btn {
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid transparent;
   padding: 10px 12px;
   cursor: pointer;
 }
 
 .primary-btn {
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  color: #041021;
+  background: var(--primary);
+  color: #ffffff;
   font-weight: 600;
+}
+
+.primary-btn:active {
+  background: var(--primary-pressed);
 }
 
 .primary-btn:disabled {
@@ -131,7 +138,7 @@ body {
 }
 
 .ghost-btn {
-  background: var(--panel-2);
+  background: var(--surface);
   color: var(--text);
   border-color: var(--line);
 }
@@ -143,11 +150,12 @@ body {
 
 .settings-card {
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel-2);
+  border-radius: 14px;
+  background: var(--surface);
   padding: 10px;
   display: grid;
   gap: 8px;
+  box-shadow: var(--shadow);
 }
 
 .settings-label {
@@ -158,8 +166,8 @@ body {
 
 .settings-input {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0c1324;
+  border-radius: 12px;
+  background: var(--surface);
   color: var(--text);
   padding: 8px 10px;
   width: 100%;
@@ -167,7 +175,8 @@ body {
 
 .settings-input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: rgba(49, 130, 246, 0.7);
+  box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.15);
 }
 
 select.settings-input {
@@ -179,7 +188,7 @@ select.settings-input {
 }
 
 select.settings-input option {
-  background: #0c1324;
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -216,7 +225,7 @@ select.settings-input option {
   display: none;
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text);
   padding: 6px 10px;
   cursor: pointer;
@@ -230,32 +239,34 @@ select.settings-input option {
 
 .chat-log {
   border: 1px solid var(--line);
-  background: rgba(10, 15, 29, 0.85);
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: 16px;
   padding: 12px;
   height: 1px;
   min-height: 0;
   flex: 1;
   overflow-y: auto;
+  box-shadow: var(--shadow);
 }
 
 .bubble {
   max-width: 75%;
   margin-bottom: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   white-space: pre-wrap;
   animation: fade-in 160ms ease-out;
 }
 
 .bubble.user {
-  background: #122140;
+  background: rgba(49, 130, 246, 0.12);
   margin-left: auto;
+  border-color: rgba(49, 130, 246, 0.25);
 }
 
 .bubble.bot {
-  background: var(--panel-2);
+  background: var(--surface-2);
 }
 
 .bubble .meta {
@@ -297,17 +308,18 @@ select.settings-input option {
   width: 100%;
   min-height: 56px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 16px;
   resize: none;
   padding: 12px;
   color: var(--text);
-  background: #0c1324;
+  background: var(--surface);
   font: inherit;
 }
 
 #messageInput:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: rgba(49, 130, 246, 0.7);
+  box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.15);
 }
 
 .composer button {

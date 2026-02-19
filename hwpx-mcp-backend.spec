@@ -103,7 +103,9 @@ a = Analysis(
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[
+        os.path.join(repo_root, "scripts", "pyi_rth_hwpx_patch.py"),
+    ],
     excludes=[
         "tkinter",
         "test",

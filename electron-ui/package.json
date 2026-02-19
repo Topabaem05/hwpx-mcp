@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "Electron desktop client for HWPX-MCP document workbench",
+  "author": {
+    "name": "HWP MCP Team",
+    "email": "hwpx-mcp@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/Topabaem05/hwpx-mcp",
+  "license": "MIT",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

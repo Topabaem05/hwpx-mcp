@@ -1,4 +1,4 @@
-const CONFIG_KEY = "hwpxUi.config.v2";
+const CONFIG_KEY = "hwpxUi.config.v3";
 
 const defaultConfig = {
   openrouterKey: "",
@@ -11,76 +11,65 @@ const loadConfig = () => {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") return { ...defaultConfig, ...parsed };
+      const p = JSON.parse(raw);
+      if (p && typeof p === "object") return { ...defaultConfig, ...p };
     }
   } catch { /* ignore */ }
   return { ...defaultConfig };
 };
 
 let config = loadConfig();
-
 const persistConfig = () => localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 
-// DOM
-const messageLog = document.getElementById("chatLog");
-const sessionList = document.getElementById("sessionList");
-const statusText = document.getElementById("statusText");
-const messageInput = document.getElementById("messageInput");
-const chatForm = document.getElementById("chatForm");
-const newSessionBtn = document.getElementById("newSession");
-const checkGateway = document.getElementById("checkGateway");
-const openrouterKeyInput = document.getElementById("openrouterKeyInput");
-const modelSelect = document.getElementById("modelSelect");
-const mcpHttpUrlInput = document.getElementById("mcpHttpUrlInput");
-const saveSettings = document.getElementById("saveSettings");
-const resetSettings = document.getElementById("resetSettings");
-const chatTitle = document.getElementById("chatTitle");
-const sendBtn = document.getElementById("sendBtn");
-const sidebarToggle = document.getElementById("sidebarToggle");
-const appShell = document.getElementById("appShell");
-const backdrop = document.getElementById("backdrop");
+// ─── DOM ───
+const $ = (id) => document.getElementById(id);
+const messageLog = $("chatLog");
+const sessionList = $("sessionList");
+const statusText = $("statusText");
+const messageInput = $("messageInput");
+const chatForm = $("chatForm");
+const newSessionBtn = $("newSession");
+const checkGateway = $("checkGateway");
+const openrouterKeyInput = $("openrouterKeyInput");
+const modelSelect = $("modelSelect");
+const mcpHttpUrlInput = $("mcpHttpUrlInput");
+const saveSettings = $("saveSettings");
+const resetSettings = $("resetSettings");
+const chatTitle = $("chatTitle");
+const sendBtn = $("sendBtn");
+const sidebarToggle = $("sidebarToggle");
+const appShell = $("appShell");
+const backdrop = $("backdrop");
 
-// State
+// ─── State ───
 let activeSessionId = null;
 let sessions = [];
 let currentAbort = null;
 let mcpSessionId = null;
 let mcpReady = false;
-let mcpTools = null;
+let mcpToolsCache = null;
 let nextRpcId = 1;
 
 const MCP_ACCEPT = "application/json, text/event-stream";
 const MCP_PROTO = "2024-11-05";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MAX_AGENT_ROUNDS = 10;
 
-const SYSTEM_PROMPT = `You are HWPX MCP Assistant, an AI that helps users create and edit HWP/HWPX documents.
-You have access to MCP tools for document operations. When you need to perform a document action, call the appropriate tool.
-Always respond in the same language as the user's message.
-When showing tool results, format them clearly for the user.
-If the MCP backend is not connected, still try to help with general questions about HWP documents.`;
-
-// Helpers
+// ─── Helpers ───
 const fmt = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const makeTitle = (t) => { const c = t.trim().replace(/\s+/g, " "); return !c ? "New Chat" : c.length > 24 ? c.slice(0, 21) + "..." : c; };
 const typingHtml = () => '<span class="typing"><span></span><span></span><span></span></span>';
 const status = (msg) => { statusText.textContent = msg; };
 const closeSidebar = () => appShell.classList.remove("sidebar-open");
 
-// Session management
+// ─── Session ───
 const createSession = () => {
-  const s = {
-    id: crypto.randomUUID(),
-    title: "New Chat",
-    messages: [],
-    llmHistory: [],
-  };
+  const s = { id: crypto.randomUUID(), title: "New Chat", messages: [], llmHistory: [] };
   sessions.unshift(s);
   activeSessionId = s.id;
   renderAll();
   return s;
 };
-
 const activeSession = () => sessions.find((s) => s.id === activeSessionId);
 
 const renderSessionList = () => {
@@ -160,9 +149,7 @@ const sendMcp = async (method, params = {}) => {
   if (sid) mcpSessionId = sid;
   if (!res.ok) {
     const txt = await res.text();
-    if ([400, 404, 409, 410].includes(res.status)) {
-      mcpSessionId = null; mcpReady = false;
-    }
+    if ([400, 404, 409, 410].includes(res.status)) { mcpSessionId = null; mcpReady = false; }
     throw new Error(`MCP ${res.status}: ${txt.slice(0, 200)}`);
   }
   const raw = await res.text();
@@ -180,28 +167,37 @@ const sendMcp = async (method, params = {}) => {
 };
 
 const ensureMcp = async () => {
-  if (mcpReady) return;
-  const r = await sendMcp("initialize", {
-    protocolVersion: MCP_PROTO,
-    capabilities: {},
-    clientInfo: { name: "hwpx-mcp-ui", version: "0.2.0" },
-  });
-  if (!r?.protocolVersion) throw new Error("MCP init failed");
-  await sendMcp("initialized", {});
-  mcpReady = true;
-  status(`MCP connected`);
+  if (mcpReady) return true;
+  try {
+    const r = await sendMcp("initialize", {
+      protocolVersion: MCP_PROTO, capabilities: {},
+      clientInfo: { name: "hwpx-mcp-ui", version: "0.3.0" },
+    });
+    if (!r?.protocolVersion) return false;
+    await sendMcp("initialized", {});
+    mcpReady = true;
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 const fetchMcpTools = async () => {
-  if (mcpTools) return mcpTools;
-  await ensureMcp();
-  const r = await sendMcp("tools/list", {});
-  mcpTools = r?.tools ?? [];
-  return mcpTools;
+  if (mcpToolsCache) return mcpToolsCache;
+  const ok = await ensureMcp();
+  if (!ok) return [];
+  try {
+    const r = await sendMcp("tools/list", {});
+    mcpToolsCache = r?.tools ?? [];
+    return mcpToolsCache;
+  } catch {
+    return [];
+  }
 };
 
 const callMcpTool = async (name, args) => {
-  await ensureMcp();
+  const ok = await ensureMcp();
+  if (!ok) throw new Error("MCP backend not connected");
   const r = await sendMcp("tools/call", { name, arguments: args || {} });
   if (!r) return "No response";
   if (typeof r === "string") return r;
@@ -212,34 +208,62 @@ const callMcpTool = async (name, args) => {
   return JSON.stringify(r, null, 2);
 };
 
-// ─── OpenRouter AI ───
-const buildToolDefs = (tools) => {
-  return tools.map((t) => ({
-    type: "function",
-    function: {
-      name: t.name,
-      description: t.description || "",
-      parameters: t.inputSchema || { type: "object", properties: {} },
-    },
-  }));
+// ─── ReAct Agent ───
+const buildSystemPrompt = (tools) => {
+  let toolDesc = "No MCP tools available (backend not connected).";
+  if (tools.length > 0) {
+    const toolLines = tools.map((t) => {
+      const params = t.inputSchema?.properties
+        ? Object.entries(t.inputSchema.properties).map(([k, v]) => {
+            const req = (t.inputSchema.required || []).includes(k) ? ", required" : "";
+            return `    ${k} (${v.type || "any"}${req}): ${v.description || ""}`;
+          }).join("\n")
+        : "    (no parameters)";
+      return `- ${t.name}: ${t.description || ""}\n  Parameters:\n${params}`;
+    }).join("\n\n");
+    toolDesc = toolLines;
+  }
+
+  return `You are HWPX MCP Assistant — an AI agent that helps users create and edit HWP/HWPX Korean documents.
+
+## Available Tools
+${toolDesc}
+
+## How to use tools
+When you need to call a tool, output EXACTLY this format on its own line:
+ACTION: tool_name
+ARGS: {"param1": "value1", "param2": "value2"}
+
+Then STOP and wait. The system will execute the tool and show you the result.
+After seeing the result, you may call another tool or give your final answer.
+
+## Rules
+- You may call multiple tools in sequence (one per round, up to ${MAX_AGENT_ROUNDS} rounds).
+- Always respond in the same language the user writes in.
+- When you have the final answer, just write it normally WITHOUT any ACTION/ARGS lines.
+- If no tools are available, answer the user's question as best you can.
+- For file operations, always use the provided tools.
+- Be concise. Show tool results clearly.`;
 };
 
-const callOpenRouter = async (messages, tools, signal) => {
-  if (!config.openrouterKey) throw new Error("OpenRouter API key not set. Please add it in Settings.");
+const parseAction = (text) => {
+  const actionMatch = text.match(/^ACTION:\s*(.+)$/m);
+  if (!actionMatch) return null;
+  const toolName = actionMatch[1].trim();
 
-  const body = {
-    model: config.model,
-    messages,
-    stream: false,
-    provider: {
-      order: [config.provider || defaultConfig.provider],
-      quantizations: [(config.provider || defaultConfig.provider).split("/")[1] || "fp16"],
-    },
-  };
-  if (tools && tools.length > 0) {
-    body.tools = buildToolDefs(tools);
-    body.tool_choice = "auto";
+  const argsMatch = text.match(/^ARGS:\s*(.+)$/m);
+  let args = {};
+  if (argsMatch) {
+    try { args = JSON.parse(argsMatch[1].trim()); } catch { /* ignore parse errors */ }
   }
+  return { tool: toolName, args };
+};
+
+const callLLM = async (messages, signal) => {
+  if (!config.openrouterKey) throw new Error("OpenRouter API key not set. Add it in Settings (sidebar).");
+
+  const providerKey = (config.provider || defaultConfig.provider).split("/")[0];
+  const quantization = (config.provider || defaultConfig.provider).split("/")[1] || "fp16";
 
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -247,9 +271,17 @@ const callOpenRouter = async (messages, tools, signal) => {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.openrouterKey}`,
       "HTTP-Referer": "https://github.com/Topabaem05/hwpx-mcp",
-      "X-Title": "HWPX MCP",
+      "X-Title": "HWPX MCP Agent",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      model: config.model,
+      messages,
+      stream: false,
+      provider: {
+        order: [providerKey],
+        quantizations: [quantization],
+      },
+    }),
     signal,
   });
 
@@ -258,70 +290,78 @@ const callOpenRouter = async (messages, tools, signal) => {
     throw new Error(`OpenRouter ${res.status}: ${err.slice(0, 300)}`);
   }
 
-  return res.json();
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "";
 };
 
-// ─── Chat Flow ───
-const handleUserMessage = async (text) => {
+// ─── Agent Loop ───
+const runAgent = async (userText, botMsg, signal) => {
   const s = activeSession();
   if (!s) return;
 
+  const tools = await fetchMcpTools();
+  const systemPrompt = buildSystemPrompt(tools);
+
+  s.llmHistory.push({ role: "user", content: userText });
+
+  for (let round = 0; round < MAX_AGENT_ROUNDS; round++) {
+    if (signal.aborted) throw new Error("Cancelled");
+
+    const messages = [{ role: "system", content: systemPrompt }, ...s.llmHistory];
+    const response = await callLLM(messages, signal);
+
+    const action = parseAction(response);
+
+    if (!action) {
+      s.llmHistory.push({ role: "assistant", content: response });
+      if (botMsg) { botMsg.text = response; botMsg.streaming = false; }
+      return;
+    }
+
+    const textBeforeAction = response.split(/^ACTION:/m)[0].trim();
+    s.llmHistory.push({ role: "assistant", content: response });
+
+    if (botMsg) {
+      botMsg.text = textBeforeAction
+        ? `${textBeforeAction}\n\n⚙ ${action.tool}(${JSON.stringify(action.args)})...`
+        : `⚙ Calling ${action.tool}...`;
+      botMsg.streaming = true;
+      renderMessages();
+    }
+
+    let result;
+    try {
+      result = await callMcpTool(action.tool, action.args);
+    } catch (e) {
+      result = `Error: ${e.message}`;
+    }
+
+    s.llmHistory.push({
+      role: "user",
+      content: `[Tool Result for ${action.tool}]\n${result}`,
+    });
+
+    if (botMsg) {
+      botMsg.text = textBeforeAction
+        ? `${textBeforeAction}\n\n⚙ ${action.tool} → done`
+        : `⚙ ${action.tool} → done`;
+      renderMessages();
+    }
+  }
+
+  s.llmHistory.push({ role: "assistant", content: "(Agent reached max rounds)" });
+  if (botMsg) { botMsg.text = "Agent reached maximum tool call rounds."; botMsg.streaming = false; }
+};
+
+// ─── Main Chat Handler ───
+const handleUserMessage = async (text) => {
   const botMsg = addMsg("bot", "", true);
   const controller = new AbortController();
   currentAbort = controller;
   updateSendBtn();
 
   try {
-    s.llmHistory.push({ role: "user", content: text });
-
-    let tools = [];
-    try {
-      tools = await fetchMcpTools();
-    } catch {
-      // MCP not available; AI will respond without tools
-    }
-
-    const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...s.llmHistory];
-    let response = await callOpenRouter(messages, tools, controller.signal);
-    let choice = response.choices?.[0];
-    if (!choice) throw new Error("Empty AI response");
-
-    let maxRounds = 8;
-    while (choice.finish_reason === "tool_calls" && choice.message?.tool_calls?.length && maxRounds-- > 0) {
-      if (controller.signal.aborted) throw new Error("Cancelled");
-
-      const assistantMsg = choice.message;
-      s.llmHistory.push(assistantMsg);
-
-      for (const tc of assistantMsg.tool_calls) {
-        const fn = tc.function;
-        let args = {};
-        try { args = typeof fn.arguments === "string" ? JSON.parse(fn.arguments) : fn.arguments || {}; } catch { /* ignore */ }
-
-        if (botMsg) {
-          botMsg.text = `Calling ${fn.name}...`;
-          botMsg.streaming = true;
-          renderMessages();
-        }
-
-        let result;
-        try {
-          result = await callMcpTool(fn.name, args);
-        } catch (e) {
-          result = `Tool error: ${e.message}`;
-        }
-
-        s.llmHistory.push({ role: "tool", tool_call_id: tc.id, content: typeof result === "string" ? result : JSON.stringify(result) });
-      }
-
-      response = await callOpenRouter([{ role: "system", content: SYSTEM_PROMPT }, ...s.llmHistory], tools, controller.signal);
-      choice = response.choices?.[0];
-      if (!choice) break;
-    }
-
-    const finalText = choice.message?.content || "(no response)";
-    s.llmHistory.push({ role: "assistant", content: finalText });
-    if (botMsg) { botMsg.text = finalText; botMsg.streaming = false; }
+    await runAgent(text, botMsg, controller.signal);
   } catch (e) {
     if (botMsg) {
       botMsg.text = controller.signal.aborted ? "Cancelled." : `Error: ${e.message}`;
@@ -334,12 +374,42 @@ const handleUserMessage = async (text) => {
   }
 };
 
+// ─── MCP Health Check (with retry) ───
+const checkMcpEndpoint = async () => {
+  status("Checking MCP backend...");
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(config.mcpHttpUrl, { method: "GET", headers: { accept: MCP_ACCEPT } });
+      const sid = res.headers.get("mcp-session-id");
+      if (sid) mcpSessionId = sid;
+
+      if (res.ok || res.status === 405 || res.status === 307) {
+        const ok = await ensureMcp();
+        if (ok) {
+          const tools = await fetchMcpTools();
+          status(`MCP connected (${tools.length} tools)`);
+          return;
+        }
+      }
+      status(`MCP returned ${res.status} (attempt ${attempt}/3)`);
+    } catch {
+      if (attempt < 3) {
+        status(`MCP not ready, retrying (${attempt}/3)...`);
+        await new Promise((r) => setTimeout(r, 2000));
+      } else {
+        status("MCP backend not running. Start it or check Settings.");
+      }
+    }
+  }
+};
+
 // ─── Events ───
 saveSettings.addEventListener("click", () => {
   config.openrouterKey = openrouterKeyInput.value.trim();
   config.model = modelSelect.value;
   config.mcpHttpUrl = mcpHttpUrlInput.value.trim() || defaultConfig.mcpHttpUrl;
-  mcpReady = false; mcpTools = null; mcpSessionId = null;
+  mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
   persistConfig();
   status("Settings saved");
 });
@@ -347,23 +417,14 @@ saveSettings.addEventListener("click", () => {
 resetSettings.addEventListener("click", () => {
   localStorage.removeItem(CONFIG_KEY);
   config = { ...defaultConfig };
-  mcpReady = false; mcpTools = null; mcpSessionId = null;
+  mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
   renderConfig();
   status("Settings reset");
 });
 
-newSessionBtn.addEventListener("click", () => { createSession(); });
+newSessionBtn.addEventListener("click", createSession);
 
-checkGateway.addEventListener("click", async () => {
-  status("Checking...");
-  try {
-    const res = await fetch(config.mcpHttpUrl, { method: "GET", headers: { accept: MCP_ACCEPT } });
-    mcpSessionId = res.headers.get("mcp-session-id");
-    status(res.ok ? "MCP endpoint reachable" : `MCP returned ${res.status}`);
-  } catch (e) {
-    status(`MCP unavailable: ${e.message}`);
-  }
-});
+checkGateway.addEventListener("click", checkMcpEndpoint);
 
 sidebarToggle.addEventListener("click", () => appShell.classList.toggle("sidebar-open"));
 backdrop.addEventListener("click", closeSidebar);
@@ -400,4 +461,8 @@ messageInput.addEventListener("keydown", (e) => {
 if (sessions.length === 0) createSession();
 renderConfig();
 renderAll();
-status(config.openrouterKey ? "Ready" : "Set OpenRouter API key in Settings to start");
+
+(async () => {
+  await new Promise((r) => setTimeout(r, 3000));
+  await checkMcpEndpoint();
+})();

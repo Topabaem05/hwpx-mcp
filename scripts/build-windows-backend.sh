@@ -62,9 +62,20 @@ echo "Extracted Python embeddable."
 # Enable site-packages in embedded Python
 PTH_FILE=$(ls "$WIN_BACKEND_DIR/python"/python*._pth 2>/dev/null | head -1)
 if [ -n "$PTH_FILE" ]; then
-  sed -i 's/^#import site/import site/' "$PTH_FILE"
-  echo "../Lib/site-packages" >> "$PTH_FILE"
-  echo "../../" >> "$PTH_FILE"
+  python3 - "$PTH_FILE" <<'PY'
+import pathlib
+import sys
+
+pth = pathlib.Path(sys.argv[1])
+text = pth.read_text(encoding="utf-8")
+text = text.replace("#import site", "import site")
+lines = text.splitlines()
+if "../Lib/site-packages" not in lines:
+    lines.append("../Lib/site-packages")
+if "../../" not in lines:
+    lines.append("../../")
+pth.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
   echo "Enabled site-packages in $PTH_FILE"
 fi
 echo ""
@@ -89,6 +100,7 @@ DEPS=(
   "xmldiff>=2.0.0"
   "uvicorn>=0.30.0"
   "starlette>=0.38.0"
+  "langgraph>=0.2.0"
 )
 
 for dep in "${DEPS[@]}"; do

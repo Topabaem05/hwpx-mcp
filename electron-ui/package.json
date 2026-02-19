@@ -39,9 +39,17 @@
         "filter": ["**/*"]
       }
     ],
+    "extraFiles": [],
     "win": {
       "target": "nsis",
-      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "../dist/hwpx-mcp-backend-win",
+          "to": "backend-win",
+          "filter": ["**/*"]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,

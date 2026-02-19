@@ -27,24 +27,39 @@ const shell = process.platform === "win32";
 const BUNDLED_BACKEND_BINARY_NAME =
   process.platform === "win32" ? "hwpx-mcp-backend.exe" : "hwpx-mcp-backend";
 
+const BUNDLED_BACKEND_BAT_NAME = "hwpx-mcp-backend.bat";
+
 const findBundledBackend = () => {
-  const candidates = [
+  const binaryCandidates = [
     join(ELECTRON_UI_DIR, "resources", "backend", BUNDLED_BACKEND_BINARY_NAME),
     join(REPO_ROOT, "dist", "hwpx-mcp-backend", BUNDLED_BACKEND_BINARY_NAME),
   ];
 
+  const batCandidates = process.platform === "win32" ? [
+    join(ELECTRON_UI_DIR, "resources", "backend-win", BUNDLED_BACKEND_BAT_NAME),
+    join(REPO_ROOT, "dist", "hwpx-mcp-backend-win", BUNDLED_BACKEND_BAT_NAME),
+  ] : [];
+
   try {
     const { app } = require("electron");
     if (app) {
-      candidates.unshift(
-        join(process.resourcesPath || "", "backend", BUNDLED_BACKEND_BINARY_NAME)
-      );
+      const resPath = process.resourcesPath || "";
+      binaryCandidates.unshift(join(resPath, "backend", BUNDLED_BACKEND_BINARY_NAME));
+      if (process.platform === "win32") {
+        batCandidates.unshift(join(resPath, "backend-win", BUNDLED_BACKEND_BAT_NAME));
+      }
     }
   } catch {
     // Not running inside Electron context; skip resourcesPath probe.
   }
 
-  for (const candidate of candidates) {
+  for (const candidate of binaryCandidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  for (const candidate of batCandidates) {
     if (existsSync(candidate)) {
       return candidate;
     }

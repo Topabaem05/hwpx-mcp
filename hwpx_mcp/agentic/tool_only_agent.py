@@ -143,7 +143,9 @@ class ToolOnlyAgent:
         self._graph = self._build_graph()
 
     async def run(
-        self, message: str, session_id: str | None = None
+        self,
+        message: str,
+        session_id: str | None = None,
     ) -> dict[str, object]:
         final_state = await self._graph.ainvoke(
             {

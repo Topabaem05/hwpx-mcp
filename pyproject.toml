@@ -50,8 +50,12 @@ dev = [
 windows = [
     "pywin32>=300",
 ]
+installer = [
+    "pyinstaller>=6.0.0",
+]
 all = [
     "pywin32>=300",
+    "pyinstaller>=6.0.0",
 ]
 
 [project.scripts]

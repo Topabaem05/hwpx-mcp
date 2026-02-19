@@ -7,11 +7,13 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" id="appShell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-title">HWPX Console</div>
-          <div class="brand-sub">Open WebUI inspired workspace</div>
+          <div>
+            <div class="brand-title">HWPX Console</div>
+            <div class="brand-sub">MCP Document Workbench</div>
+          </div>
         </div>
 
         <button id="newSession" type="button" class="primary-btn">New Session</button>
@@ -38,18 +40,19 @@
 
       <main class="chat-area">
         <header class="header">
-          <h1>Document Workbench</h1>
-          <p class="muted">Design direction aligned with open-webui style cards and spaced layout.</p>
+          <button id="sidebarToggle" type="button" class="header-toggle" aria-label="Toggle sidebar">&#9776;</button>
+          <h1 id="chatTitle">Document Workbench</h1>
         </header>
 
         <section id="chatLog" class="chat-log"></section>
 
         <form id="chatForm" class="composer" autocomplete="off">
           <textarea id="messageInput" placeholder="Write a command for HWPX MCP..." rows="2"></textarea>
-          <button type="submit" class="primary-btn">Send</button>
+          <button id="sendBtn" type="submit" class="primary-btn">Send</button>
         </form>
       </main>
     </div>
+    <div class="backdrop" id="backdrop"></div>
 
     <script type="module" src="renderer.js"></script>
   </body>

@@ -51,8 +51,14 @@ const checkGateway = document.getElementById("checkGateway");
 const mcpHttpUrlInput = document.getElementById("mcpHttpUrlInput");
 const saveSettings = document.getElementById("saveSettings");
 const resetSettings = document.getElementById("resetSettings");
+const chatTitle = document.getElementById("chatTitle");
+const sendBtn = document.getElementById("sendBtn");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const appShell = document.getElementById("appShell");
+const backdrop = document.getElementById("backdrop");
 
 let activeSession = "Session 1";
+let currentAbortController = null;
 
 const sessions = [
   {
@@ -60,7 +66,9 @@ const sessions = [
     history: [
       {
         role: "bot",
-        text: "Welcome. This interface mirrors open-webui layout patterns and can be connected to your MCP endpoint.",
+        text: "Welcome. Type a tool command (e.g. hwp_ping) or JSON: {\"tool\": \"hwp_ping\", \"arguments\": {}}",
+        timestamp: Date.now(),
+        streaming: false,
       },
     ],
   },
@@ -70,6 +78,23 @@ let nextRequestId = 1;
 let mcpSessionId = null;
 let mcpReady = false;
 let mcpProtocolVersion = MCP_PROTOCOL_VERSION;
+
+const formatTime = (epochMs) => {
+  const date = new Date(epochMs);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const makeTitleFromText = (text) => {
+  const cleaned = text.trim().replace(/\s+/g, " ");
+  if (!cleaned) {
+    return "New Session";
+  }
+  const limit = 24;
+  return cleaned.length > limit ? `${cleaned.slice(0, limit - 3)}...` : cleaned;
+};
+
+const typingIndicatorHtml = () =>
+  '<span class="typing" aria-hidden="true"><span></span><span></span><span></span></span>';
 
 const renderConfigInputs = () => {
   mcpHttpUrlInput.value = config.mcpHttpUrl;
@@ -106,6 +131,8 @@ const renderSessionList = () => {
       activeSession = session.title;
       renderSessionList();
       renderMessages();
+      updateChatTitle();
+      closeSidebar();
     });
     sessionList.appendChild(el);
   });
@@ -113,24 +140,57 @@ const renderSessionList = () => {
 
 const activeHistory = () => sessions.find((session) => session.title === activeSession)?.history ?? [];
 
+const updateChatTitle = () => {
+  chatTitle.textContent = activeSession;
+};
+
 const renderMessages = () => {
   messageLog.innerHTML = "";
   activeHistory().forEach((message) => {
     const bubble = document.createElement("div");
     bubble.className = `bubble ${message.role}`;
-    bubble.textContent = message.text;
+
+    if (message.streaming && message.text.length === 0) {
+      bubble.innerHTML = typingIndicatorHtml();
+    } else {
+      bubble.textContent = message.text;
+    }
+
+    if (message.timestamp) {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = formatTime(message.timestamp);
+      bubble.appendChild(meta);
+    }
+
     messageLog.appendChild(bubble);
   });
   messageLog.scrollTop = messageLog.scrollHeight;
 };
 
-const appendMessage = (role, text) => {
+const appendMessage = (role, text, streaming = false) => {
   const session = sessions.find((session) => session.title === activeSession);
   if (!session) {
-    return;
+    return null;
   }
-  session.history.push({ role, text });
+  const msg = { role, text, timestamp: Date.now(), streaming };
+  session.history.push(msg);
   renderMessages();
+  return msg;
+};
+
+const updateSendButton = () => {
+  if (currentAbortController) {
+    sendBtn.textContent = "Stop";
+    sendBtn.type = "button";
+  } else {
+    sendBtn.textContent = "Send";
+    sendBtn.type = "submit";
+  }
+};
+
+const closeSidebar = () => {
+  appShell.classList.remove("sidebar-open");
 };
 
 const parseCommand = (rawText) => {
@@ -351,13 +411,16 @@ const createSession = () => {
     history: [
       {
         role: "bot",
-        text: "A new workflow session is ready. Use this pane as a command draft room.",
+        text: "A new session is ready. Use this pane as a command workspace.",
+        timestamp: Date.now(),
+        streaming: false,
       },
     ],
   });
   activeSession = title;
   renderSessionList();
   renderMessages();
+  updateChatTitle();
 };
 
 const pingGateway = async () => {
@@ -415,6 +478,22 @@ openWebUI.addEventListener("click", () => {
 
 checkGateway.addEventListener("click", pingGateway);
 
+sidebarToggle.addEventListener("click", () => {
+  appShell.classList.toggle("sidebar-open");
+});
+
+backdrop.addEventListener("click", closeSidebar);
+
+sendBtn.addEventListener("click", (event) => {
+  if (currentAbortController) {
+    event.preventDefault();
+    currentAbortController.abort();
+    currentAbortController = null;
+    updateSendButton();
+    return;
+  }
+});
+
 chatForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = messageInput.value.trim();
@@ -425,29 +504,71 @@ chatForm.addEventListener("submit", (event) => {
   appendMessage("user", text);
   messageInput.value = "";
 
+  const session = sessions.find((s) => s.title === activeSession);
+  if (session && session.title.startsWith("Session ") && session.history.length <= 2) {
+    const oldTitle = session.title;
+    session.title = makeTitleFromText(text);
+    if (activeSession === oldTitle) {
+      activeSession = session.title;
+    }
+    renderSessionList();
+    updateChatTitle();
+  }
+
+  const botMsg = appendMessage("bot", "", true);
+  const controller = new AbortController();
+  currentAbortController = controller;
+  updateSendButton();
+
   (async () => {
     const command = parseCommand(text);
     if (!command || typeof command.tool !== "string") {
-      appendMessage(
-        "bot",
-        "Type a tool command, e.g. `hwp_platform_info` or JSON: {\"tool\": \"hwp_platform_info\", \"arguments\": {}}",
-      );
+      if (botMsg) {
+        botMsg.text = "Type a tool command, e.g. `hwp_ping` or JSON: {\"tool\": \"hwp_ping\", \"arguments\": {}}";
+        botMsg.streaming = false;
+      }
+      currentAbortController = null;
+      updateSendButton();
+      renderMessages();
       return;
     }
 
     try {
+      if (controller.signal.aborted) {
+        throw new Error("Aborted");
+      }
       const reply = await callMcpTool(command.tool, command.arguments);
-      appendMessage("bot", reply);
+      if (botMsg) {
+        botMsg.text = reply;
+        botMsg.streaming = false;
+      }
     } catch (error) {
-      appendMessage("bot", `Tool call failed: ${error.message}`);
+      if (botMsg) {
+        botMsg.text = controller.signal.aborted
+          ? "Request cancelled."
+          : `Tool call failed: ${error.message}`;
+        botMsg.streaming = false;
+      }
       if (!/MCP connected/.test(statusText.textContent)) {
         updateStatus("MCP session not connected yet");
       }
+    } finally {
+      currentAbortController = null;
+      updateSendButton();
+      renderMessages();
     }
   })();
+});
+
+messageInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    chatForm.requestSubmit();
+  }
 });
 
 renderSessionList();
 renderMessages();
 renderConfigInputs();
+updateChatTitle();
 updateStatus(`Gateway target: ${config.mcpHttpUrl}`);

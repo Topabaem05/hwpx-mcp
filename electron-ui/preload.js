@@ -15,5 +15,5 @@ contextBridge.exposeInMainWorld("hwpxUi", {
   selectFolderDialog: (opts) => ipcRenderer.invoke("dialog:selectFolder", opts),
 
   getBackendStatus: () => ipcRenderer.invoke("backend:status"),
-  restartBackend: () => ipcRenderer.invoke("backend:restart"),
+  restartBackend: (opts) => ipcRenderer.invoke("backend:restart", opts),
 });

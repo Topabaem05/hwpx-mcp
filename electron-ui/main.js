@@ -11,6 +11,17 @@ const BACKEND_URL = `http://${MCP_HOST}:${MCP_PORT}${MCP_PATH}`;
 let backendProcess = null;
 let backendLog = [];
 let mainWindow = null;
+let backendEnvOverrides = {};
+
+const setOpenRouterKey = (value) => {
+  const key = typeof value === "string" ? value.trim() : "";
+  if (key) {
+    backendEnvOverrides = { ...backendEnvOverrides, OPENROUTER_API_KEY: key };
+  } else if (backendEnvOverrides.OPENROUTER_API_KEY) {
+    const { OPENROUTER_API_KEY, ...rest } = backendEnvOverrides;
+    backendEnvOverrides = rest;
+  }
+};
 
 const log = (msg) => {
   const line = `[main] ${msg}`;
@@ -109,6 +120,7 @@ const startBackend = () => {
       windowsVerbatimArguments: isWin && type === "bat",
       env: {
         ...process.env,
+        ...backendEnvOverrides,
         MCP_TRANSPORT: "streamable-http",
         MCP_HOST,
         MCP_PORT,
@@ -165,7 +177,7 @@ const createWindow = () => {
     minWidth: 980,
     minHeight: 640,
     show: false,
-    backgroundColor: "#090b14",
+    backgroundColor: "#f2f4f6",
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -224,7 +236,10 @@ ipcMain.handle("backend:status", () => ({
   log: backendLog.slice(-30),
 }));
 
-ipcMain.handle("backend:restart", () => {
+ipcMain.handle("backend:restart", (_, opts) => {
+  if (opts && typeof opts === "object") {
+    setOpenRouterKey(opts.openrouterKey);
+  }
   stopBackend();
   startBackend();
   return { restarted: true, url: BACKEND_URL, pid: backendProcess?.pid ?? null };

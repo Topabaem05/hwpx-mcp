@@ -1,11 +1,9 @@
-const CONFIG_KEY = "hwpxUi.config.v4";
+const CONFIG_KEY = "hwpxUi.config.v5";
 
 const defaultConfig = {
   backendBaseUrl:
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
-  apiKey: "",
-  provider: "cerebras/fp16",
-  model: "openai/gpt-oss-120b",
+  openrouterKey: "",
 };
 
 const loadConfig = () => {
@@ -14,7 +12,14 @@ const loadConfig = () => {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
-        return { ...defaultConfig, ...parsed };
+        const migrated = { ...parsed };
+        if (
+          typeof migrated.apiKey === "string" &&
+          typeof migrated.openrouterKey !== "string"
+        ) {
+          migrated.openrouterKey = migrated.apiKey;
+        }
+        return { ...defaultConfig, ...migrated };
       }
     }
   } catch {
@@ -36,8 +41,6 @@ const checkGateway = $("checkGateway");
 const restartBackendBtn = $("restartBackend");
 const backendBaseUrlInput = $("backendBaseUrlInput");
 const agentApiKeyInput = $("agentApiKeyInput");
-const agentProviderInput = $("agentProviderInput");
-const agentModelInput = $("agentModelInput");
 const saveSettings = $("saveSettings");
 const resetSettings = $("resetSettings");
 const chatTitle = $("chatTitle");
@@ -128,9 +131,7 @@ const renderMessages = () => {
 
 const renderConfig = () => {
   backendBaseUrlInput.value = config.backendBaseUrl;
-  agentApiKeyInput.value = config.apiKey;
-  agentProviderInput.value = config.provider;
-  agentModelInput.value = config.model;
+  agentApiKeyInput.value = config.openrouterKey;
 };
 
 const renderAll = () => {
@@ -179,11 +180,6 @@ const callAgentChat = async (message, signal) => {
     body: JSON.stringify({
       message,
       session_id: activeSessionId || "",
-      runtime: {
-        api_key: config.apiKey,
-        provider: config.provider,
-        model: config.model,
-      },
     }),
   });
 
@@ -254,7 +250,7 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
       const health = await checkAgentEndpoint();
       const defaults = health?.defaults || {};
       status(
-        `Agent connected (${defaults.provider || config.provider} / ${defaults.model || config.model})`
+        `Agent connected (${defaults.provider || "cerebras/fp16"} / ${defaults.model || "openai/gpt-oss-120b"})`
       );
       return true;
     } catch {
@@ -278,11 +274,16 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
 saveSettings.addEventListener("click", () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput.value);
-  config.apiKey = agentApiKeyInput.value.trim();
-  config.provider = agentProviderInput.value.trim() || defaultConfig.provider;
-  config.model = agentModelInput.value.trim() || defaultConfig.model;
+  config.openrouterKey = agentApiKeyInput.value.trim();
   persistConfig();
-  status("Settings saved");
+  status("Settings saved. Restarting backend...");
+  if (window.hwpxUi?.restartBackend) {
+    window.hwpxUi
+      .restartBackend({ openrouterKey: config.openrouterKey })
+      .catch((error) => {
+        status(`Backend restart failed: ${error?.message || String(error)}`);
+      });
+  }
 });
 
 resetSettings.addEventListener("click", () => {
@@ -299,7 +300,7 @@ checkGateway.addEventListener("click", async () => {
     const health = await checkAgentEndpoint();
     const defaults = health?.defaults || {};
     status(
-      `Agent healthy (${defaults.provider || config.provider} / ${defaults.model || config.model})`
+      `Agent healthy (${defaults.provider || "cerebras/fp16"} / ${defaults.model || "openai/gpt-oss-120b"})`
     );
   } catch (error) {
     status(`Agent check failed: ${error.message}`);
@@ -310,7 +311,7 @@ restartBackendBtn.addEventListener("click", async () => {
   status("Restarting backend...");
   try {
     if (window.hwpxUi?.restartBackend) {
-      const result = await window.hwpxUi.restartBackend();
+      const result = await window.hwpxUi.restartBackend({ openrouterKey: config.openrouterKey });
       status(`Backend restarted (pid ${result.pid || "?"}). Waiting...`);
     }
   } catch (error) {
@@ -364,5 +365,12 @@ renderAll();
 
 (async () => {
   await new Promise((resolve) => setTimeout(resolve, 5000));
+  if (config.openrouterKey && window.hwpxUi?.restartBackend) {
+    try {
+      await window.hwpxUi.restartBackend({ openrouterKey: config.openrouterKey });
+    } catch (error) {
+      status(`Backend restart failed: ${error?.message || String(error)}`);
+    }
+  }
   await waitForBackend(15, 2000);
 })();

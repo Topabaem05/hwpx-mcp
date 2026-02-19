@@ -1100,16 +1100,15 @@ def main():
             mcp.run(transport="stdio")
         elif config.transport in ("http", "streamable-http"):
             import uvicorn
-            from starlette.applications import Starlette
-            from starlette.routing import Mount
+            from fastapi import FastAPI
 
-            from .agentic.http_api import build_agent_http_routes
+            from .agentic.http_api import build_agent_http_router
 
             mcp_app = mcp.streamable_http_app()
             mount_path = config.path if config.path and config.path != "" else "/"
-            routes = build_agent_http_routes(mcp)
-            routes.append(Mount(mount_path, app=mcp_app))
-            app = Starlette(routes=routes)
+            app = FastAPI()
+            app.include_router(build_agent_http_router(mcp))
+            app.mount(mount_path, mcp_app)
 
             uvicorn.run(app, host=config.host, port=config.port, log_level="info")
         elif config.transport == "sse":

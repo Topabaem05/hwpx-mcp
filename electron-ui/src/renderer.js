@@ -1,24 +1,30 @@
-const CONFIG_KEY = "hwpxUi.config.v3";
+const CONFIG_KEY = "hwpxUi.config.v4";
 
 const defaultConfig = {
-  mcpHttpUrl: window.hwpxUi?.getConfig?.()?.mcpHttpUrl ?? "http://127.0.0.1:8000/mcp",
+  backendBaseUrl:
+    window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
+  apiKey: "",
+  provider: "cerebras/fp16",
+  model: "openai/gpt-oss-120b",
 };
 
 const loadConfig = () => {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (raw) {
-      const p = JSON.parse(raw);
-      if (p && typeof p === "object") return { ...defaultConfig, ...p };
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return { ...defaultConfig, ...parsed };
+      }
     }
-  } catch { /* ignore */ }
+  } catch {
+  }
   return { ...defaultConfig };
 };
 
 let config = loadConfig();
 const persistConfig = () => localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 
-// ─── DOM ───
 const $ = (id) => document.getElementById(id);
 const messageLog = $("chatLog");
 const sessionList = $("sessionList");
@@ -28,7 +34,10 @@ const chatForm = $("chatForm");
 const newSessionBtn = $("newSession");
 const checkGateway = $("checkGateway");
 const restartBackendBtn = $("restartBackend");
-const mcpHttpUrlInput = $("mcpHttpUrlInput");
+const backendBaseUrlInput = $("backendBaseUrlInput");
+const agentApiKeyInput = $("agentApiKeyInput");
+const agentProviderInput = $("agentProviderInput");
+const agentModelInput = $("agentModelInput");
 const saveSettings = $("saveSettings");
 const resetSettings = $("resetSettings");
 const chatTitle = $("chatTitle");
@@ -37,72 +46,91 @@ const sidebarToggle = $("sidebarToggle");
 const appShell = $("appShell");
 const backdrop = $("backdrop");
 
-// ─── State ───
 let activeSessionId = null;
 let sessions = [];
 let currentAbort = null;
-let mcpSessionId = null;
-let mcpReady = false;
-let mcpToolsCache = null;
-let nextRpcId = 1;
 
-const MCP_ACCEPT = "application/json, text/event-stream";
-const MCP_PROTO = "2024-11-05";
-
-// ─── Helpers ───
-const fmt = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const makeTitle = (t) => { const c = t.trim().replace(/\s+/g, " "); return !c ? "New Chat" : c.length > 24 ? c.slice(0, 21) + "..." : c; };
-const typingHtml = () => '<span class="typing"><span></span><span></span><span></span></span>';
-const status = (msg) => { statusText.textContent = msg; };
+const fmt = (ms) =>
+  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const makeTitle = (text) => {
+  const cleaned = text.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "New Chat";
+  return cleaned.length > 24 ? `${cleaned.slice(0, 21)}...` : cleaned;
+};
+const typingHtml = () =>
+  '<span class="typing"><span></span><span></span><span></span></span>';
+const status = (msg) => {
+  statusText.textContent = msg;
+};
 const closeSidebar = () => appShell.classList.remove("sidebar-open");
 
-// ─── Session ───
-const createSession = () => {
-  const s = { id: crypto.randomUUID(), title: "New Chat", messages: [] };
-  sessions.unshift(s);
-  activeSessionId = s.id;
-  renderAll();
-  return s;
+const normalizeBaseUrl = (value) => {
+  const trimmed = value.trim();
+  const base = trimmed || defaultConfig.backendBaseUrl;
+  return base.replace(/\/+$/, "");
 };
-const activeSession = () => sessions.find((s) => s.id === activeSessionId);
+
+const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
+
+const createSession = () => {
+  const session = { id: crypto.randomUUID(), title: "New Chat", messages: [] };
+  sessions.unshift(session);
+  activeSessionId = session.id;
+  renderAll();
+  return session;
+};
+
+const activeSession = () => sessions.find((session) => session.id === activeSessionId);
 
 const renderSessionList = () => {
   sessionList.innerHTML = "";
-  for (const s of sessions) {
-    const el = document.createElement("button");
-    el.type = "button";
-    el.className = `session-item${s.id === activeSessionId ? " active" : ""}`;
-    el.textContent = s.title;
-    el.addEventListener("click", () => { activeSessionId = s.id; renderAll(); closeSidebar(); });
-    sessionList.appendChild(el);
+  for (const session of sessions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `session-item${session.id === activeSessionId ? " active" : ""}`;
+    button.textContent = session.title;
+    button.addEventListener("click", () => {
+      activeSessionId = session.id;
+      renderAll();
+      closeSidebar();
+    });
+    sessionList.appendChild(button);
   }
 };
 
 const renderMessages = () => {
   messageLog.innerHTML = "";
-  const s = activeSession();
-  if (!s) return;
-  for (const m of s.messages) {
+  const session = activeSession();
+  if (!session) return;
+
+  for (const message of session.messages) {
     const bubble = document.createElement("div");
-    bubble.className = `bubble ${m.role}`;
-    if (m.streaming && !m.text) {
+    bubble.className = `bubble ${message.role}`;
+
+    if (message.streaming && !message.text) {
       bubble.innerHTML = typingHtml();
     } else {
-      bubble.textContent = m.text;
+      bubble.textContent = message.text;
     }
-    if (m.ts) {
+
+    if (message.ts) {
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.textContent = fmt(m.ts);
+      meta.textContent = fmt(message.ts);
       bubble.appendChild(meta);
     }
+
     messageLog.appendChild(bubble);
   }
+
   messageLog.scrollTop = messageLog.scrollHeight;
 };
 
 const renderConfig = () => {
-  mcpHttpUrlInput.value = config.mcpHttpUrl;
+  backendBaseUrlInput.value = config.backendBaseUrl;
+  agentApiKeyInput.value = config.apiKey;
+  agentProviderInput.value = config.provider;
+  agentModelInput.value = config.model;
 };
 
 const renderAll = () => {
@@ -112,12 +140,13 @@ const renderAll = () => {
 };
 
 const addMsg = (role, text, streaming = false) => {
-  const s = activeSession();
-  if (!s) return null;
-  const m = { role, text, ts: Date.now(), streaming };
-  s.messages.push(m);
+  const session = activeSession();
+  if (!session) return null;
+
+  const message = { role, text, ts: Date.now(), streaming };
+  session.messages.push(message);
   renderMessages();
-  return m;
+  return message;
 };
 
 const updateSendBtn = () => {
@@ -125,94 +154,51 @@ const updateSendBtn = () => {
   sendBtn.type = currentAbort ? "button" : "submit";
 };
 
-// ─── MCP Backend ───
-const sendMcp = async (method, params = {}) => {
-  const res = await fetch(config.mcpHttpUrl, {
+const checkAgentEndpoint = async () => {
+  const response = await fetch(endpointUrl("/agent/health"), {
+    method: "GET",
+    headers: { accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Agent ${response.status}: ${body.slice(0, 160)}`);
+  }
+
+  return response.json();
+};
+
+const callAgentChat = async (message, signal) => {
+  const response = await fetch(endpointUrl("/agent/chat"), {
     method: "POST",
+    signal,
     headers: {
       "content-type": "application/json",
-      accept: MCP_ACCEPT,
-      ...(mcpSessionId ? { "mcp-session-id": mcpSessionId } : {}),
-      "MCP-Protocol-Version": MCP_PROTO,
+      accept: "application/json",
     },
-    body: JSON.stringify({ jsonrpc: "2.0", id: nextRpcId++, method, params }),
+    body: JSON.stringify({
+      message,
+      session_id: activeSessionId || "",
+      runtime: {
+        api_key: config.apiKey,
+        provider: config.provider,
+        model: config.model,
+      },
+    }),
   });
-  const sid = res.headers.get("mcp-session-id");
-  if (sid) mcpSessionId = sid;
-  if (!res.ok) {
-    const txt = await res.text();
-    if ([400, 404, 409, 410].includes(res.status)) { mcpSessionId = null; mcpReady = false; }
-    throw new Error(`MCP ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  const raw = await res.text();
-  if (!raw.trim()) return null;
-  const ct = res.headers.get("content-type")?.toLowerCase() ?? "";
-  let payload;
-  if (ct.includes("application/json") || raw.trim().startsWith("{")) {
-    payload = JSON.parse(raw);
-  } else {
-    const lines = raw.split(/\r?\n/).filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim());
-    payload = JSON.parse(lines[lines.length - 1]);
-  }
-  if (payload.error) throw new Error(payload.error.message || JSON.stringify(payload.error));
-  return payload.result;
-};
 
-const ensureMcp = async () => {
-  if (mcpReady) return true;
-  try {
-    const r = await sendMcp("initialize", {
-      protocolVersion: MCP_PROTO, capabilities: {},
-      clientInfo: { name: "hwpx-mcp-ui", version: "0.3.0" },
-    });
-    if (!r?.protocolVersion) return false;
-    await sendMcp("initialized", {});
-    mcpReady = true;
-    return true;
-  } catch {
-    return false;
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const reason = payload?.error || payload?.message || `HTTP ${response.status}`;
+    throw new Error(String(reason));
   }
-};
-
-const callMcpTool = async (name, args = {}) => {
-  const ok = await ensureMcp();
-  if (!ok) throw new Error("MCP backend not connected");
-  return await sendMcp("tools/call", { name, arguments: args });
-};
-
-const extractToolPayload = (toolCallResult) => {
-  if (!toolCallResult) return null;
-  if (typeof toolCallResult === "string") {
-    try {
-      return JSON.parse(toolCallResult);
-    } catch {
-      return toolCallResult;
-    }
-  }
-
-  const content = toolCallResult.content;
-  if (Array.isArray(content)) {
-    for (const item of content) {
-      const text = typeof item === "string" ? item : item?.text || item?.content || "";
-      if (!text) continue;
-      try {
-        return JSON.parse(text);
-      } catch {
-        return text;
-      }
-    }
-  }
-  return toolCallResult;
+  return payload;
 };
 
 const runToolOnlyAgent = async (userText, botMsg, signal) => {
   if (signal.aborted) throw new Error("Cancelled");
 
-  const raw = await callMcpTool("hwp_agent_chat", {
-    message: userText,
-    session_id: activeSessionId || "",
-  });
-  const payload = extractToolPayload(raw);
+  const payload = await callAgentChat(userText, signal);
 
   let reply = "";
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -223,14 +209,13 @@ const runToolOnlyAgent = async (userText, botMsg, signal) => {
   } else if (typeof payload === "string") {
     reply = payload;
   } else {
-    reply = JSON.stringify(payload ?? raw, null, 2);
+    reply = JSON.stringify(payload, null, 2);
   }
 
   botMsg.text = reply;
   botMsg.streaming = false;
 };
 
-// ─── Main Chat Handler ───
 const handleUserMessage = async (text) => {
   const botMsg = addMsg("bot", "", true);
   const controller = new AbortController();
@@ -239,9 +224,10 @@ const handleUserMessage = async (text) => {
 
   try {
     await runToolOnlyAgent(text, botMsg, controller.signal);
-  } catch (e) {
+  } catch (error) {
     if (botMsg) {
-      botMsg.text = controller.signal.aborted ? "Cancelled." : `Error: ${e.message}`;
+      botMsg.text =
+        controller.signal.aborted ? "Cancelled." : `Error: ${error.message}`;
       botMsg.streaming = false;
     }
   } finally {
@@ -251,78 +237,50 @@ const handleUserMessage = async (text) => {
   }
 };
 
-// ─── MCP Health Check ───
 const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
-  status("Waiting for MCP backend to start...");
+  status("Waiting for agent backend to start...");
 
   if (window.hwpxUi?.getBackendStatus) {
-    const bs = await window.hwpxUi.getBackendStatus();
-    if (bs.running) {
-      status(`Backend process running (pid ${bs.pid}). Connecting...`);
+    const backendStatus = await window.hwpxUi.getBackendStatus();
+    if (backendStatus.running) {
+      status(`Backend process running (pid ${backendStatus.pid}). Connecting...`);
     } else {
       status("Backend process not running. Trying to connect anyway...");
     }
   }
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const res = await fetch(config.mcpHttpUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: MCP_ACCEPT },
-        body: JSON.stringify({ jsonrpc: "2.0", id: nextRpcId++, method: "initialize", params: {
-          protocolVersion: MCP_PROTO, capabilities: {},
-          clientInfo: { name: "hwpx-mcp-ui", version: "0.3.0" },
-        }}),
-      });
-
-      if (res.ok || res.status < 500) {
-        const sid = res.headers.get("mcp-session-id");
-        if (sid) mcpSessionId = sid;
-
-        const raw = await res.text();
-        if (raw.trim()) {
-          mcpReady = false;
-          const ok = await ensureMcp();
-          if (ok) {
-            const tools = await fetchMcpTools();
-            status(`MCP connected (${tools.length} tools available)`);
-            return true;
-          }
-        }
-      }
-
-      status(`MCP starting... (${attempt}/${maxAttempts})`);
+      const health = await checkAgentEndpoint();
+      const defaults = health?.defaults || {};
+      status(
+        `Agent connected (${defaults.provider || config.provider} / ${defaults.model || config.model})`
+      );
+      return true;
     } catch {
-      status(`Waiting for backend... (${attempt}/${maxAttempts})`);
+      status(`Agent starting... (${attempt}/${maxAttempts})`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
-
-    await new Promise((r) => setTimeout(r, delayMs));
   }
 
   if (window.hwpxUi?.getBackendStatus) {
-    const bs = await window.hwpxUi.getBackendStatus();
-    if (bs.log?.length) {
-      const lastLines = bs.log.slice(-5).join("\n");
-      status(`MCP failed to start. Log:\n${lastLines}`);
+    const backendStatus = await window.hwpxUi.getBackendStatus();
+    if (backendStatus.log?.length) {
+      const lastLines = backendStatus.log.slice(-5).join("\n");
+      status(`Agent failed to start. Log:\n${lastLines}`);
       return false;
     }
   }
 
-  status("MCP backend not reachable. Click 'Restart' to try again.");
+  status("Agent backend not reachable. Click 'Restart' to try again.");
   return false;
 };
 
-const checkMcpEndpoint = async () => {
-  mcpReady = false;
-  mcpToolsCache = null;
-  mcpSessionId = null;
-  return waitForBackend(5, 1500);
-};
-
-// ─── Events ───
 saveSettings.addEventListener("click", () => {
-  config.mcpHttpUrl = mcpHttpUrlInput.value.trim() || defaultConfig.mcpHttpUrl;
-  mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
+  config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput.value);
+  config.apiKey = agentApiKeyInput.value.trim();
+  config.provider = agentProviderInput.value.trim() || defaultConfig.provider;
+  config.model = agentModelInput.value.trim() || defaultConfig.model;
   persistConfig();
   status("Settings saved");
 });
@@ -330,67 +288,81 @@ saveSettings.addEventListener("click", () => {
 resetSettings.addEventListener("click", () => {
   localStorage.removeItem(CONFIG_KEY);
   config = { ...defaultConfig };
-  mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
   renderConfig();
   status("Settings reset");
 });
 
 newSessionBtn.addEventListener("click", createSession);
 
-checkGateway.addEventListener("click", checkMcpEndpoint);
+checkGateway.addEventListener("click", async () => {
+  try {
+    const health = await checkAgentEndpoint();
+    const defaults = health?.defaults || {};
+    status(
+      `Agent healthy (${defaults.provider || config.provider} / ${defaults.model || config.model})`
+    );
+  } catch (error) {
+    status(`Agent check failed: ${error.message}`);
+  }
+});
 
 restartBackendBtn.addEventListener("click", async () => {
   status("Restarting backend...");
-  mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
   try {
     if (window.hwpxUi?.restartBackend) {
-      const r = await window.hwpxUi.restartBackend();
-      status(`Backend restarted (pid ${r.pid || "?"}). Waiting...`);
+      const result = await window.hwpxUi.restartBackend();
+      status(`Backend restarted (pid ${result.pid || "?"}). Waiting...`);
     }
-  } catch (e) {
-    status(`Restart failed: ${e.message}`);
+  } catch (error) {
+    status(`Restart failed: ${error.message}`);
   }
-  await new Promise((r) => setTimeout(r, 3000));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
   await waitForBackend(10, 2000);
 });
 
 sidebarToggle.addEventListener("click", () => appShell.classList.toggle("sidebar-open"));
 backdrop.addEventListener("click", closeSidebar);
 
-sendBtn.addEventListener("click", (e) => {
-  if (currentAbort) { e.preventDefault(); currentAbort.abort(); currentAbort = null; updateSendBtn(); }
+sendBtn.addEventListener("click", (event) => {
+  if (!currentAbort) return;
+  event.preventDefault();
+  currentAbort.abort();
+  currentAbort = null;
+  updateSendBtn();
 });
 
-chatForm.addEventListener("submit", (e) => {
-  e.preventDefault();
+chatForm.addEventListener("submit", (event) => {
+  event.preventDefault();
   const text = messageInput.value.trim();
   if (!text) return;
 
-  let s = activeSession();
-  if (!s) s = createSession();
+  let session = activeSession();
+  if (!session) session = createSession();
 
   addMsg("user", text);
   messageInput.value = "";
 
-  if (s.title === "New Chat" && s.messages.length <= 2) {
-    s.title = makeTitle(text);
+  if (session.title === "New Chat" && session.messages.length <= 2) {
+    session.title = makeTitle(text);
     renderSessionList();
-    chatTitle.textContent = s.title;
+    chatTitle.textContent = session.title;
   }
 
   handleUserMessage(text);
 });
 
-messageInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chatForm.requestSubmit(); }
+messageInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    chatForm.requestSubmit();
+  }
 });
 
-// ─── Init ───
 if (sessions.length === 0) createSession();
 renderConfig();
 renderAll();
 
 (async () => {
-  await new Promise((r) => setTimeout(r, 5000));
+  await new Promise((resolve) => setTimeout(resolve, 5000));
   await waitForBackend(15, 2000);
 })();

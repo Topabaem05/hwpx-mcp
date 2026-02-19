@@ -38,6 +38,7 @@ dependencies = [
     # HTTP Server (for remote MCP)
     "uvicorn>=0.30.0",
     "starlette>=0.38.0",
+    "langgraph>=0.2.0",
 ]
 
 requires-python = ">=3.10"

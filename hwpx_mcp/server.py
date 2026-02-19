@@ -88,6 +88,7 @@ try:
         HAS_PYHWP,
     )
     from hwpx_mcp.tools.unified_tools import register_unified_tools
+    from hwpx_mcp.tools.agent_tools import register_agent_tools
 
     logger.info("All tool modules imported successfully")
 except ImportError as e:
@@ -159,6 +160,8 @@ def initialize_server() -> None:
 
         if IS_WINDOWS:
             register_windows_tools(mcp)
+
+        register_agent_tools(mcp)
 
         logger.info("All tools registered successfully")
     except Exception as e:

@@ -1,9 +1,6 @@
 const CONFIG_KEY = "hwpxUi.config.v3";
 
 const defaultConfig = {
-  openrouterKey: "",
-  model: "openai/gpt-oss-120b",
-  provider: "cerebras/fp16",
   mcpHttpUrl: window.hwpxUi?.getConfig?.()?.mcpHttpUrl ?? "http://127.0.0.1:8000/mcp",
 };
 
@@ -31,8 +28,6 @@ const chatForm = $("chatForm");
 const newSessionBtn = $("newSession");
 const checkGateway = $("checkGateway");
 const restartBackendBtn = $("restartBackend");
-const openrouterKeyInput = $("openrouterKeyInput");
-const modelSelect = $("modelSelect");
 const mcpHttpUrlInput = $("mcpHttpUrlInput");
 const saveSettings = $("saveSettings");
 const resetSettings = $("resetSettings");
@@ -53,8 +48,6 @@ let nextRpcId = 1;
 
 const MCP_ACCEPT = "application/json, text/event-stream";
 const MCP_PROTO = "2024-11-05";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MAX_AGENT_ROUNDS = 10;
 
 // ─── Helpers ───
 const fmt = (ms) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -65,7 +58,7 @@ const closeSidebar = () => appShell.classList.remove("sidebar-open");
 
 // ─── Session ───
 const createSession = () => {
-  const s = { id: crypto.randomUUID(), title: "New Chat", messages: [], llmHistory: [] };
+  const s = { id: crypto.randomUUID(), title: "New Chat", messages: [] };
   sessions.unshift(s);
   activeSessionId = s.id;
   renderAll();
@@ -109,8 +102,6 @@ const renderMessages = () => {
 };
 
 const renderConfig = () => {
-  openrouterKeyInput.value = config.openrouterKey;
-  modelSelect.value = config.model;
   mcpHttpUrlInput.value = config.mcpHttpUrl;
 };
 
@@ -183,175 +174,60 @@ const ensureMcp = async () => {
   }
 };
 
-const fetchMcpTools = async () => {
-  if (mcpToolsCache) return mcpToolsCache;
-  const ok = await ensureMcp();
-  if (!ok) return [];
-  try {
-    const r = await sendMcp("tools/list", {});
-    mcpToolsCache = r?.tools ?? [];
-    return mcpToolsCache;
-  } catch {
-    return [];
-  }
-};
-
-const callMcpTool = async (name, args) => {
+const callMcpTool = async (name, args = {}) => {
   const ok = await ensureMcp();
   if (!ok) throw new Error("MCP backend not connected");
-  const r = await sendMcp("tools/call", { name, arguments: args || {} });
-  if (!r) return "No response";
-  if (typeof r === "string") return r;
-  if (r.content && Array.isArray(r.content)) {
-    const parts = r.content.map((c) => (typeof c === "string" ? c : c.text || c.content || "")).filter(Boolean).join("\n");
-    if (parts) return parts;
-  }
-  return JSON.stringify(r, null, 2);
+  return await sendMcp("tools/call", { name, arguments: args });
 };
 
-// ─── ReAct Agent ───
-const buildSystemPrompt = (tools) => {
-  let toolDesc = "No MCP tools available (backend not connected).";
-  if (tools.length > 0) {
-    const toolLines = tools.map((t) => {
-      const params = t.inputSchema?.properties
-        ? Object.entries(t.inputSchema.properties).map(([k, v]) => {
-            const req = (t.inputSchema.required || []).includes(k) ? ", required" : "";
-            return `    ${k} (${v.type || "any"}${req}): ${v.description || ""}`;
-          }).join("\n")
-        : "    (no parameters)";
-      return `- ${t.name}: ${t.description || ""}\n  Parameters:\n${params}`;
-    }).join("\n\n");
-    toolDesc = toolLines;
-  }
-
-  return `You are HWPX MCP Assistant — an AI agent that helps users create and edit HWP/HWPX Korean documents.
-
-## Available Tools
-${toolDesc}
-
-## How to use tools
-When you need to call a tool, output EXACTLY this format on its own line:
-ACTION: tool_name
-ARGS: {"param1": "value1", "param2": "value2"}
-
-Then STOP and wait. The system will execute the tool and show you the result.
-After seeing the result, you may call another tool or give your final answer.
-
-## Rules
-- You may call multiple tools in sequence (one per round, up to ${MAX_AGENT_ROUNDS} rounds).
-- Always respond in the same language the user writes in.
-- When you have the final answer, just write it normally WITHOUT any ACTION/ARGS lines.
-- If no tools are available, answer the user's question as best you can.
-- For file operations, always use the provided tools.
-- Be concise. Show tool results clearly.`;
-};
-
-const parseAction = (text) => {
-  const actionMatch = text.match(/^ACTION:\s*(.+)$/m);
-  if (!actionMatch) return null;
-  const toolName = actionMatch[1].trim();
-
-  const argsMatch = text.match(/^ARGS:\s*(.+)$/m);
-  let args = {};
-  if (argsMatch) {
-    try { args = JSON.parse(argsMatch[1].trim()); } catch { /* ignore parse errors */ }
-  }
-  return { tool: toolName, args };
-};
-
-const callLLM = async (messages, signal) => {
-  if (!config.openrouterKey) throw new Error("OpenRouter API key not set. Add it in Settings (sidebar).");
-
-  const providerKey = (config.provider || defaultConfig.provider).split("/")[0];
-  const quantization = (config.provider || defaultConfig.provider).split("/")[1] || "fp16";
-
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.openrouterKey}`,
-      "HTTP-Referer": "https://github.com/Topabaem05/hwpx-mcp",
-      "X-Title": "HWPX MCP Agent",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      stream: false,
-      provider: {
-        order: [providerKey],
-        quantizations: [quantization],
-      },
-    }),
-    signal,
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenRouter ${res.status}: ${err.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
-};
-
-// ─── Agent Loop ───
-const runAgent = async (userText, botMsg, signal) => {
-  const s = activeSession();
-  if (!s) return;
-
-  const tools = await fetchMcpTools();
-  const systemPrompt = buildSystemPrompt(tools);
-
-  s.llmHistory.push({ role: "user", content: userText });
-
-  for (let round = 0; round < MAX_AGENT_ROUNDS; round++) {
-    if (signal.aborted) throw new Error("Cancelled");
-
-    const messages = [{ role: "system", content: systemPrompt }, ...s.llmHistory];
-    const response = await callLLM(messages, signal);
-
-    const action = parseAction(response);
-
-    if (!action) {
-      s.llmHistory.push({ role: "assistant", content: response });
-      if (botMsg) { botMsg.text = response; botMsg.streaming = false; }
-      return;
-    }
-
-    const textBeforeAction = response.split(/^ACTION:/m)[0].trim();
-    s.llmHistory.push({ role: "assistant", content: response });
-
-    if (botMsg) {
-      botMsg.text = textBeforeAction
-        ? `${textBeforeAction}\n\n⚙ ${action.tool}(${JSON.stringify(action.args)})...`
-        : `⚙ Calling ${action.tool}...`;
-      botMsg.streaming = true;
-      renderMessages();
-    }
-
-    let result;
+const extractToolPayload = (toolCallResult) => {
+  if (!toolCallResult) return null;
+  if (typeof toolCallResult === "string") {
     try {
-      result = await callMcpTool(action.tool, action.args);
-    } catch (e) {
-      result = `Error: ${e.message}`;
-    }
-
-    s.llmHistory.push({
-      role: "user",
-      content: `[Tool Result for ${action.tool}]\n${result}`,
-    });
-
-    if (botMsg) {
-      botMsg.text = textBeforeAction
-        ? `${textBeforeAction}\n\n⚙ ${action.tool} → done`
-        : `⚙ ${action.tool} → done`;
-      renderMessages();
+      return JSON.parse(toolCallResult);
+    } catch {
+      return toolCallResult;
     }
   }
 
-  s.llmHistory.push({ role: "assistant", content: "(Agent reached max rounds)" });
-  if (botMsg) { botMsg.text = "Agent reached maximum tool call rounds."; botMsg.streaming = false; }
+  const content = toolCallResult.content;
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      const text = typeof item === "string" ? item : item?.text || item?.content || "";
+      if (!text) continue;
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    }
+  }
+  return toolCallResult;
+};
+
+const runToolOnlyAgent = async (userText, botMsg, signal) => {
+  if (signal.aborted) throw new Error("Cancelled");
+
+  const raw = await callMcpTool("hwp_agent_chat", {
+    message: userText,
+    session_id: activeSessionId || "",
+  });
+  const payload = extractToolPayload(raw);
+
+  let reply = "";
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    reply = payload.reply || payload.message || JSON.stringify(payload, null, 2);
+    if (payload.case && payload.subagent) {
+      status(`Case: ${payload.case} | Subagent: ${payload.subagent}`);
+    }
+  } else if (typeof payload === "string") {
+    reply = payload;
+  } else {
+    reply = JSON.stringify(payload ?? raw, null, 2);
+  }
+
+  botMsg.text = reply;
+  botMsg.streaming = false;
 };
 
 // ─── Main Chat Handler ───
@@ -362,7 +238,7 @@ const handleUserMessage = async (text) => {
   updateSendBtn();
 
   try {
-    await runAgent(text, botMsg, controller.signal);
+    await runToolOnlyAgent(text, botMsg, controller.signal);
   } catch (e) {
     if (botMsg) {
       botMsg.text = controller.signal.aborted ? "Cancelled." : `Error: ${e.message}`;
@@ -445,8 +321,6 @@ const checkMcpEndpoint = async () => {
 
 // ─── Events ───
 saveSettings.addEventListener("click", () => {
-  config.openrouterKey = openrouterKeyInput.value.trim();
-  config.model = modelSelect.value;
   config.mcpHttpUrl = mcpHttpUrlInput.value.trim() || defaultConfig.mcpHttpUrl;
   mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
   persistConfig();

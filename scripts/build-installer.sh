@@ -48,13 +48,18 @@ echo ""
 
 # Step 1: Backend
 if [ "$SKIP_BACKEND" = false ]; then
-  echo "--- Step 1: Building backend binary ---"
-  bash "$REPO_ROOT/scripts/build-backend.sh"
+  if [ "$TARGET_PLATFORM" = "win" ]; then
+    echo "--- Step 1: Building Windows self-contained backend ---"
+    bash "$REPO_ROOT/scripts/build-windows-backend.sh"
+  else
+    echo "--- Step 1: Building backend binary ---"
+    bash "$REPO_ROOT/scripts/build-backend.sh"
+  fi
   echo ""
 else
   echo "--- Step 1: Skipping backend build ---"
-  if [ ! -d "$DIST_DIR/hwpx-mcp-backend" ]; then
-    echo "WARNING: dist/hwpx-mcp-backend/ not found."
+  if [ ! -d "$DIST_DIR/hwpx-mcp-backend" ] && [ ! -d "$DIST_DIR/hwpx-mcp-backend-win" ]; then
+    echo "WARNING: No backend build found in dist/."
     echo "Electron installer will be built without bundled backend."
     echo "Users will need Python runtime to run the backend."
   fi

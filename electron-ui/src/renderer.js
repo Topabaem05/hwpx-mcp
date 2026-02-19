@@ -30,6 +30,7 @@ const messageInput = $("messageInput");
 const chatForm = $("chatForm");
 const newSessionBtn = $("newSession");
 const checkGateway = $("checkGateway");
+const restartBackendBtn = $("restartBackend");
 const openrouterKeyInput = $("openrouterKeyInput");
 const modelSelect = $("modelSelect");
 const mcpHttpUrlInput = $("mcpHttpUrlInput");
@@ -374,34 +375,72 @@ const handleUserMessage = async (text) => {
   }
 };
 
-// ─── MCP Health Check (with retry) ───
-const checkMcpEndpoint = async () => {
-  status("Checking MCP backend...");
+// ─── MCP Health Check ───
+const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
+  status("Waiting for MCP backend to start...");
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const res = await fetch(config.mcpHttpUrl, { method: "GET", headers: { accept: MCP_ACCEPT } });
-      const sid = res.headers.get("mcp-session-id");
-      if (sid) mcpSessionId = sid;
-
-      if (res.ok || res.status === 405 || res.status === 307) {
-        const ok = await ensureMcp();
-        if (ok) {
-          const tools = await fetchMcpTools();
-          status(`MCP connected (${tools.length} tools)`);
-          return;
-        }
-      }
-      status(`MCP returned ${res.status} (attempt ${attempt}/3)`);
-    } catch {
-      if (attempt < 3) {
-        status(`MCP not ready, retrying (${attempt}/3)...`);
-        await new Promise((r) => setTimeout(r, 2000));
-      } else {
-        status("MCP backend not running. Start it or check Settings.");
-      }
+  if (window.hwpxUi?.getBackendStatus) {
+    const bs = await window.hwpxUi.getBackendStatus();
+    if (bs.running) {
+      status(`Backend process running (pid ${bs.pid}). Connecting...`);
+    } else {
+      status("Backend process not running. Trying to connect anyway...");
     }
   }
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(config.mcpHttpUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: MCP_ACCEPT },
+        body: JSON.stringify({ jsonrpc: "2.0", id: nextRpcId++, method: "initialize", params: {
+          protocolVersion: MCP_PROTO, capabilities: {},
+          clientInfo: { name: "hwpx-mcp-ui", version: "0.3.0" },
+        }}),
+      });
+
+      if (res.ok || res.status < 500) {
+        const sid = res.headers.get("mcp-session-id");
+        if (sid) mcpSessionId = sid;
+
+        const raw = await res.text();
+        if (raw.trim()) {
+          mcpReady = false;
+          const ok = await ensureMcp();
+          if (ok) {
+            const tools = await fetchMcpTools();
+            status(`MCP connected (${tools.length} tools available)`);
+            return true;
+          }
+        }
+      }
+
+      status(`MCP starting... (${attempt}/${maxAttempts})`);
+    } catch {
+      status(`Waiting for backend... (${attempt}/${maxAttempts})`);
+    }
+
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+
+  if (window.hwpxUi?.getBackendStatus) {
+    const bs = await window.hwpxUi.getBackendStatus();
+    if (bs.log?.length) {
+      const lastLines = bs.log.slice(-5).join("\n");
+      status(`MCP failed to start. Log:\n${lastLines}`);
+      return false;
+    }
+  }
+
+  status("MCP backend not reachable. Click 'Restart' to try again.");
+  return false;
+};
+
+const checkMcpEndpoint = async () => {
+  mcpReady = false;
+  mcpToolsCache = null;
+  mcpSessionId = null;
+  return waitForBackend(5, 1500);
 };
 
 // ─── Events ───
@@ -425,6 +464,21 @@ resetSettings.addEventListener("click", () => {
 newSessionBtn.addEventListener("click", createSession);
 
 checkGateway.addEventListener("click", checkMcpEndpoint);
+
+restartBackendBtn.addEventListener("click", async () => {
+  status("Restarting backend...");
+  mcpReady = false; mcpToolsCache = null; mcpSessionId = null;
+  try {
+    if (window.hwpxUi?.restartBackend) {
+      const r = await window.hwpxUi.restartBackend();
+      status(`Backend restarted (pid ${r.pid || "?"}). Waiting...`);
+    }
+  } catch (e) {
+    status(`Restart failed: ${e.message}`);
+  }
+  await new Promise((r) => setTimeout(r, 3000));
+  await waitForBackend(10, 2000);
+});
 
 sidebarToggle.addEventListener("click", () => appShell.classList.toggle("sidebar-open"));
 backdrop.addEventListener("click", closeSidebar);
@@ -463,6 +517,6 @@ renderConfig();
 renderAll();
 
 (async () => {
-  await new Promise((r) => setTimeout(r, 3000));
-  await checkMcpEndpoint();
+  await new Promise((r) => setTimeout(r, 5000));
+  await waitForBackend(15, 2000);
 })();

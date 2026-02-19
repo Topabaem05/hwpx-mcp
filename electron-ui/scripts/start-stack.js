@@ -24,6 +24,35 @@ const uiPackageManager = (process.env.HWPX_ELECTRON_PKG_MANAGER || "").trim().to
 
 const shell = process.platform === "win32";
 
+const BUNDLED_BACKEND_BINARY_NAME =
+  process.platform === "win32" ? "hwpx-mcp-backend.exe" : "hwpx-mcp-backend";
+
+const findBundledBackend = () => {
+  const candidates = [
+    join(ELECTRON_UI_DIR, "resources", "backend", BUNDLED_BACKEND_BINARY_NAME),
+    join(REPO_ROOT, "dist", "hwpx-mcp-backend", BUNDLED_BACKEND_BINARY_NAME),
+  ];
+
+  try {
+    const { app } = require("electron");
+    if (app) {
+      candidates.unshift(
+        join(process.resourcesPath || "", "backend", BUNDLED_BACKEND_BINARY_NAME)
+      );
+    }
+  } catch {
+    // Not running inside Electron context; skip resourcesPath probe.
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
 const isCommandAvailable = (command) => {
   const check = shell ? "where" : "which";
   return spawnSync(check, [command], { stdio: "ignore" }).status === 0;
@@ -175,7 +204,20 @@ const sharedEnv = {
   OPEN_WEBUI_URL: openWebUiUrl,
 };
 
-const backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
+let backendCommand;
+
+if (!explicitBackendExecutable && requestedBackendCommand === "uv run hwpx-mcp") {
+  const bundled = findBundledBackend();
+  if (bundled) {
+    console.log(`Found bundled backend binary: ${bundled}`);
+    backendCommand = bundled.includes(" ") ? `"${bundled}"` : bundled;
+  } else {
+    backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
+  }
+} else {
+  backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
+}
+
 sharedEnv.HWPX_MCP_BACKEND_COMMAND = backendCommand;
 
 const stopProcess = (child) => {

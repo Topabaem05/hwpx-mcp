@@ -704,9 +704,19 @@ npm run build:mac    # macOS DMG
 npm run build:linux  # Linux AppImage + deb
 ```
 
+**Cross-build Windows installer from Linux** (requires Wine):
+
+```bash
+sudo apt-get install wine wine32:i386
+./scripts/build-installer.sh --win
+```
+
 Output goes to `dist/electron-installer/`.
 
-If you skip the backend build, the Electron app still works but requires Python/uv to be installed on the target machine (falls back to `uv run hwpx-mcp` or `python -m hwpx_mcp.server`).
+> **Note:** PyInstaller cannot cross-compile. When cross-building from Linux, the
+> bundled backend is the Linux binary. On Windows the Electron app falls back to
+> `uv run hwpx-mcp` or `python -m hwpx_mcp.server` at runtime. For a fully
+> self-contained Windows installer, run `scripts/build-installer.ps1` **on Windows**.
 
 ### Distribution Strategy
 

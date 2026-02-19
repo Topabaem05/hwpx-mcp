@@ -25,10 +25,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ELECTRON_UI_DIR="$REPO_ROOT/electron-ui"
 DIST_DIR="$REPO_ROOT/dist"
 SKIP_BACKEND=false
+TARGET_PLATFORM=""
 
 for arg in "$@"; do
   case "$arg" in
     --skip-backend) SKIP_BACKEND=true ;;
+    --win) TARGET_PLATFORM="win" ;;
+    --mac) TARGET_PLATFORM="mac" ;;
+    --linux) TARGET_PLATFORM="linux" ;;
     *) echo "Unknown argument: $arg"; exit 1 ;;
   esac
 done
@@ -36,9 +40,10 @@ done
 echo "=============================================="
 echo " HWPX-MCP Installer Build Pipeline"
 echo "=============================================="
-echo "Repository:  $REPO_ROOT"
-echo "Platform:    $(uname -s) $(uname -m)"
-echo "Skip backend: $SKIP_BACKEND"
+echo "Repository:    $REPO_ROOT"
+echo "Host platform: $(uname -s) $(uname -m)"
+echo "Target:        ${TARGET_PLATFORM:-auto-detect}"
+echo "Skip backend:  $SKIP_BACKEND"
 echo ""
 
 # Step 1: Backend
@@ -74,26 +79,40 @@ echo ""
 
 # Step 3: Electron installer
 echo "--- Step 3: Building Electron installer ---"
-PLATFORM="$(uname -s)"
-case "$PLATFORM" in
-  Darwin)
-    echo "Building for macOS..."
-    (cd "$ELECTRON_UI_DIR" && npm run build:mac)
-    ;;
-  Linux)
-    echo "Building for Linux..."
-    (cd "$ELECTRON_UI_DIR" && npm run build:linux)
-    ;;
-  MINGW*|MSYS*|CYGWIN*)
-    echo "Building for Windows..."
-    (cd "$ELECTRON_UI_DIR" && npm run build:win)
-    ;;
-  *)
-    echo "Unknown platform: $PLATFORM"
-    echo "Attempting generic directory build..."
-    (cd "$ELECTRON_UI_DIR" && npm run build:dir)
-    ;;
-esac
+
+if [ -n "$TARGET_PLATFORM" ]; then
+  echo "Building for target: $TARGET_PLATFORM"
+  if [ "$TARGET_PLATFORM" = "win" ] && [ "$(uname -s)" = "Linux" ]; then
+    echo "Cross-building Windows installer from Linux (requires Wine)."
+    if ! command -v wine >/dev/null 2>&1; then
+      echo "ERROR: Wine is required for Windows cross-build."
+      echo "Install with: sudo apt-get install wine wine32:i386"
+      exit 1
+    fi
+  fi
+  (cd "$ELECTRON_UI_DIR" && npm run "build:$TARGET_PLATFORM")
+else
+  PLATFORM="$(uname -s)"
+  case "$PLATFORM" in
+    Darwin)
+      echo "Building for macOS..."
+      (cd "$ELECTRON_UI_DIR" && npm run build:mac)
+      ;;
+    Linux)
+      echo "Building for Linux..."
+      (cd "$ELECTRON_UI_DIR" && npm run build:linux)
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      echo "Building for Windows..."
+      (cd "$ELECTRON_UI_DIR" && npm run build:win)
+      ;;
+    *)
+      echo "Unknown platform: $PLATFORM"
+      echo "Attempting generic directory build..."
+      (cd "$ELECTRON_UI_DIR" && npm run build:dir)
+      ;;
+  esac
+fi
 echo ""
 
 # Summary

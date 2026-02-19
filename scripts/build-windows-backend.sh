@@ -72,8 +72,8 @@ text = text.replace("#import site", "import site")
 lines = text.splitlines()
 if "../Lib/site-packages" not in lines:
     lines.append("../Lib/site-packages")
-if "../../" not in lines:
-    lines.append("../../")
+if ".." not in lines:
+    lines.append("..")
 pth.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
   echo "Enabled site-packages in $PTH_FILE"
@@ -99,7 +99,9 @@ DEPS=(
   "pydantic-xml>=2.0.0"
   "xmldiff>=2.0.0"
   "uvicorn>=0.30.0"
+  "fastapi>=0.110.0"
   "starlette>=0.38.0"
+  "httpx>=0.28.0"
   "langgraph>=0.2.0"
 )
 

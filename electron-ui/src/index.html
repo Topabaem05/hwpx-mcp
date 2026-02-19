@@ -3,53 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HWPX MCP UI</title>
+    <title>HWPX MCP</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" id="appShell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="brand-title">HWPX Console</div>
-          <div class="brand-sub">Open WebUI inspired workspace</div>
+          <div>
+            <div class="brand-title">HWPX MCP</div>
+            <div class="brand-sub">AI Document Workbench</div>
+          </div>
         </div>
 
-        <button id="newSession" type="button" class="primary-btn">New Session</button>
+        <button id="newSession" type="button" class="primary-btn">+ New Chat</button>
 
-        <div class="section-title">Sessions</div>
+        <div class="section-title">Chats</div>
         <div id="sessionList" class="session-list"></div>
-
-        <div class="section-title">Connection</div>
-        <button id="openWebUI" type="button" class="ghost-btn">Open WebUI</button>
-        <button id="checkGateway" type="button" class="ghost-btn">Check MCP endpoint</button>
 
         <div class="section-title">Settings</div>
         <div class="settings-card">
-          <label for="mcpHttpUrlInput" class="settings-label">MCP API URL</label>
+          <label for="openrouterKeyInput" class="settings-label">OpenRouter API Key</label>
+          <input id="openrouterKeyInput" class="settings-input" type="password" placeholder="sk-or-v1-..." autocomplete="off" />
+
+          <label for="modelSelect" class="settings-label">Model</label>
+          <select id="modelSelect" class="settings-input">
+            <option value="openai/gpt-oss-120b">GPT-OSS 120B (Cerebras)</option>
+            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
+            <option value="openai/gpt-4o">GPT-4o</option>
+            <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+            <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="google/gemini-2.5-pro">Gemini 2.5 Pro</option>
+          </select>
+
+          <label for="mcpHttpUrlInput" class="settings-label">MCP Backend URL</label>
           <input id="mcpHttpUrlInput" class="settings-input" type="url" placeholder="http://127.0.0.1:8000/mcp" />
+
           <div class="settings-actions">
             <button id="saveSettings" type="button" class="primary-btn settings-btn">Save</button>
             <button id="resetSettings" type="button" class="ghost-btn settings-btn">Reset</button>
           </div>
         </div>
 
-        <p id="statusText" class="status">Gateway state unknown</p>
+        <div class="section-title">MCP Backend</div>
+        <div class="settings-actions">
+          <button id="checkGateway" type="button" class="ghost-btn settings-btn">Check</button>
+          <button id="restartBackend" type="button" class="ghost-btn settings-btn">Restart</button>
+        </div>
+        <p id="statusText" class="status">Starting...</p>
       </aside>
 
       <main class="chat-area">
         <header class="header">
-          <h1>Document Workbench</h1>
-          <p class="muted">Design direction aligned with open-webui style cards and spaced layout.</p>
+          <button id="sidebarToggle" type="button" class="header-toggle" aria-label="Toggle sidebar">&#9776;</button>
+          <h1 id="chatTitle">HWPX MCP</h1>
         </header>
 
         <section id="chatLog" class="chat-log"></section>
 
         <form id="chatForm" class="composer" autocomplete="off">
-          <textarea id="messageInput" placeholder="Write a command for HWPX MCP..." rows="2"></textarea>
-          <button type="submit" class="primary-btn">Send</button>
+          <textarea id="messageInput" placeholder="Ask anything about HWP documents..." rows="2"></textarea>
+          <button id="sendBtn" type="submit" class="primary-btn">Send</button>
         </form>
       </main>
     </div>
+    <div class="backdrop" id="backdrop"></div>
 
     <script type="module" src="renderer.js"></script>
   </body>

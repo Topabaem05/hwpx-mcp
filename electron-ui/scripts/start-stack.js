@@ -24,6 +24,50 @@ const uiPackageManager = (process.env.HWPX_ELECTRON_PKG_MANAGER || "").trim().to
 
 const shell = process.platform === "win32";
 
+const BUNDLED_BACKEND_BINARY_NAME =
+  process.platform === "win32" ? "hwpx-mcp-backend.exe" : "hwpx-mcp-backend";
+
+const BUNDLED_BACKEND_BAT_NAME = "hwpx-mcp-backend.bat";
+
+const findBundledBackend = () => {
+  const binaryCandidates = [
+    join(ELECTRON_UI_DIR, "resources", "backend", BUNDLED_BACKEND_BINARY_NAME),
+    join(REPO_ROOT, "dist", "hwpx-mcp-backend", BUNDLED_BACKEND_BINARY_NAME),
+  ];
+
+  const batCandidates = process.platform === "win32" ? [
+    join(ELECTRON_UI_DIR, "resources", "backend-win", BUNDLED_BACKEND_BAT_NAME),
+    join(REPO_ROOT, "dist", "hwpx-mcp-backend-win", BUNDLED_BACKEND_BAT_NAME),
+  ] : [];
+
+  try {
+    const { app } = require("electron");
+    if (app) {
+      const resPath = process.resourcesPath || "";
+      binaryCandidates.unshift(join(resPath, "backend", BUNDLED_BACKEND_BINARY_NAME));
+      if (process.platform === "win32") {
+        batCandidates.unshift(join(resPath, "backend-win", BUNDLED_BACKEND_BAT_NAME));
+      }
+    }
+  } catch {
+    // Not running inside Electron context; skip resourcesPath probe.
+  }
+
+  for (const candidate of binaryCandidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  for (const candidate of batCandidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+};
+
 const isCommandAvailable = (command) => {
   const check = shell ? "where" : "which";
   return spawnSync(check, [command], { stdio: "ignore" }).status === 0;
@@ -175,7 +219,20 @@ const sharedEnv = {
   OPEN_WEBUI_URL: openWebUiUrl,
 };
 
-const backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
+let backendCommand;
+
+if (!explicitBackendExecutable && requestedBackendCommand === "uv run hwpx-mcp") {
+  const bundled = findBundledBackend();
+  if (bundled) {
+    console.log(`Found bundled backend binary: ${bundled}`);
+    backendCommand = bundled.includes(" ") ? `"${bundled}"` : bundled;
+  } else {
+    backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
+  }
+} else {
+  backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
+}
+
 sharedEnv.HWPX_MCP_BACKEND_COMMAND = backendCommand;
 
 const stopProcess = (child) => {

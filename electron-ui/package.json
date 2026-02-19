@@ -2,31 +2,72 @@
   "name": "hwpx-mcp-electron-ui",
   "version": "0.1.0",
   "private": true,
-  "description": "Open WebUI-inspired Electron shell for hwpx-mcp",
+  "description": "Electron desktop client for HWPX-MCP document workbench",
+  "author": {
+    "name": "HWP MCP Team",
+    "email": "hwpx-mcp@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/Topabaem05/hwpx-mcp",
+  "license": "MIT",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "start-stack": "node ./scripts/start-stack.js",
     "dev": "electron .",
     "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
     "build:dir": "electron-builder --win --dir"
   },
   "build": {
     "appId": "io.topabaem05.hwpx-mcp",
     "productName": "HWPX MCP",
     "directories": {
-      "output": "../dist/electron-windows"
+      "output": "../dist/electron-installer"
     },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "scripts/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/hwpx-mcp-backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "extraFiles": [],
     "win": {
       "target": "nsis",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "../dist/hwpx-mcp-backend-win",
+          "to": "backend-win",
+          "filter": ["**/*"]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Office",
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
+    },
+    "afterPack": "./scripts/after-pack.js"
   },
   "devDependencies": {
     "electron": "^34.0.0",

@@ -895,7 +895,7 @@ def hwp_ping() -> dict:
     return {
         "status": "connected",
         "server": "HWP-Extended",
-        "version": "0.3.0",
+        "version": "0.3.1",
         "platform": platform.system(),
         "is_windows": IS_WINDOWS,
         "pyhwp_status": pyhwp_status,
@@ -925,7 +925,7 @@ def hwp_get_capabilities() -> dict:
     """
     return {
         "server": "HWP-Extended",
-        "version": "0.3.0",
+        "version": "0.3.1",
         "platform": platform.system(),
         "is_windows": IS_WINDOWS,
         "capabilities": {

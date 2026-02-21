@@ -547,14 +547,14 @@ npm run start-stack
 
 필수 선행 조건:
 
-- Python 의존성 설치 (`uv pip install -e .` 또는 `pip install -e .`)
+- Python 의존성 설치 (`uv pip install -e .` 또는 `pip install -e .`). Windows에서는 이 설치 경로에 `pywin32`가 자동 포함됩니다.
 - Electron UI 의존성 설치 (`electron-ui`에서 `npm install` 또는 `bunx npm install`) 또는 `npm run start-stack`에서 최초 실행 시 자동 설치
 - 필요한 경우 `HWPX_ELECTRON_PKG_MANAGER`를 `npm` 또는 `bunx`로 설정해 설치 방식을 강제할 수 있습니다.
 - Hancom HWP가 설치되어야 Windows COM 기능이 정상 동작합니다.
 
 크로스플랫폼 배포 전략은 `DISTRIBUTION_PRD.md`를 기준 문서로 사용합니다.
 
-- **Track A(현재 기준선):** `npm run start-stack`(또는 `start-stack-windows.*`) 한 번 실행으로 로컬 부트스트랩 가능. 단, Python 런타임과 백엔드 설치(`uv pip install -e .` 또는 `pip install -e .`)가 별도로 필요합니다.
+- **Track A(현재 기준선):** `npm run start-stack`(또는 `start-stack-windows.*`) 한 번 실행으로 로컬 부트스트랩 가능. 단, Python 런타임과 백엔드 설치(`uv pip install -e .` 또는 `pip install -e .`, Windows는 `pywin32` 자동 포함)가 별도로 필요합니다.
 - **Track B(패키징 확장):** Electron 설치 프로그램(`npm run build:win`) 및 향후 백엔드 번들링을 통해 비기술 사용자 설정 부담을 줄이는 방향입니다.
 - UI 경로는 streamable HTTP 전송을 사용하고, 에이전틱 게이트웨이(`hwpx-mcp-gateway`)는 독립적인 stdio 전용 프로세스입니다.
 
@@ -1038,7 +1038,7 @@ hwp_create_from_template(
 - matplotlib >= 3.7.0 (차트 렌더링용)
 
 ### Windows 전용
-- pywin32 >= 300 (COM 자동화용)
+- pywin32 >= 305 (COM 자동화용)
 - 한글 2010 이상
 
 ## 아키텍처

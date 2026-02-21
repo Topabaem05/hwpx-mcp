@@ -668,7 +668,7 @@ Set `HWPX_MCP_START_BACKEND=0` to open only the UI.
 
 Prerequisite notes:
 
-- Install Python dependencies first (`uv pip install -e .` or `pip install -e .`).
+- Install Python dependencies first (`uv pip install -e .` or `pip install -e .`). On Windows, this install path now includes `pywin32` automatically.
 - Install Node dependencies for Electron by running `npm install` inside `electron-ui` once, or let `npm run start-stack` install them automatically on first run (`npm install` or `bunx npm install`).
 - If needed, set `HWPX_ELECTRON_PKG_MANAGER` to `npm` or `bunx` before first launch to force which installer is used.
 - Hancom HWP (Windows COM features) must be installed for full Windows feature parity.
@@ -722,7 +722,7 @@ Output goes to `dist/electron-installer/`.
 
 Use `DISTRIBUTION_PRD.md` for the cross-platform delivery plan. It defines:
 
-- **Track A (current baseline):** `npm run start-stack` (or `start-stack-windows.*`) as the one-command local bootstrap; this path still requires Python runtime availability and backend install (`uv pip install -e .` or `pip install -e .`).
+- **Track A (current baseline):** `npm run start-stack` (or `start-stack-windows.*`) as the one-command local bootstrap; this path still requires Python runtime availability and backend install (`uv pip install -e .` or `pip install -e .`, Windows includes `pywin32` automatically).
 - **Track B (packaged installer):** Electron installer flow (`npm run build:win`) and a future backend-bundling strategy to reduce manual setup for end users.
 - Hard constraint separation: Electron/UI path uses streamable HTTP, while the agentic gateway path is separate and stdio-only (`hwpx-mcp-gateway`).
 
@@ -1173,7 +1173,7 @@ hwp_create_from_template(
 - matplotlib >= 3.7.0 (for chart rendering)
 
 ### Windows Only
-- pywin32 >= 300 (for COM automation)
+- pywin32 >= 305 (for COM automation)
 - Hancom Office 2010 or later
 
 ## Architecture

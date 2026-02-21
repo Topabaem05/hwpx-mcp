@@ -16,8 +16,7 @@ const backendUrl =
   process.env.HWPX_MCP_HTTP_URL || `http://${MCP_HOST}:${MCP_PORT}${MCP_PATH}`;
 
 const explicitBackendExecutable = (process.env.HWPX_MCP_BACKEND_EXE || "").trim();
-const requestedBackendCommand =
-  process.env.HWPX_MCP_BACKEND_COMMAND || "uv run hwpx-mcp";
+const requestedBackendCommand = process.env.HWPX_MCP_BACKEND_COMMAND || "uv run hwpx-mcp";
 const openWebUiUrl = process.env.OPEN_WEBUI_URL || "http://localhost:3000";
 const runWithBackend = process.env.HWPX_MCP_START_BACKEND !== "0";
 const uiPackageManager = (process.env.HWPX_ELECTRON_PKG_MANAGER || "").trim().toLowerCase();
@@ -232,7 +231,6 @@ if (!explicitBackendExecutable && requestedBackendCommand === "uv run hwpx-mcp")
 } else {
   backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
 }
-
 sharedEnv.HWPX_MCP_BACKEND_COMMAND = backendCommand;
 
 const stopProcess = (child) => {

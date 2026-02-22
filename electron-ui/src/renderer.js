@@ -4,6 +4,7 @@ const defaultConfig = {
   backendBaseUrl:
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
   openrouterKey: "",
+  gptOauthToken: "",
 };
 
 const loadConfig = () => {
@@ -45,6 +46,7 @@ const saveSettings = $("saveSettings");
 const resetSettings = $("resetSettings");
 const chatTitle = $("chatTitle");
 const sendBtn = $("sendBtn");
+const gptOauthTokenInput = $("gptOauthTokenInput");
 const sidebarToggle = $("sidebarToggle");
 const appShell = $("appShell");
 const backdrop = $("backdrop");
@@ -132,6 +134,7 @@ const renderMessages = () => {
 const renderConfig = () => {
   backendBaseUrlInput.value = config.backendBaseUrl;
   agentApiKeyInput.value = config.openrouterKey;
+  gptOauthTokenInput.value = config.gptOauthToken;
 };
 
 const renderAll = () => {
@@ -275,11 +278,15 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 saveSettings.addEventListener("click", () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput.value);
   config.openrouterKey = agentApiKeyInput.value.trim();
+  config.gptOauthToken = gptOauthTokenInput.value.trim();
   persistConfig();
   status("Settings saved. Restarting backend...");
   if (window.hwpxUi?.restartBackend) {
     window.hwpxUi
-      .restartBackend({ openrouterKey: config.openrouterKey })
+      .restartBackend({
+        openrouterKey: config.openrouterKey,
+        gptOauthToken: config.gptOauthToken,
+      })
       .catch((error) => {
         status(`Backend restart failed: ${error?.message || String(error)}`);
       });
@@ -311,7 +318,10 @@ restartBackendBtn.addEventListener("click", async () => {
   status("Restarting backend...");
   try {
     if (window.hwpxUi?.restartBackend) {
-      const result = await window.hwpxUi.restartBackend({ openrouterKey: config.openrouterKey });
+      const result = await window.hwpxUi.restartBackend({
+        openrouterKey: config.openrouterKey,
+        gptOauthToken: config.gptOauthToken,
+      });
       status(`Backend restarted (pid ${result.pid || "?"}). Waiting...`);
     }
   } catch (error) {
@@ -365,9 +375,12 @@ renderAll();
 
 (async () => {
   await new Promise((resolve) => setTimeout(resolve, 5000));
-  if (config.openrouterKey && window.hwpxUi?.restartBackend) {
+  if ((config.openrouterKey || config.gptOauthToken) && window.hwpxUi?.restartBackend) {
     try {
-      await window.hwpxUi.restartBackend({ openrouterKey: config.openrouterKey });
+      await window.hwpxUi.restartBackend({
+        openrouterKey: config.openrouterKey,
+        gptOauthToken: config.gptOauthToken,
+      });
     } catch (error) {
       status(`Backend restart failed: ${error?.message || String(error)}`);
     }

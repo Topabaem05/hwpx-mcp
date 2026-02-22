@@ -13,14 +13,26 @@ let backendLog = [];
 let mainWindow = null;
 let backendEnvOverrides = {};
 
-const setOpenRouterKey = (value) => {
-  const key = typeof value === "string" ? value.trim() : "";
-  if (key) {
-    backendEnvOverrides = { ...backendEnvOverrides, OPENROUTER_API_KEY: key };
-  } else if (backendEnvOverrides.OPENROUTER_API_KEY) {
-    const { OPENROUTER_API_KEY, ...rest } = backendEnvOverrides;
+const setOptionalEnv = (envName, value) => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized) {
+    backendEnvOverrides = { ...backendEnvOverrides, [envName]: normalized };
+    return;
+  }
+
+  if (backendEnvOverrides[envName]) {
+    const { [envName]: _removed, ...rest } = backendEnvOverrides;
     backendEnvOverrides = rest;
   }
+};
+
+const setBackendCredentials = (opts) => {
+  if (!opts || typeof opts !== "object") {
+    return;
+  }
+
+  setOptionalEnv("OPENROUTER_API_KEY", opts.openrouterKey);
+  setOptionalEnv("OPENAI_OAUTH_TOKEN", opts.gptOauthToken);
 };
 
 const log = (msg) => {
@@ -237,9 +249,7 @@ ipcMain.handle("backend:status", () => ({
 }));
 
 ipcMain.handle("backend:restart", (_, opts) => {
-  if (opts && typeof opts === "object") {
-    setOpenRouterKey(opts.openrouterKey);
-  }
+  setBackendCredentials(opts);
   stopBackend();
   startBackend();
   return { restarted: true, url: BACKEND_URL, pid: backendProcess?.pid ?? null };

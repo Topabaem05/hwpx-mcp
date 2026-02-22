@@ -3,9 +3,13 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from hwpx_mcp.agentic.gateway import BackendServer
 from hwpx_mcp.agentic.http_api import DEFAULT_MODEL
 from hwpx_mcp.agentic.http_api import DEFAULT_PROVIDER
 from hwpx_mcp.agentic.http_api import build_agent_http_router
+from hwpx_mcp.agentic.openrouter_agent import AgentAuthError
+from hwpx_mcp.agentic.openrouter_agent import JsonValue
+from hwpx_mcp.agentic.openrouter_agent import LlmRequestError
 from hwpx_mcp.agentic.openrouter_agent import OpenRouterClient
 from hwpx_mcp.agentic.openrouter_agent import OpenRouterToolAgent
 
@@ -27,13 +31,13 @@ class DummyTool:
 class DummyBackend:
     def __init__(self, tools: list[DummyTool]):
         self._tools = tools
-        self.call_tool_calls: list[tuple[str, dict[str, object]]] = []
+        self.call_tool_calls: list[tuple[str, dict[str, JsonValue]]] = []
         self._tool_manager = self._create_tool_manager()
 
     async def list_tools(self):
         return self._tools
 
-    async def call_tool(self, name: str, arguments: dict[str, object]):
+    async def call_tool(self, name: str, arguments: dict[str, JsonValue]):
         self.call_tool_calls.append((name, arguments))
         return {"success": True, "name": name, "arguments": arguments}
 
@@ -118,7 +122,7 @@ def _create_client():
     )
     app = FastAPI()
 
-    def agent_factory(server):
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
         return OpenRouterToolAgent(server, client=FakeOpenRouterClient(), max_rounds=2)
 
     app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
@@ -170,3 +174,66 @@ def test_agent_chat_endpoint_requires_non_empty_message():
 
     assert response.status_code == 422
     assert response.json()["detail"] == "message_required"
+
+
+def test_agent_chat_returns_400_for_auth_error():
+    backend = DummyBackend([])
+    app = FastAPI()
+
+    class ErrorAgent(OpenRouterToolAgent):
+        def __init__(self, backend_server: BackendServer, error: Exception):
+            super().__init__(backend_server=backend_server)
+            self._error = error
+
+        async def run(self, *, message: str, session_id: str = "") -> dict[str, object]:
+            _ = (message, session_id)
+            raise self._error
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return ErrorAgent(
+            backend_server=server,
+            error=AgentAuthError("OPENAI_OAUTH_TOKEN or OPENAI_API_KEY is not set"),
+        )
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        response = client.post("/agent/chat", json={"message": "hello"})
+
+    assert response.status_code == 400
+    assert (
+        "OPENAI_OAUTH_TOKEN or OPENAI_API_KEY is not set" in response.json()["detail"]
+    )
+
+
+def test_agent_chat_maps_upstream_llm_500_to_502():
+    backend = DummyBackend([])
+    app = FastAPI()
+
+    class ErrorAgent(OpenRouterToolAgent):
+        def __init__(self, backend_server: BackendServer, error: Exception):
+            super().__init__(backend_server=backend_server)
+            self._error = error
+
+        async def run(self, *, message: str, session_id: str = "") -> dict[str, object]:
+            _ = (message, session_id)
+            raise self._error
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return ErrorAgent(
+            backend_server=server,
+            error=LlmRequestError(
+                status_code=500,
+                message="llm_error[openai-api-key]: 500: upstream",
+            ),
+        )
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        response = client.post("/agent/chat", json={"message": "hello"})
+
+    assert response.status_code == 502
+    assert "llm_error[openai-api-key]" in response.json()["detail"]

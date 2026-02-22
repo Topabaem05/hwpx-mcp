@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from .gateway import BackendServer
 from .openrouter_agent import DEFAULT_MODEL
 from .openrouter_agent import DEFAULT_PROVIDER
+from .openrouter_agent import AgentAuthError
+from .openrouter_agent import LlmRequestError
 from .openrouter_agent import OpenRouterToolAgent
 
 
@@ -45,7 +47,19 @@ class AgentHttpSurface:
             raise HTTPException(status_code=422, detail="message_required")
 
         session_id = payload.session_id.strip()
-        result = await self._agent.run(message=message, session_id=session_id)
+        try:
+            result = await self._agent.run(message=message, session_id=session_id)
+        except AgentAuthError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except LlmRequestError as error:
+            status_code = 502
+            if error.status_code in (400, 401, 403, 404, 429):
+                status_code = 400
+            raise HTTPException(status_code=status_code, detail=str(error)) from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=500, detail=f"agent_runtime_error: {error}"
+            ) from error
         return {
             **result,
             "runtime": {

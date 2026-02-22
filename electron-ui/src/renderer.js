@@ -359,7 +359,12 @@ const callAgentChat = async (message, signal) => {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const reason = payload?.error || payload?.message || `HTTP ${response.status}`;
+    const detail = payload?.detail;
+    const reason =
+      payload?.error ||
+      payload?.message ||
+      (typeof detail === "string" ? detail : Array.isArray(detail) ? JSON.stringify(detail) : "") ||
+      `HTTP ${response.status}`;
     throw new Error(String(reason));
   }
   return payload;

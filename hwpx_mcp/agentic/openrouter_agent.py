@@ -30,6 +30,16 @@ JsonObject = dict[str, JsonValue]
 MessageRole = Literal["system", "user", "assistant", "tool"]
 
 
+class AgentAuthError(RuntimeError):
+    pass
+
+
+class LlmRequestError(RuntimeError):
+    def __init__(self, *, status_code: int, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 @dataclass(slots=True)
 class ToolCall:
     tool_call_id: str
@@ -162,7 +172,7 @@ class OpenRouterClient:
         if openai_api_key:
             return "openai-api-key", openai_api_key
 
-        raise RuntimeError(
+        raise AgentAuthError(
             f"{OPENAI_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
         )
 
@@ -211,8 +221,9 @@ class OpenRouterClient:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(target_url, headers=headers, json=body)
             if response.status_code >= 400:
-                raise RuntimeError(
-                    f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}"
+                raise LlmRequestError(
+                    status_code=response.status_code,
+                    message=f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}",
                 )
             return response.json()
 

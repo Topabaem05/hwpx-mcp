@@ -66,15 +66,27 @@ jobs:
       - name: Verify bundled backend executable exists
         shell: pwsh
         run: |
-          $backendExe = Join-Path $env:GITHUB_WORKSPACE "dist/electron-windows/win-unpacked/resources/backend/hwpx-mcp-backend.exe"
-          if (-not (Test-Path $backendExe)) {
-            throw "Bundled backend executable missing: $backendExe"
+          $candidates = @(
+            (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend.exe"),
+            (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend")
+          )
+
+          $found = $false
+          foreach ($candidate in $candidates) {
+            if (Test-Path $candidate) {
+              $found = $true
+              break
+            }
+          }
+
+          if (-not $found) {
+            throw "Bundled backend executable missing in expected resources/backend paths."
           }
 
       - name: Normalize release asset name
         shell: pwsh
         run: |
-          $outputDir = Join-Path $env:GITHUB_WORKSPACE "dist/electron-windows"
+          $outputDir = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer"
           $installer = Get-ChildItem $outputDir -File -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
           if (-not $installer) {

@@ -61,6 +61,11 @@ const backendBaseUrlInput = $("backendBaseUrlInput");
 const openaiApiKeyInput = $("openaiApiKeyInput");
 const gptOauthTokenInput = $("gptOauthTokenInput");
 const openAiOauthLoginBtn = $("openAiOauthLoginBtn");
+const oauthCodePanel = $("oauthCodePanel");
+const oauthUserCode = $("oauthUserCode");
+const oauthManualHint = $("oauthManualHint");
+const oauthCopyCodeBtn = $("oauthCopyCodeBtn");
+const oauthOpenLinkBtn = $("oauthOpenLinkBtn");
 const saveSettingsBtn = $("saveSettings");
 const resetSettingsBtn = $("resetSettings");
 const checkGatewayBtn = $("checkGateway");
@@ -72,10 +77,34 @@ const suggestionButtons = document.querySelectorAll(".suggestion-prompt");
 let sessions = [];
 let activeSessionId = "";
 let currentAbort = null;
+let oauthVerificationUrl = "";
 
 const status = (msg) => {
   if (statusText) {
     statusText.textContent = String(msg);
+  }
+};
+
+const hideOauthCodePanel = () => {
+  oauthCodePanel?.classList.add("hidden");
+};
+
+const showOauthCodePanel = ({ userCode, verificationUrl, manualCodeRequired }) => {
+  if (!oauthCodePanel) {
+    return;
+  }
+
+  oauthVerificationUrl = (verificationUrl || "").trim();
+  oauthCodePanel.classList.remove("hidden");
+
+  if (oauthUserCode) {
+    oauthUserCode.textContent = userCode || "-";
+  }
+
+  if (oauthManualHint) {
+    oauthManualHint.textContent = manualCodeRequired
+      ? "브라우저에서 위 코드를 입력해 로그인하세요."
+      : "코드 입력 없이 자동 인증 링크로 로그인 진행 중입니다.";
   }
 };
 
@@ -479,8 +508,99 @@ resetSettingsBtn?.addEventListener("click", () => {
   localStorage.removeItem(CONFIG_KEY);
   config = { ...defaultConfig };
   renderConfig();
+  hideOauthCodePanel();
   status("Settings reset");
 });
+
+oauthCopyCodeBtn?.addEventListener("click", async () => {
+  const code = (oauthUserCode?.textContent || "").trim();
+  if (!code || code === "-") {
+    status("복사할 인증 코드가 없습니다.");
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(code);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = code;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    status("인증 코드를 클립보드에 복사했습니다.");
+  } catch (error) {
+    status(`코드 복사 실패: ${error?.message || String(error)}`);
+  }
+});
+
+oauthOpenLinkBtn?.addEventListener("click", async () => {
+  const url = oauthVerificationUrl;
+  if (!url) {
+    status("열 수 있는 인증 링크가 없습니다.");
+    return;
+  }
+
+  try {
+    if (window.hwpxUi?.openExternal) {
+      await window.hwpxUi.openExternal(url);
+      status("브라우저에서 인증 페이지를 열었습니다.");
+    }
+  } catch (error) {
+    status(`인증 페이지 열기 실패: ${error?.message || String(error)}`);
+  }
+});
+
+if (window.hwpxUi?.onOpenAiOauthProgress) {
+  window.hwpxUi.onOpenAiOauthProgress((payload) => {
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+
+    if (payload.stage === "starting") {
+      hideOauthCodePanel();
+      status("OpenAI OAuth 준비 중...");
+      return;
+    }
+
+    if (payload.stage === "code_issued") {
+      showOauthCodePanel({
+        userCode: payload.userCode,
+        verificationUrl: payload.verificationUrlComplete || payload.verificationUrl || payload.openUrl,
+        manualCodeRequired: Boolean(payload.manualCodeRequired),
+      });
+      status(
+        payload.manualCodeRequired
+          ? `OpenAI OAuth 코드 발급됨: ${payload.userCode || "-"}`
+          : "OpenAI OAuth 자동 인증 링크로 로그인 진행 중..."
+      );
+      return;
+    }
+
+    if (payload.stage === "browser_opened") {
+      status("브라우저에서 OpenAI 로그인 페이지를 열었습니다.");
+      return;
+    }
+
+    if (payload.stage === "token_ready") {
+      status("OpenAI OAuth 토큰 확인됨. 최종 연결 중...");
+      return;
+    }
+
+    if (payload.stage === "failed") {
+      status(`OpenAI OAuth 로그인 실패: ${payload.error || "unknown"}`);
+      return;
+    }
+
+    if (payload.stage === "completed") {
+      status("OpenAI OAuth 인증 완료.");
+    }
+  });
+}
 
 openAiOauthLoginBtn?.addEventListener("click", async () => {
   status("Starting OpenAI OAuth login...");
@@ -500,7 +620,18 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
     persistConfig();
     renderConfig();
 
-    status(`OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`);
+    showOauthCodePanel({
+      userCode: loginResult.userCode,
+      verificationUrl:
+        loginResult.verificationUrlComplete || loginResult.verificationUrl || loginResult.openUrl,
+      manualCodeRequired: Boolean(loginResult.manualCodeRequired),
+    });
+
+    status(
+      loginResult.manualCodeRequired
+        ? `OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`
+        : "OpenAI OAuth verified. Restarting backend..."
+    );
     const restart = await restartBackendWithCurrentCredentials();
     status(`OpenAI OAuth connected (pid ${restart?.pid || "?"}).`);
   } catch (error) {

@@ -255,6 +255,22 @@
             OpenAI OAuth 로그인
           </button>
 
+          <div id="oauthCodePanel" class="hidden rounded-xl border border-zinc-700 bg-zinc-850 px-3 py-3 space-y-2">
+            <p class="text-xs text-zinc-400">인증 코드</p>
+            <div id="oauthUserCode" class="text-base font-semibold tracking-[0.2em] text-zinc-100">-</div>
+            <p id="oauthManualHint" class="text-xs text-zinc-400">
+              브라우저에서 위 코드를 입력해 로그인하세요.
+            </p>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="oauthCopyCodeBtn" class="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-zinc-100 hover:bg-zinc-700 transition-colors">
+                코드 복사
+              </button>
+              <button id="oauthOpenLinkBtn" class="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-zinc-100 hover:bg-zinc-700 transition-colors">
+                인증 페이지 열기
+              </button>
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-2">
             <button id="saveSettings" class="rounded-xl bg-white text-black px-3 py-2 text-sm font-medium hover:bg-zinc-200 transition-colors">저장</button>
             <button id="resetSettings" class="rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 px-3 py-2 text-sm hover:bg-zinc-700 transition-colors">초기화</button>

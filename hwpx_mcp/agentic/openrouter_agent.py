@@ -20,6 +20,11 @@ from .tool_only_agent import SubagentName
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
+OPENAI_OAUTH_TOKEN_ENV = "OPENAI_OAUTH_TOKEN"
+OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+
 DEFAULT_MODEL = "openai/gpt-oss-120b"
 DEFAULT_PROVIDER = "cerebras/fp16"
 
@@ -151,11 +156,34 @@ class OpenRouterClient:
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key
 
-    def _resolve_api_key(self) -> str:
+    def _resolve_auth(self) -> tuple[str, str]:
         api_key = (self._api_key or os.getenv(OPENROUTER_API_KEY_ENV, "")).strip()
         if not api_key:
-            raise RuntimeError(f"{OPENROUTER_API_KEY_ENV} is not set")
-        return api_key
+            oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
+            if oauth_token:
+                return "openai-oauth", oauth_token
+
+            openai_api_key = os.getenv(OPENAI_API_KEY_ENV, "").strip()
+            if openai_api_key:
+                return "openai-api-key", openai_api_key
+
+            raise RuntimeError(
+                f"{OPENROUTER_API_KEY_ENV} or {OPENAI_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
+            )
+
+        return "openrouter", api_key
+
+    @staticmethod
+    def _resolve_openai_model(model: str) -> str:
+        candidate = model.strip()
+        if candidate and "/" not in candidate:
+            return candidate
+
+        override = os.getenv("OPENAI_MODEL", "").strip()
+        if override:
+            return override
+
+        return OPENAI_DEFAULT_MODEL
 
     async def chat_completions(
         self,
@@ -166,35 +194,46 @@ class OpenRouterClient:
         tools: list[dict[str, object]] | None,
         tool_choice: str | None,
     ) -> dict[str, object]:
-        api_key = self._resolve_api_key()
+        auth_mode, auth_token = self._resolve_auth()
 
-        body: dict[str, object] = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "provider": {
-                "order": [provider],
-                "quantizations": [
-                    provider.split("/", 1)[1] if "/" in provider else "fp16"
-                ],
-            },
+        body: dict[str, object]
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {auth_token}",
         }
+
+        if auth_mode == "openrouter":
+            body = {
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "provider": {
+                    "order": [provider],
+                    "quantizations": [
+                        provider.split("/", 1)[1] if "/" in provider else "fp16"
+                    ],
+                },
+            }
+            headers["HTTP-Referer"] = "https://github.com/Topabaem05/hwpx-mcp"
+            headers["X-Title"] = "HWPX MCP"
+            target_url = OPENROUTER_URL
+        else:
+            body = {
+                "model": self._resolve_openai_model(model),
+                "messages": messages,
+                "stream": False,
+            }
+            target_url = OPENAI_URL
+
         if tools:
             body["tools"] = tools
             body["tool_choice"] = tool_choice or "auto"
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "HTTP-Referer": "https://github.com/Topabaem05/hwpx-mcp",
-            "X-Title": "HWPX MCP",
-        }
-
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(OPENROUTER_URL, headers=headers, json=body)
+            response = await client.post(target_url, headers=headers, json=body)
             if response.status_code >= 400:
                 raise RuntimeError(
-                    f"openrouter_error: {response.status_code}: {response.text[:300]}"
+                    f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}"
                 )
             return response.json()
 

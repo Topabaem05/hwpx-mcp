@@ -1,4 +1,4 @@
-const CONFIG_KEY = "hwpxUi.config.v5";
+const CONFIG_KEY = "hwpxUi.config.v6";
 
 const defaultConfig = {
   backendBaseUrl:
@@ -14,10 +14,7 @@ const loadConfig = () => {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
         const migrated = { ...parsed };
-        if (
-          typeof migrated.apiKey === "string" &&
-          typeof migrated.openaiApiKey !== "string"
-        ) {
+        if (typeof migrated.apiKey === "string" && typeof migrated.openaiApiKey !== "string") {
           migrated.openaiApiKey = migrated.apiKey;
         }
         if (
@@ -38,64 +35,141 @@ let config = loadConfig();
 const persistConfig = () => localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 
 const $ = (id) => document.getElementById(id);
-const messageLog = $("chatLog");
-const sessionList = $("sessionList");
-const statusText = $("statusText");
-const messageInput = $("messageInput");
+
+const sidebar = $("sidebar");
+const sidebarOverlay = $("sidebar-overlay");
+const closeSidebarBtn = $("closeSidebar");
+const sidebarToggleBtn = $("sidebarToggle");
+
+const chatContainer = $("chat-container");
+const chatTitle = $("chatTitle");
+const messageList = $("message-list");
+const welcomeScreen = $("welcome-screen");
+const messageInput = $("message-input");
+const sendBtn = $("send-btn");
 const chatForm = $("chatForm");
+const sessionList = $("sessionList");
 const newSessionBtn = $("newSession");
-const checkGateway = $("checkGateway");
-const restartBackendBtn = $("restartBackend");
+
+const openSettingsBtn = $("openSettingsBtn");
+const openSettingsHeaderBtn = $("openSettingsHeaderBtn");
+const settingsModal = $("settingsModal");
+const settingsOverlay = $("settingsOverlay");
+const closeSettingsBtn = $("closeSettingsBtn");
+
 const backendBaseUrlInput = $("backendBaseUrlInput");
 const openaiApiKeyInput = $("openaiApiKeyInput");
-const saveSettings = $("saveSettings");
-const resetSettings = $("resetSettings");
-const chatTitle = $("chatTitle");
-const sendBtn = $("sendBtn");
 const gptOauthTokenInput = $("gptOauthTokenInput");
 const openAiOauthLoginBtn = $("openAiOauthLoginBtn");
-const sidebarToggle = $("sidebarToggle");
-const appShell = $("appShell");
-const backdrop = $("backdrop");
+const saveSettingsBtn = $("saveSettings");
+const resetSettingsBtn = $("resetSettings");
+const checkGatewayBtn = $("checkGateway");
+const restartBackendBtn = $("restartBackend");
+const statusText = $("statusText");
 
-let activeSessionId = null;
+const suggestionButtons = document.querySelectorAll(".suggestion-prompt");
+
 let sessions = [];
+let activeSessionId = "";
 let currentAbort = null;
 
-const fmt = (ms) =>
-  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const makeTitle = (text) => {
-  const cleaned = text.trim().replace(/\s+/g, " ");
-  if (!cleaned) return "New Chat";
-  return cleaned.length > 24 ? `${cleaned.slice(0, 21)}...` : cleaned;
-};
-const typingHtml = () =>
-  '<span class="typing"><span></span><span></span><span></span></span>';
 const status = (msg) => {
-  statusText.textContent = msg;
+  if (statusText) {
+    statusText.textContent = String(msg);
+  }
 };
-const closeSidebar = () => appShell.classList.remove("sidebar-open");
 
 const normalizeBaseUrl = (value) => {
-  const trimmed = value.trim();
+  const trimmed = (value || "").trim();
   const base = trimmed || defaultConfig.backendBaseUrl;
   return base.replace(/\/+$/, "");
 };
 
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
 
-const restartBackendWithCurrentCredentials = async () => {
-  if (!window.hwpxUi?.restartBackend) {
-    return null;
+const closeSidebar = () => {
+  sidebar?.classList.add("-translate-x-full");
+  sidebarOverlay?.classList.add("hidden");
+};
+
+const openSidebar = () => {
+  sidebar?.classList.remove("-translate-x-full");
+  sidebarOverlay?.classList.remove("hidden");
+};
+
+const toggleSidebar = () => {
+  if (sidebar?.classList.contains("-translate-x-full")) {
+    openSidebar();
+  } else {
+    closeSidebar();
   }
-  return window.hwpxUi.restartBackend({
-    openaiApiKey: config.openaiApiKey,
-    gptOauthToken: config.gptOauthToken,
+};
+
+const openSettings = () => {
+  settingsModal?.classList.remove("hidden");
+};
+
+const closeSettings = () => {
+  settingsModal?.classList.add("hidden");
+};
+
+const autoResize = () => {
+  if (!messageInput) {
+    return;
+  }
+  messageInput.style.height = "auto";
+  messageInput.style.height = `${Math.min(messageInput.scrollHeight, 192)}px`;
+};
+
+const updateSendBtn = () => {
+  if (!sendBtn) {
+    return;
+  }
+
+  const iconContainer = sendBtn.querySelector("div");
+  const hasText = (messageInput?.value || "").trim().length > 0;
+
+  if (currentAbort) {
+    sendBtn.classList.remove("bg-zinc-700", "text-zinc-400");
+    sendBtn.classList.add("bg-red-500", "text-white");
+    if (iconContainer) {
+      iconContainer.innerHTML = '<i data-lucide="square" class="w-4 h-4"></i>';
+    }
+  } else if (hasText) {
+    sendBtn.classList.remove("bg-zinc-700", "text-zinc-400", "bg-red-500", "text-white");
+    sendBtn.classList.add("bg-white", "text-black");
+    if (iconContainer) {
+      iconContainer.innerHTML = '<i data-lucide="arrow-up" class="w-5 h-5"></i>';
+    }
+  } else {
+    sendBtn.classList.remove("bg-white", "text-black", "bg-red-500", "text-white");
+    sendBtn.classList.add("bg-zinc-700", "text-zinc-400");
+    if (iconContainer) {
+      iconContainer.innerHTML = '<i data-lucide="arrow-up" class="w-5 h-5"></i>';
+    }
+  }
+
+  if (window.lucide?.createIcons) {
+    window.lucide.createIcons();
+  }
+};
+
+const scrollToBottom = () => {
+  chatContainer?.scrollTo({
+    top: chatContainer.scrollHeight,
+    behavior: "smooth",
   });
 };
 
+const fmt = (ms) =>
+  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
 const createSession = () => {
-  const session = { id: crypto.randomUUID(), title: "New Chat", messages: [] };
+  const session = {
+    id: crypto.randomUUID(),
+    title: "새 채팅",
+    messages: [],
+  };
   sessions.unshift(session);
   activeSessionId = session.id;
   renderAll();
@@ -104,60 +178,10 @@ const createSession = () => {
 
 const activeSession = () => sessions.find((session) => session.id === activeSessionId);
 
-const renderSessionList = () => {
-  sessionList.innerHTML = "";
-  for (const session of sessions) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `session-item${session.id === activeSessionId ? " active" : ""}`;
-    button.textContent = session.title;
-    button.addEventListener("click", () => {
-      activeSessionId = session.id;
-      renderAll();
-      closeSidebar();
-    });
-    sessionList.appendChild(button);
-  }
-};
-
-const renderMessages = () => {
-  messageLog.innerHTML = "";
-  const session = activeSession();
-  if (!session) return;
-
-  for (const message of session.messages) {
-    const bubble = document.createElement("div");
-    bubble.className = `bubble ${message.role}`;
-
-    if (message.streaming && !message.text) {
-      bubble.innerHTML = typingHtml();
-    } else {
-      bubble.textContent = message.text;
-    }
-
-    if (message.ts) {
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = fmt(message.ts);
-      bubble.appendChild(meta);
-    }
-
-    messageLog.appendChild(bubble);
-  }
-
-  messageLog.scrollTop = messageLog.scrollHeight;
-};
-
-const renderConfig = () => {
-  backendBaseUrlInput.value = config.backendBaseUrl;
-  openaiApiKeyInput.value = config.openaiApiKey;
-  gptOauthTokenInput.value = config.gptOauthToken;
-};
-
-const renderAll = () => {
-  renderSessionList();
-  renderMessages();
-  chatTitle.textContent = activeSession()?.title ?? "HWPX MCP";
+const makeTitle = (text) => {
+  const cleaned = text.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "새 채팅";
+  return cleaned.length > 24 ? `${cleaned.slice(0, 21)}...` : cleaned;
 };
 
 const addMsg = (role, text, streaming = false) => {
@@ -170,9 +194,110 @@ const addMsg = (role, text, streaming = false) => {
   return message;
 };
 
-const updateSendBtn = () => {
-  sendBtn.textContent = currentAbort ? "Stop" : "Send";
-  sendBtn.type = currentAbort ? "button" : "submit";
+const escapeHtml = (text) =>
+  String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+
+const renderSessionList = () => {
+  if (!sessionList) {
+    return;
+  }
+  sessionList.innerHTML = "";
+
+  sessions.forEach((session) => {
+    const li = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className =
+      "w-full text-left px-2 py-2 text-sm rounded-lg truncate transition-colors " +
+      (session.id === activeSessionId
+        ? "bg-zinc-800 text-white"
+        : "text-zinc-300 hover:bg-zinc-800/50");
+    button.textContent = session.title;
+    button.addEventListener("click", () => {
+      activeSessionId = session.id;
+      renderAll();
+      closeSidebar();
+    });
+    li.appendChild(button);
+    sessionList.appendChild(li);
+  });
+};
+
+const renderMessages = () => {
+  if (!messageList) {
+    return;
+  }
+  messageList.innerHTML = "";
+
+  const session = activeSession();
+  if (!session) return;
+
+  if (welcomeScreen) {
+    welcomeScreen.style.display = session.messages.length ? "none" : "flex";
+  }
+
+  session.messages.forEach((message) => {
+    const roleName = message.role === "user" ? "User" : "OpenAI";
+    const avatar =
+      message.role === "user"
+        ? '<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">U</div>'
+        : '<div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center border border-zinc-700"><i data-lucide="bot" class="w-5 h-5"></i></div>';
+
+    const body = message.streaming
+      ? '<div class="flex items-center gap-1 h-6"><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div></div>'
+      : `<div class="prose prose-invert max-w-none text-zinc-200 text-[15px] leading-relaxed break-words">${escapeHtml(
+          message.text
+        )}</div>`;
+
+    const html = `
+      <div class="flex gap-4 px-2 py-4 group">
+        <div class="flex-shrink-0">${avatar}</div>
+        <div class="flex-1 space-y-2 overflow-hidden">
+          <div class="font-semibold text-zinc-100 text-sm">${roleName}</div>
+          ${body}
+          <div class="text-xs text-zinc-500">${fmt(message.ts)}</div>
+        </div>
+      </div>
+    `;
+    messageList.insertAdjacentHTML("beforeend", html);
+  });
+
+  if (window.lucide?.createIcons) {
+    window.lucide.createIcons();
+  }
+  scrollToBottom();
+};
+
+const renderConfig = () => {
+  if (backendBaseUrlInput) backendBaseUrlInput.value = config.backendBaseUrl;
+  if (openaiApiKeyInput) openaiApiKeyInput.value = config.openaiApiKey;
+  if (gptOauthTokenInput) gptOauthTokenInput.value = config.gptOauthToken;
+};
+
+const renderAll = () => {
+  renderSessionList();
+  renderMessages();
+  const title = activeSession()?.title ?? "OpenAI (gpt-4o-mini)";
+  if (chatTitle) {
+    chatTitle.innerHTML = `${escapeHtml(title)} <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>`;
+  }
+  if (window.lucide?.createIcons) {
+    window.lucide.createIcons();
+  }
+};
+
+const restartBackendWithCurrentCredentials = async () => {
+  if (!window.hwpxUi?.restartBackend) {
+    return null;
+  }
+  return window.hwpxUi.restartBackend({
+    openaiApiKey: config.openaiApiKey,
+    gptOauthToken: config.gptOauthToken,
+  });
 };
 
 const checkAgentEndpoint = async () => {
@@ -213,7 +338,6 @@ const callAgentChat = async (message, signal) => {
 
 const runToolOnlyAgent = async (userText, botMsg, signal) => {
   if (signal.aborted) throw new Error("Cancelled");
-
   const payload = await callAgentChat(userText, signal);
 
   let reply = "";
@@ -243,7 +367,7 @@ const handleUserMessage = async (text) => {
   } catch (error) {
     if (botMsg) {
       botMsg.text =
-        controller.signal.aborted ? "Cancelled." : `Error: ${error.message}`;
+        controller.signal.aborted ? "Cancelled." : `Error: ${error?.message || String(error)}`;
       botMsg.streaming = false;
     }
   } finally {
@@ -269,9 +393,7 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
     try {
       const health = await checkAgentEndpoint();
       const defaults = health?.defaults || {};
-      status(
-        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`
-      );
+      status(`Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`);
       return true;
     } catch {
       status(`Agent starting... (${attempt}/${maxAttempts})`);
@@ -282,28 +404,85 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
   if (window.hwpxUi?.getBackendStatus) {
     const backendStatus = await window.hwpxUi.getBackendStatus();
     if (backendStatus.log?.length) {
-      const lastLines = backendStatus.log.slice(-5).join("\n");
-      status(`Agent failed to start. Log:\n${lastLines}`);
+      status(`Agent failed to start. Log:\n${backendStatus.log.slice(-5).join("\n")}`);
       return false;
     }
   }
 
-  status("Agent backend not reachable. Click 'Restart' to try again.");
+  status("Agent backend not reachable. Click backend restart.");
   return false;
 };
 
-saveSettings.addEventListener("click", () => {
-  config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput.value);
-  config.openaiApiKey = openaiApiKeyInput.value.trim();
-  config.gptOauthToken = gptOauthTokenInput.value.trim();
-  persistConfig();
-  status("Settings saved. Restarting backend...");
-  restartBackendWithCurrentCredentials().catch((error) => {
-    status(`Backend restart failed: ${error?.message || String(error)}`);
-  });
+const sendMessage = () => {
+  const text = (messageInput?.value || "").trim();
+  if (!text || currentAbort) return;
+
+  let session = activeSession();
+  if (!session) {
+    session = createSession();
+  }
+
+  addMsg("user", text);
+  if (messageInput) {
+    messageInput.value = "";
+  }
+  autoResize();
+  updateSendBtn();
+
+  if (session.title === "새 채팅" && session.messages.length <= 2) {
+    session.title = makeTitle(text);
+    renderSessionList();
+    renderAll();
+  }
+
+  handleUserMessage(text);
+};
+
+const stopMessage = () => {
+  if (currentAbort) {
+    currentAbort.abort();
+    currentAbort = null;
+    updateSendBtn();
+  }
+};
+
+newSessionBtn?.addEventListener("click", () => {
+  createSession();
+  closeSidebar();
 });
 
-openAiOauthLoginBtn.addEventListener("click", async () => {
+sidebarToggleBtn?.addEventListener("click", toggleSidebar);
+closeSidebarBtn?.addEventListener("click", closeSidebar);
+sidebarOverlay?.addEventListener("click", closeSidebar);
+
+openSettingsBtn?.addEventListener("click", openSettings);
+openSettingsHeaderBtn?.addEventListener("click", openSettings);
+closeSettingsBtn?.addEventListener("click", closeSettings);
+settingsOverlay?.addEventListener("click", closeSettings);
+
+saveSettingsBtn?.addEventListener("click", () => {
+  config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
+  config.openaiApiKey = (openaiApiKeyInput?.value || "").trim();
+  config.gptOauthToken = (gptOauthTokenInput?.value || "").trim();
+  persistConfig();
+  status("Settings saved. Restarting backend...");
+  restartBackendWithCurrentCredentials()
+    .then((result) => {
+      status(`Backend restarted (pid ${result?.pid || "?"}).`);
+    })
+    .catch((error) => {
+      status(`Backend restart failed: ${error?.message || String(error)}`);
+    });
+});
+
+resetSettingsBtn?.addEventListener("click", () => {
+  localStorage.removeItem(CONFIG_KEY);
+  config = { ...defaultConfig };
+  renderConfig();
+  status("Settings reset");
+});
+
+openAiOauthLoginBtn?.addEventListener("click", async () => {
   status("Starting OpenAI OAuth login...");
   openAiOauthLoginBtn.disabled = true;
   try {
@@ -316,13 +495,12 @@ openAiOauthLoginBtn.addEventListener("click", async () => {
       throw new Error(loginResult?.error || "OpenAI OAuth login failed");
     }
 
-    config.gptOauthToken = typeof loginResult.accessToken === "string" ? loginResult.accessToken : "";
+    config.gptOauthToken =
+      typeof loginResult.accessToken === "string" ? loginResult.accessToken : "";
     persistConfig();
     renderConfig();
 
-    status(
-      `OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`
-    );
+    status(`OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`);
     const restart = await restartBackendWithCurrentCredentials();
     status(`OpenAI OAuth connected (pid ${restart?.pid || "?"}).`);
   } catch (error) {
@@ -332,83 +510,80 @@ openAiOauthLoginBtn.addEventListener("click", async () => {
   }
 });
 
-resetSettings.addEventListener("click", () => {
-  localStorage.removeItem(CONFIG_KEY);
-  config = { ...defaultConfig };
-  renderConfig();
-  status("Settings reset");
-});
-
-newSessionBtn.addEventListener("click", createSession);
-
-checkGateway.addEventListener("click", async () => {
+checkGatewayBtn?.addEventListener("click", async () => {
   try {
     const health = await checkAgentEndpoint();
     const defaults = health?.defaults || {};
-    status(
-      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`
-    );
+    status(`Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`);
   } catch (error) {
-    status(`Agent check failed: ${error.message}`);
+    status(`Agent check failed: ${error?.message || String(error)}`);
   }
 });
 
-restartBackendBtn.addEventListener("click", async () => {
+restartBackendBtn?.addEventListener("click", async () => {
   status("Restarting backend...");
   try {
     const result = await restartBackendWithCurrentCredentials();
     status(`Backend restarted (pid ${result?.pid || "?"}). Waiting...`);
   } catch (error) {
-    status(`Restart failed: ${error.message}`);
+    status(`Restart failed: ${error?.message || String(error)}`);
   }
   await new Promise((resolve) => setTimeout(resolve, 3000));
   await waitForBackend(10, 2000);
 });
 
-sidebarToggle.addEventListener("click", () => appShell.classList.toggle("sidebar-open"));
-backdrop.addEventListener("click", closeSidebar);
+chatForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (currentAbort) {
+    stopMessage();
+  } else {
+    sendMessage();
+  }
+});
 
-sendBtn.addEventListener("click", (event) => {
+sendBtn?.addEventListener("click", (event) => {
   if (!currentAbort) return;
   event.preventDefault();
-  currentAbort.abort();
-  currentAbort = null;
+  stopMessage();
+});
+
+messageInput?.addEventListener("input", () => {
+  autoResize();
   updateSendBtn();
 });
 
-chatForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const text = messageInput.value.trim();
-  if (!text) return;
-
-  let session = activeSession();
-  if (!session) session = createSession();
-
-  addMsg("user", text);
-  messageInput.value = "";
-
-  if (session.title === "New Chat" && session.messages.length <= 2) {
-    session.title = makeTitle(text);
-    renderSessionList();
-    chatTitle.textContent = session.title;
-  }
-
-  handleUserMessage(text);
-});
-
-messageInput.addEventListener("keydown", (event) => {
+messageInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
-    chatForm.requestSubmit();
+    chatForm?.requestSubmit();
   }
 });
+
+suggestionButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const prompt = (button.getAttribute("data-prompt") || "").trim();
+    if (!prompt) return;
+    if (messageInput) {
+      messageInput.value = prompt;
+    }
+    autoResize();
+    updateSendBtn();
+    chatForm?.requestSubmit();
+  });
+});
+
+if (window.lucide?.createIcons) {
+  window.lucide.createIcons();
+}
 
 if (sessions.length === 0) createSession();
 renderConfig();
 renderAll();
+autoResize();
+updateSendBtn();
 
 (async () => {
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
   if (config.openaiApiKey || config.gptOauthToken) {
     try {
       await restartBackendWithCurrentCredentials();

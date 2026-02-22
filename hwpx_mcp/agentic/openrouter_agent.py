@@ -17,16 +17,13 @@ from .tool_only_agent import CaseName
 from .tool_only_agent import IntentName
 from .tool_only_agent import SubagentName
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
-
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_OAUTH_TOKEN_ENV = "OPENAI_OAUTH_TOKEN"
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
 
-DEFAULT_MODEL = "openai/gpt-oss-120b"
-DEFAULT_PROVIDER = "cerebras/fp16"
+DEFAULT_MODEL = OPENAI_DEFAULT_MODEL
+DEFAULT_PROVIDER = "openai"
 
 
 JsonObject = dict[str, JsonValue]
@@ -157,21 +154,17 @@ class OpenRouterClient:
         self._api_key = api_key
 
     def _resolve_auth(self) -> tuple[str, str]:
-        api_key = (self._api_key or os.getenv(OPENROUTER_API_KEY_ENV, "")).strip()
-        if not api_key:
-            oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
-            if oauth_token:
-                return "openai-oauth", oauth_token
+        oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
+        if oauth_token:
+            return "openai-oauth", oauth_token
 
-            openai_api_key = os.getenv(OPENAI_API_KEY_ENV, "").strip()
-            if openai_api_key:
-                return "openai-api-key", openai_api_key
+        openai_api_key = (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
+        if openai_api_key:
+            return "openai-api-key", openai_api_key
 
-            raise RuntimeError(
-                f"{OPENROUTER_API_KEY_ENV} or {OPENAI_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
-            )
-
-        return "openrouter", api_key
+        raise RuntimeError(
+            f"{OPENAI_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
+        )
 
     @staticmethod
     def _resolve_openai_model(model: str) -> str:
@@ -201,29 +194,15 @@ class OpenRouterClient:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {auth_token}",
         }
+        body = {
+            "model": self._resolve_openai_model(model),
+            "messages": messages,
+            "stream": False,
+        }
+        target_url = OPENAI_URL
 
-        if auth_mode == "openrouter":
-            body = {
-                "model": model,
-                "messages": messages,
-                "stream": False,
-                "provider": {
-                    "order": [provider],
-                    "quantizations": [
-                        provider.split("/", 1)[1] if "/" in provider else "fp16"
-                    ],
-                },
-            }
-            headers["HTTP-Referer"] = "https://github.com/Topabaem05/hwpx-mcp"
-            headers["X-Title"] = "HWPX MCP"
-            target_url = OPENROUTER_URL
-        else:
-            body = {
-                "model": self._resolve_openai_model(model),
-                "messages": messages,
-                "stream": False,
-            }
-            target_url = OPENAI_URL
+        if provider:
+            _ = provider
 
         if tools:
             body["tools"] = tools

@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "hwp-mcp-extended"
-version = "0.3.5"
+version = "0.3.6"
 description = "HWP MCP Server with Chart, Equation, Document, and Template support"
 authors = [
     {name = "HWP MCP Team"}

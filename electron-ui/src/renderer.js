@@ -3,7 +3,7 @@ const CONFIG_KEY = "hwpxUi.config.v5";
 const defaultConfig = {
   backendBaseUrl:
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
-  openrouterKey: "",
+  openaiApiKey: "",
   gptOauthToken: "",
 };
 
@@ -16,9 +16,15 @@ const loadConfig = () => {
         const migrated = { ...parsed };
         if (
           typeof migrated.apiKey === "string" &&
-          typeof migrated.openrouterKey !== "string"
+          typeof migrated.openaiApiKey !== "string"
         ) {
-          migrated.openrouterKey = migrated.apiKey;
+          migrated.openaiApiKey = migrated.apiKey;
+        }
+        if (
+          typeof migrated.openrouterKey === "string" &&
+          typeof migrated.openaiApiKey !== "string"
+        ) {
+          migrated.openaiApiKey = migrated.openrouterKey;
         }
         return { ...defaultConfig, ...migrated };
       }
@@ -41,12 +47,13 @@ const newSessionBtn = $("newSession");
 const checkGateway = $("checkGateway");
 const restartBackendBtn = $("restartBackend");
 const backendBaseUrlInput = $("backendBaseUrlInput");
-const agentApiKeyInput = $("agentApiKeyInput");
+const openaiApiKeyInput = $("openaiApiKeyInput");
 const saveSettings = $("saveSettings");
 const resetSettings = $("resetSettings");
 const chatTitle = $("chatTitle");
 const sendBtn = $("sendBtn");
 const gptOauthTokenInput = $("gptOauthTokenInput");
+const openAiOauthLoginBtn = $("openAiOauthLoginBtn");
 const sidebarToggle = $("sidebarToggle");
 const appShell = $("appShell");
 const backdrop = $("backdrop");
@@ -76,6 +83,16 @@ const normalizeBaseUrl = (value) => {
 };
 
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
+
+const restartBackendWithCurrentCredentials = async () => {
+  if (!window.hwpxUi?.restartBackend) {
+    return null;
+  }
+  return window.hwpxUi.restartBackend({
+    openaiApiKey: config.openaiApiKey,
+    gptOauthToken: config.gptOauthToken,
+  });
+};
 
 const createSession = () => {
   const session = { id: crypto.randomUUID(), title: "New Chat", messages: [] };
@@ -133,7 +150,7 @@ const renderMessages = () => {
 
 const renderConfig = () => {
   backendBaseUrlInput.value = config.backendBaseUrl;
-  agentApiKeyInput.value = config.openrouterKey;
+  openaiApiKeyInput.value = config.openaiApiKey;
   gptOauthTokenInput.value = config.gptOauthToken;
 };
 
@@ -253,7 +270,7 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
       const health = await checkAgentEndpoint();
       const defaults = health?.defaults || {};
       status(
-        `Agent connected (${defaults.provider || "cerebras/fp16"} / ${defaults.model || "openai/gpt-oss-120b"})`
+        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`
       );
       return true;
     } catch {
@@ -277,19 +294,41 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
 saveSettings.addEventListener("click", () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput.value);
-  config.openrouterKey = agentApiKeyInput.value.trim();
+  config.openaiApiKey = openaiApiKeyInput.value.trim();
   config.gptOauthToken = gptOauthTokenInput.value.trim();
   persistConfig();
   status("Settings saved. Restarting backend...");
-  if (window.hwpxUi?.restartBackend) {
-    window.hwpxUi
-      .restartBackend({
-        openrouterKey: config.openrouterKey,
-        gptOauthToken: config.gptOauthToken,
-      })
-      .catch((error) => {
-        status(`Backend restart failed: ${error?.message || String(error)}`);
-      });
+  restartBackendWithCurrentCredentials().catch((error) => {
+    status(`Backend restart failed: ${error?.message || String(error)}`);
+  });
+});
+
+openAiOauthLoginBtn.addEventListener("click", async () => {
+  status("Starting OpenAI OAuth login...");
+  openAiOauthLoginBtn.disabled = true;
+  try {
+    if (!window.hwpxUi?.openAiOauthLogin) {
+      throw new Error("OpenAI OAuth login is unavailable in this build");
+    }
+
+    const loginResult = await window.hwpxUi.openAiOauthLogin();
+    if (!loginResult?.success) {
+      throw new Error(loginResult?.error || "OpenAI OAuth login failed");
+    }
+
+    config.gptOauthToken = typeof loginResult.accessToken === "string" ? loginResult.accessToken : "";
+    persistConfig();
+    renderConfig();
+
+    status(
+      `OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`
+    );
+    const restart = await restartBackendWithCurrentCredentials();
+    status(`OpenAI OAuth connected (pid ${restart?.pid || "?"}).`);
+  } catch (error) {
+    status(`OpenAI OAuth login failed: ${error?.message || String(error)}`);
+  } finally {
+    openAiOauthLoginBtn.disabled = false;
   }
 });
 
@@ -307,7 +346,7 @@ checkGateway.addEventListener("click", async () => {
     const health = await checkAgentEndpoint();
     const defaults = health?.defaults || {};
     status(
-      `Agent healthy (${defaults.provider || "cerebras/fp16"} / ${defaults.model || "openai/gpt-oss-120b"})`
+      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`
     );
   } catch (error) {
     status(`Agent check failed: ${error.message}`);
@@ -317,13 +356,8 @@ checkGateway.addEventListener("click", async () => {
 restartBackendBtn.addEventListener("click", async () => {
   status("Restarting backend...");
   try {
-    if (window.hwpxUi?.restartBackend) {
-      const result = await window.hwpxUi.restartBackend({
-        openrouterKey: config.openrouterKey,
-        gptOauthToken: config.gptOauthToken,
-      });
-      status(`Backend restarted (pid ${result.pid || "?"}). Waiting...`);
-    }
+    const result = await restartBackendWithCurrentCredentials();
+    status(`Backend restarted (pid ${result?.pid || "?"}). Waiting...`);
   } catch (error) {
     status(`Restart failed: ${error.message}`);
   }
@@ -375,12 +409,9 @@ renderAll();
 
 (async () => {
   await new Promise((resolve) => setTimeout(resolve, 5000));
-  if ((config.openrouterKey || config.gptOauthToken) && window.hwpxUi?.restartBackend) {
+  if (config.openaiApiKey || config.gptOauthToken) {
     try {
-      await window.hwpxUi.restartBackend({
-        openrouterKey: config.openrouterKey,
-        gptOauthToken: config.gptOauthToken,
-      });
+      await restartBackendWithCurrentCredentials();
     } catch (error) {
       status(`Backend restart failed: ${error?.message || String(error)}`);
     }

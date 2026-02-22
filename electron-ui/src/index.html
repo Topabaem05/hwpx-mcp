@@ -26,11 +26,15 @@
           <label for="backendBaseUrlInput" class="settings-label">Backend URL</label>
           <input id="backendBaseUrlInput" class="settings-input" type="url" placeholder="http://127.0.0.1:8000" />
 
-          <label for="agentApiKeyInput" class="settings-label">OpenRouter API Key</label>
-          <input id="agentApiKeyInput" class="settings-input" type="password" placeholder="Enter API key" />
+          <label for="openaiApiKeyInput" class="settings-label">OpenAI API Key (Fallback)</label>
+          <input id="openaiApiKeyInput" class="settings-input" type="password" placeholder="sk-..." />
 
           <label for="gptOauthTokenInput" class="settings-label">GPT OAuth Token</label>
           <input id="gptOauthTokenInput" class="settings-input" type="password" placeholder="Enter OAuth token" />
+
+          <button id="openAiOauthLoginBtn" type="button" class="ghost-btn settings-btn settings-full-btn">
+            Login with OpenAI OAuth
+          </button>
 
           <div class="settings-actions">
             <button id="saveSettings" type="button" class="primary-btn settings-btn">Save</button>

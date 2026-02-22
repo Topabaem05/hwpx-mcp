@@ -16,4 +16,5 @@ contextBridge.exposeInMainWorld("hwpxUi", {
 
   getBackendStatus: () => ipcRenderer.invoke("backend:status"),
   restartBackend: (opts) => ipcRenderer.invoke("backend:restart", opts),
+  openAiOauthLogin: () => ipcRenderer.invoke("auth:openai-oauth-login"),
 });

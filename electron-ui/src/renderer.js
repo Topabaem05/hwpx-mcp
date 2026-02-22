@@ -433,7 +433,10 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
   if (window.hwpxUi?.getBackendStatus) {
     const backendStatus = await window.hwpxUi.getBackendStatus();
     if (backendStatus.log?.length) {
-      status(`Agent failed to start. Log:\n${backendStatus.log.slice(-5).join("\n")}`);
+      const pathHint = backendStatus.logPath
+        ? `\nStartup log file: ${backendStatus.logPath}`
+        : "";
+      status(`Agent failed to start. Log:\n${backendStatus.log.slice(-5).join("\n")}${pathHint}`);
       return false;
     }
   }

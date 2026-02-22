@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require("electron");
 const { join, resolve, dirname } = require("path");
 const { spawn, spawnSync } = require("child_process");
-const { existsSync } = require("fs");
+const { existsSync, appendFileSync, mkdirSync } = require("fs");
 
 const MCP_HOST = process.env.MCP_HOST || "127.0.0.1";
 const MCP_PORT = process.env.MCP_PORT || "8000";
@@ -51,6 +51,38 @@ let backendProcess = null;
 let backendLog = [];
 let mainWindow = null;
 let backendEnvOverrides = {};
+let backendLogFilePath = null;
+let backendFileLogFailed = false;
+
+const resolveBackendLogFilePath = () => {
+  if (backendLogFilePath) {
+    return backendLogFilePath;
+  }
+
+  try {
+    const logDir = join(app.getPath("userData"), "logs");
+    mkdirSync(logDir, { recursive: true });
+    backendLogFilePath = join(logDir, "backend-startup.log");
+  } catch {
+    backendLogFilePath = join(process.cwd(), "backend-startup.log");
+  }
+
+  return backendLogFilePath;
+};
+
+const appendBackendFileLog = (line) => {
+  try {
+    appendFileSync(resolveBackendLogFilePath(), `${new Date().toISOString()} ${line}\n`, "utf8");
+  } catch (error) {
+    if (!backendFileLogFailed) {
+      backendFileLogFailed = true;
+      const fallbackLine = `[main] Backend file logging disabled: ${error.message}`;
+      backendLog.push(fallbackLine);
+      if (backendLog.length > 200) backendLog.shift();
+      console.warn(fallbackLine);
+    }
+  }
+};
 
 const setOptionalEnv = (envName, value) => {
   const normalized = typeof value === "string" ? value.trim() : "";
@@ -79,6 +111,7 @@ const log = (msg) => {
   console.log(line);
   backendLog.push(line);
   if (backendLog.length > 200) backendLog.shift();
+  appendBackendFileLog(line);
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -241,6 +274,26 @@ const runOpenAiOauthLogin = async (emitProgress) => {
   };
 };
 
+const waitForProcessExit = (proc, timeoutMs = 2500) =>
+  new Promise((resolveWait) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolveWait();
+    };
+
+    try {
+      proc.once("exit", finish);
+      proc.once("error", finish);
+    } catch {
+      finish();
+      return;
+    }
+
+    setTimeout(finish, timeoutMs);
+  });
+
 const isCmd = (cmd) => {
   const check = process.platform === "win32" ? "where" : "which";
   return spawnSync(check, [cmd], { stdio: "ignore" }).status === 0;
@@ -261,15 +314,15 @@ const findBackendCommand = () => {
   const candidates = [];
 
   if (resPath) {
-    if (isWin) candidates.push({ path: join(resPath, "backend-win", batName), type: "bat" });
     candidates.push({ path: join(resPath, "backend", binName), type: "bin" });
+    if (isWin) candidates.push({ path: join(resPath, "backend-win", batName), type: "bat" });
   }
 
-  if (isWin) candidates.push({ path: join(appDir, "resources", "backend-win", batName), type: "bat" });
   candidates.push({ path: join(appDir, "resources", "backend", binName), type: "bin" });
+  if (isWin) candidates.push({ path: join(appDir, "resources", "backend-win", batName), type: "bat" });
 
-  if (isWin) candidates.push({ path: join(repoRoot, "dist", "hwpx-mcp-backend-win", batName), type: "bat" });
   candidates.push({ path: join(repoRoot, "dist", "hwpx-mcp-backend", binName), type: "bin" });
+  if (isWin) candidates.push({ path: join(repoRoot, "dist", "hwpx-mcp-backend-win", batName), type: "bat" });
 
   for (const c of candidates) {
     log(`Checking: ${c.path} → ${existsSync(c.path) ? "FOUND" : "not found"}`);
@@ -343,12 +396,16 @@ const startBackend = () => {
     backendProcess.stdout?.on("data", (d) => {
       const s = d.toString();
       process.stdout.write(`[backend] ${s}`);
-      backendLog.push(`[out] ${s.trim()}`);
+      const line = `[out] ${s.trim()}`;
+      backendLog.push(line);
+      appendBackendFileLog(line);
     });
     backendProcess.stderr?.on("data", (d) => {
       const s = d.toString();
       process.stderr.write(`[backend] ${s}`);
-      backendLog.push(`[err] ${s.trim()}`);
+      const line = `[err] ${s.trim()}`;
+      backendLog.push(line);
+      appendBackendFileLog(line);
     });
     backendProcess.on("error", (e) => {
       log(`Backend spawn error: ${e.message}`);
@@ -366,18 +423,24 @@ const startBackend = () => {
   }
 };
 
-const stopBackend = () => {
+const stopBackend = async ({ waitForExit = false } = {}) => {
   if (!backendProcess || backendProcess.killed) return;
+  const proc = backendProcess;
   log("Stopping backend...");
   try {
     if (process.platform === "win32") {
-      spawn("taskkill", ["/pid", String(backendProcess.pid), "/f", "/t"], { stdio: "ignore" });
+      spawn("taskkill", ["/pid", String(proc.pid), "/f", "/t"], { stdio: "ignore" });
     } else {
-      backendProcess.kill("SIGTERM");
+      proc.kill("SIGTERM");
     }
   } catch (e) {
     log(`Stop error: ${e.message}`);
   }
+
+  if (waitForExit) {
+    await waitForProcessExit(proc);
+  }
+
   backendProcess = null;
 };
 
@@ -444,12 +507,16 @@ ipcMain.handle("backend:status", () => ({
   running: backendProcess !== null && !backendProcess.killed,
   pid: backendProcess?.pid ?? null,
   url: BACKEND_URL,
+  logPath: resolveBackendLogFilePath(),
   log: backendLog.slice(-30),
 }));
 
-ipcMain.handle("backend:restart", (_, opts) => {
+ipcMain.handle("backend:restart", async (_, opts) => {
   setBackendCredentials(opts);
-  stopBackend();
+  await stopBackend({ waitForExit: true });
+  if (process.platform === "win32") {
+    await sleep(450);
+  }
   startBackend();
   return { restarted: true, url: BACKEND_URL, pid: backendProcess?.pid ?? null };
 });

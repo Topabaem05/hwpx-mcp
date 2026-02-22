@@ -22,6 +22,31 @@ const OPENAI_OAUTH_TIMEOUT_MS = Number.parseInt(
 const OPENAI_OAUTH_API_BASE = `${OPENAI_OAUTH_ISSUER}/api/accounts`;
 const OPENAI_OAUTH_DEVICE_URL = `${OPENAI_OAUTH_ISSUER}/codex/device`;
 
+const readUrlField = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  return trimmed || "";
+};
+
+const resolveOpenAiVerificationUrls = (payload) => {
+  const verificationUrlComplete =
+    readUrlField(payload?.verification_uri_complete) ||
+    readUrlField(payload?.verification_url_complete);
+
+  const verificationUrl =
+    readUrlField(payload?.verification_uri) ||
+    readUrlField(payload?.verification_url) ||
+    OPENAI_OAUTH_DEVICE_URL;
+
+  return {
+    verificationUrl,
+    verificationUrlComplete,
+    openUrl: verificationUrlComplete || verificationUrl || OPENAI_OAUTH_DEVICE_URL,
+  };
+};
+
 let backendProcess = null;
 let backendLog = [];
 let mainWindow = null;
@@ -80,8 +105,15 @@ const requestOpenAiDeviceCode = async () => {
   const deviceAuthId =
     typeof payload?.device_auth_id === "string" ? payload.device_auth_id.trim() : "";
   const userCode = typeof payload?.user_code === "string" ? payload.user_code.trim() : "";
-  const rawInterval = typeof payload?.interval === "string" ? payload.interval : "5";
-  const intervalSeconds = Math.max(3, Number.parseInt(rawInterval, 10) || 5);
+  const rawInterval = payload?.interval;
+  const intervalSeconds = Math.max(
+    3,
+    typeof rawInterval === "number"
+      ? Math.floor(rawInterval)
+      : Number.parseInt(typeof rawInterval === "string" ? rawInterval : "5", 10) || 5
+  );
+
+  const verification = resolveOpenAiVerificationUrls(payload);
 
   if (!deviceAuthId || !userCode) {
     throw new Error("Invalid deviceauth response from OpenAI issuer");
@@ -91,11 +123,13 @@ const requestOpenAiDeviceCode = async () => {
     deviceAuthId,
     userCode,
     intervalSeconds,
+    ...verification,
   };
 };
 
 const pollOpenAiDeviceCode = async ({ deviceAuthId, userCode, intervalSeconds }) => {
   const startedAt = Date.now();
+  let currentIntervalSeconds = intervalSeconds;
 
   while (Date.now() - startedAt < OPENAI_OAUTH_TIMEOUT_MS) {
     const response = await fetch(`${OPENAI_OAUTH_API_BASE}/deviceauth/token`, {
@@ -113,8 +147,14 @@ const pollOpenAiDeviceCode = async ({ deviceAuthId, userCode, intervalSeconds })
       return response.json();
     }
 
+    if (response.status === 429) {
+      currentIntervalSeconds = Math.min(currentIntervalSeconds + 5, 30);
+      await sleep(currentIntervalSeconds * 1000);
+      continue;
+    }
+
     if (response.status === 403 || response.status === 404) {
-      await sleep(intervalSeconds * 1000);
+      await sleep(currentIntervalSeconds * 1000);
       continue;
     }
 
@@ -158,9 +198,19 @@ const exchangeOpenAiAuthorizationCode = async ({ authorizationCode, codeVerifier
   return accessToken;
 };
 
-const runOpenAiOauthLogin = async () => {
+const runOpenAiOauthLogin = async (emitProgress) => {
   const device = await requestOpenAiDeviceCode();
-  await shell.openExternal(OPENAI_OAUTH_DEVICE_URL);
+  emitProgress?.({
+    stage: "code_issued",
+    userCode: device.userCode,
+    verificationUrl: device.verificationUrl,
+    verificationUrlComplete: device.verificationUrlComplete,
+    openUrl: device.openUrl,
+    manualCodeRequired: !device.verificationUrlComplete,
+  });
+
+  await shell.openExternal(device.openUrl || OPENAI_OAUTH_DEVICE_URL);
+  emitProgress?.({ stage: "browser_opened" });
 
   const codePayload = await pollOpenAiDeviceCode(device);
   const authorizationCode =
@@ -179,10 +229,15 @@ const runOpenAiOauthLogin = async () => {
     codeVerifier,
   });
 
+  emitProgress?.({ stage: "token_ready" });
+
   return {
     accessToken,
     userCode: device.userCode,
-    verificationUrl: OPENAI_OAUTH_DEVICE_URL,
+    verificationUrl: device.verificationUrl,
+    verificationUrlComplete: device.verificationUrlComplete,
+    openUrl: device.openUrl,
+    manualCodeRequired: !device.verificationUrlComplete,
   };
 };
 
@@ -400,11 +455,24 @@ ipcMain.handle("backend:restart", (_, opts) => {
 });
 
 ipcMain.handle("auth:openai-oauth-login", async () => {
+  const emitProgress = (payload) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+    mainWindow.webContents.send("auth:openai-oauth-progress", payload);
+  };
+
   try {
-    const login = await runOpenAiOauthLogin();
+    emitProgress({ stage: "starting" });
+    const login = await runOpenAiOauthLogin(emitProgress);
     setOptionalEnv("OPENAI_OAUTH_TOKEN", login.accessToken);
+    emitProgress({ stage: "completed", ...login });
     return { success: true, ...login };
   } catch (error) {
+    emitProgress({
+      stage: "failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

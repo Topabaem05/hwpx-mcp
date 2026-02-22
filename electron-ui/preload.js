@@ -17,4 +17,16 @@ contextBridge.exposeInMainWorld("hwpxUi", {
   getBackendStatus: () => ipcRenderer.invoke("backend:status"),
   restartBackend: (opts) => ipcRenderer.invoke("backend:restart", opts),
   openAiOauthLogin: () => ipcRenderer.invoke("auth:openai-oauth-login"),
+  onOpenAiOauthProgress: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("auth:openai-oauth-progress", listener);
+
+    return () => {
+      ipcRenderer.removeListener("auth:openai-oauth-progress", listener);
+    };
+  },
 });

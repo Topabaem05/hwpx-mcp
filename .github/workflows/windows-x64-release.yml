@@ -56,7 +56,7 @@ jobs:
       - name: Install Electron dependencies
         working-directory: electron-ui
         shell: pwsh
-        run: npm ci
+        run: npm install
 
       - name: Build bundled Windows x64 installer
         working-directory: electron-ui

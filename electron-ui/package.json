@@ -14,7 +14,7 @@
     "start": "electron .",
     "start-stack": "node ./scripts/start-stack.js",
     "dev": "electron .",
-    "build:backend:win": "pyinstaller --noconfirm --clean --onefile --name hwpx-mcp-backend ../hwpx_mcp/server.py --distpath ../dist/hwpx-mcp-backend --workpath ../dist/hwpx-mcp-backend-build --specpath ../dist/hwpx-mcp-backend-spec",
+    "build:backend:win": "pyinstaller --noconfirm --clean --onefile --name hwpx-mcp-backend ../hwpx_mcp/server.py --hidden-import=win32com --hidden-import=win32com.client --hidden-import=pythoncom --hidden-import=pywintypes --collect-submodules=win32com --collect-submodules=win32comext --distpath ../dist/hwpx-mcp-backend --workpath ../dist/hwpx-mcp-backend-build --specpath ../dist/hwpx-mcp-backend-spec",
     "build:win": "node ./scripts/ensure-wine.js && electron-builder --win",
     "build:win:bundle": "npm run build:backend:win && npm run build:win",
     "build:mac": "electron-builder --mac",

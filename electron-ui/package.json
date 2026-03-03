@@ -1,6 +1,6 @@
 {
   "name": "hwpx-mcp-electron-ui",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "description": "Electron desktop client for HWPX-MCP document workbench",
   "author": {
@@ -56,6 +56,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
+      "include": "scripts/installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },

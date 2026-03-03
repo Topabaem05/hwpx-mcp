@@ -310,7 +310,7 @@ const renderConfig = () => {
 const renderAll = () => {
   renderSessionList();
   renderMessages();
-  const title = activeSession()?.title ?? "OpenAI (gpt-4o-mini)";
+  const title = activeSession()?.title ?? "OpenAI (gpt-5.2)";
   if (chatTitle) {
     chatTitle.innerHTML = `${escapeHtml(title)} <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>`;
   }
@@ -412,8 +412,16 @@ const handleUserMessage = async (text) => {
     await runToolOnlyAgent(text, botMsg, controller.signal);
   } catch (error) {
     if (botMsg) {
-      botMsg.text =
-        controller.signal.aborted ? "Cancelled." : `Error: ${error?.message || String(error)}`;
+      const raw = error?.message || String(error);
+      const hasQuotaSignal =
+        typeof raw === "string" &&
+        (raw.includes("insufficient_quota") || raw.includes("quota_hint"));
+
+      const quotaHelp = hasQuotaSignal
+        ? "\n\nTip: OAuth quota is exhausted. Set 'OpenAI API Key (Fallback)' in settings and restart backend."
+        : "";
+
+      botMsg.text = controller.signal.aborted ? "Cancelled." : `Error: ${raw}${quotaHelp}`;
       botMsg.streaming = false;
     }
   } finally {
@@ -440,7 +448,7 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
       const health = await checkAgentEndpoint();
       const defaults = health?.defaults || {};
       status(
-        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-5.2"}, ${authStatusLabel(
           health?.auth
         )})`
       );
@@ -670,7 +678,7 @@ checkGatewayBtn?.addEventListener("click", async () => {
     const health = await checkAgentEndpoint();
     const defaults = health?.defaults || {};
     status(
-      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-5.2"}, ${authStatusLabel(
         health?.auth
       )})`
     );

@@ -355,6 +355,20 @@ const authStatusLabel = (auth) => {
   return `auth:missing (${auth.detail || "token not set"})`;
 };
 
+const hasStoredAuth = () => Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
+
+const isAuthMissingErrorMessage = (message) => {
+  if (typeof message !== "string") {
+    return false;
+  }
+
+  return (
+    message.includes("OPENAI_OAUTH_TOKEN") ||
+    message.includes("CODEX_OAUTH_TOKEN") ||
+    message.includes("OPENAI_API_KEY")
+  );
+};
+
 const callAgentChat = async (message, signal) => {
   const response = await fetch(endpointUrl("/agent/chat"), {
     method: "POST",
@@ -431,7 +445,24 @@ const syncAgentAuth = async () => {
 
 const runToolOnlyAgent = async (userText, botMsg, signal) => {
   if (signal.aborted) throw new Error("Cancelled");
-  const payload = await callAgentChat(userText, signal);
+  let payload = null;
+
+  try {
+    payload = await callAgentChat(userText, signal);
+  } catch (error) {
+    const reason = error?.message || String(error);
+    const shouldRetryWithAuthSync = isAuthMissingErrorMessage(reason) && hasStoredAuth();
+
+    if (!shouldRetryWithAuthSync || signal.aborted) {
+      throw error;
+    }
+
+    await syncAgentAuth();
+    if (signal.aborted) {
+      throw new Error("Cancelled");
+    }
+    payload = await callAgentChat(userText, signal);
+  }
 
   let reply = "";
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -492,7 +523,16 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const health = await checkAgentEndpoint();
+      let health = await checkAgentEndpoint();
+
+      if (!health?.auth?.configured && hasStoredAuth()) {
+        try {
+          await syncAgentAuth();
+          health = await checkAgentEndpoint();
+        } catch {
+        }
+      }
+
       const defaults = health?.defaults || {};
       status(
         `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-5.2"}, ${authStatusLabel(
@@ -753,7 +793,16 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
 
 checkGatewayBtn?.addEventListener("click", async () => {
   try {
-    const health = await checkAgentEndpoint();
+    let health = await checkAgentEndpoint();
+
+    if (!health?.auth?.configured && hasStoredAuth()) {
+      try {
+        await syncAgentAuth();
+        health = await checkAgentEndpoint();
+      } catch {
+      }
+    }
+
     const defaults = health?.defaults || {};
     status(
       `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-5.2"}, ${authStatusLabel(

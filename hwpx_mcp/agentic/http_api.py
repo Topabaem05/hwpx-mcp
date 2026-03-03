@@ -32,6 +32,7 @@ class AgentHttpSurface:
         )
 
     async def health(self) -> dict[str, object]:
+        auth = self._agent.auth_status()
         return {
             "status": "ok",
             "surface": "agent-http",
@@ -39,6 +40,7 @@ class AgentHttpSurface:
                 "provider": DEFAULT_PROVIDER,
                 "model": DEFAULT_MODEL,
             },
+            "auth": auth,
         }
 
     async def chat(self, payload: ChatRequest) -> dict[str, object]:

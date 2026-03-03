@@ -20,6 +20,7 @@ from .tool_only_agent import SubagentName
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_OAUTH_TOKEN_ENV = "OPENAI_OAUTH_TOKEN"
+CODEX_OAUTH_TOKEN_ENV = "CODEX_OAUTH_TOKEN"
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
 
 DEFAULT_MODEL = OPENAI_DEFAULT_MODEL
@@ -165,16 +166,38 @@ class OpenRouterClient:
 
     def _resolve_auth(self) -> tuple[str, str]:
         oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
+        if oauth_token.lower().startswith("bearer "):
+            oauth_token = oauth_token[7:].strip()
         if oauth_token:
             return "openai-oauth", oauth_token
+
+        codex_oauth_token = os.getenv(CODEX_OAUTH_TOKEN_ENV, "").strip()
+        if codex_oauth_token.lower().startswith("bearer "):
+            codex_oauth_token = codex_oauth_token[7:].strip()
+        if codex_oauth_token:
+            return "codex-oauth", codex_oauth_token
 
         openai_api_key = (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
         if openai_api_key:
             return "openai-api-key", openai_api_key
 
         raise AgentAuthError(
-            f"{OPENAI_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
+            f"{OPENAI_OAUTH_TOKEN_ENV} or {CODEX_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
         )
+
+    def auth_status(self) -> dict[str, object]:
+        try:
+            mode, _ = self._resolve_auth()
+            return {
+                "configured": True,
+                "mode": mode,
+            }
+        except AgentAuthError as error:
+            return {
+                "configured": False,
+                "mode": "none",
+                "detail": str(error),
+            }
 
     @staticmethod
     def _resolve_openai_model(model: str) -> str:
@@ -219,13 +242,25 @@ class OpenRouterClient:
             body["tool_choice"] = tool_choice or "auto"
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(target_url, headers=headers, json=body)
+            try:
+                response = await client.post(target_url, headers=headers, json=body)
+            except httpx.HTTPError as error:
+                raise LlmRequestError(
+                    status_code=502,
+                    message=f"llm_network_error[{auth_mode}]: {error}",
+                ) from error
             if response.status_code >= 400:
                 raise LlmRequestError(
                     status_code=response.status_code,
                     message=f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}",
                 )
-            return response.json()
+            try:
+                return response.json()
+            except ValueError as error:
+                raise LlmRequestError(
+                    status_code=502,
+                    message=f"llm_invalid_json[{auth_mode}]: {response.text[:300]}",
+                ) from error
 
 
 @dataclass(slots=True)
@@ -351,6 +386,9 @@ class OpenRouterToolAgent:
             "reply": "도구 호출 루프가 너무 오래 지속되었습니다.",
             "error": "max_rounds_exceeded",
         }
+
+    def auth_status(self) -> dict[str, object]:
+        return self.client.auth_status()
 
     async def _call_tool_by_name(self, name: str, arguments: JsonObject) -> object:
         for record in self._gateway.registry:

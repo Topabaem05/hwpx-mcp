@@ -139,6 +139,8 @@ def test_agent_health_endpoint_uses_expected_defaults():
     assert payload["status"] == "ok"
     assert payload["defaults"]["provider"] == DEFAULT_PROVIDER
     assert payload["defaults"]["model"] == DEFAULT_MODEL
+    assert payload["auth"]["configured"] is True
+    assert payload["auth"]["mode"] == "openai-api-key"
 
 
 def test_agent_chat_endpoint_runs_tool_only_agent_directly():
@@ -192,7 +194,9 @@ def test_agent_chat_returns_400_for_auth_error():
     def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
         return ErrorAgent(
             backend_server=server,
-            error=AgentAuthError("OPENAI_OAUTH_TOKEN or OPENAI_API_KEY is not set"),
+            error=AgentAuthError(
+                "OPENAI_OAUTH_TOKEN or CODEX_OAUTH_TOKEN or OPENAI_API_KEY is not set"
+            ),
         )
 
     app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
@@ -203,7 +207,8 @@ def test_agent_chat_returns_400_for_auth_error():
 
     assert response.status_code == 400
     assert (
-        "OPENAI_OAUTH_TOKEN or OPENAI_API_KEY is not set" in response.json()["detail"]
+        "OPENAI_OAUTH_TOKEN or CODEX_OAUTH_TOKEN or OPENAI_API_KEY is not set"
+        in response.json()["detail"]
     )
 
 
@@ -237,3 +242,27 @@ def test_agent_chat_maps_upstream_llm_500_to_502():
 
     assert response.status_code == 502
     assert "llm_error[openai-api-key]" in response.json()["detail"]
+
+
+def test_openrouter_client_resolves_codex_oauth_token(monkeypatch):
+    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.setenv("CODEX_OAUTH_TOKEN", "codex-token-value")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    client = OpenRouterClient()
+    mode, token = client._resolve_auth()
+
+    assert mode == "codex-oauth"
+    assert token == "codex-token-value"
+
+
+def test_openrouter_client_trims_bearer_prefix(monkeypatch):
+    monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "Bearer oauth-token-value")
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    client = OpenRouterClient()
+    mode, token = client._resolve_auth()
+
+    assert mode == "openai-oauth"
+    assert token == "oauth-token-value"

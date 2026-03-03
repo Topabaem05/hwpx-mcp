@@ -21,7 +21,7 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_OAUTH_TOKEN_ENV = "OPENAI_OAUTH_TOKEN"
 CODEX_OAUTH_TOKEN_ENV = "CODEX_OAUTH_TOKEN"
-OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+OPENAI_DEFAULT_MODEL = "gpt-5.2"
 
 DEFAULT_MODEL = OPENAI_DEFAULT_MODEL
 DEFAULT_PROVIDER = "openai"
@@ -164,33 +164,147 @@ class OpenRouterClient:
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key
 
-    def _resolve_auth(self) -> tuple[str, str]:
+    def _auth_candidates(self) -> list[tuple[str, str]]:
+        candidates: list[tuple[str, str]] = []
+
         oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
         if oauth_token.lower().startswith("bearer "):
             oauth_token = oauth_token[7:].strip()
         if oauth_token:
-            return "openai-oauth", oauth_token
+            candidates.append(("openai-oauth", oauth_token))
 
         codex_oauth_token = os.getenv(CODEX_OAUTH_TOKEN_ENV, "").strip()
         if codex_oauth_token.lower().startswith("bearer "):
             codex_oauth_token = codex_oauth_token[7:].strip()
         if codex_oauth_token:
-            return "codex-oauth", codex_oauth_token
+            candidates.append(("codex-oauth", codex_oauth_token))
 
         openai_api_key = (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
         if openai_api_key:
-            return "openai-api-key", openai_api_key
+            candidates.append(("openai-api-key", openai_api_key))
+
+        unique_candidates: list[tuple[str, str]] = []
+        seen_tokens: set[str] = set()
+        for mode, token in candidates:
+            if token in seen_tokens:
+                continue
+            seen_tokens.add(token)
+            unique_candidates.append((mode, token))
+
+        if unique_candidates:
+            return unique_candidates
 
         raise AgentAuthError(
             f"{OPENAI_OAUTH_TOKEN_ENV} or {CODEX_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
         )
 
+    def _resolve_auth(self) -> tuple[str, str]:
+        return self._auth_candidates()[0]
+
+    @staticmethod
+    def _is_insufficient_quota(status_code: int, response_text: str) -> bool:
+        if status_code != 429:
+            return False
+
+        lowered = response_text.lower()
+        if "insufficient_quota" in lowered:
+            return True
+
+        try:
+            payload = json.loads(response_text)
+        except (TypeError, ValueError):
+            return False
+
+        if not isinstance(payload, dict):
+            return False
+
+        error = payload.get("error")
+        if not isinstance(error, dict):
+            return False
+
+        error_type = error.get("type")
+        return isinstance(error_type, str) and error_type == "insufficient_quota"
+
+    @staticmethod
+    def _parse_error_fields(response_text: str) -> tuple[str, str]:
+        try:
+            payload = json.loads(response_text)
+        except (TypeError, ValueError):
+            return "", ""
+
+        if not isinstance(payload, dict):
+            return "", ""
+
+        error = payload.get("error")
+        if not isinstance(error, dict):
+            return "", ""
+
+        error_type = error.get("type")
+        error_code = error.get("code")
+
+        normalized_type = error_type if isinstance(error_type, str) else ""
+        normalized_code = error_code if isinstance(error_code, str) else ""
+        return normalized_type, normalized_code
+
+    @classmethod
+    def _can_try_next_auth(cls, *, status_code: int, response_text: str) -> bool:
+        if status_code == 401:
+            return True
+
+        error_type, error_code = cls._parse_error_fields(response_text)
+
+        if status_code == 403:
+            auth_like_markers = {
+                "invalid_api_key",
+                "invalid_authentication",
+                "authentication_error",
+                "insufficient_permissions",
+            }
+            return error_type in auth_like_markers or error_code in auth_like_markers
+
+        if status_code == 429 and cls._is_insufficient_quota(
+            status_code, response_text
+        ):
+            return True
+
+        return False
+
+    @classmethod
+    def _append_quota_hint(
+        cls,
+        *,
+        message: str,
+        auth_mode: str,
+        status_code: int,
+        response_text: str,
+    ) -> str:
+        if auth_mode not in ("openai-oauth", "codex-oauth"):
+            return message
+        if not cls._is_insufficient_quota(status_code, response_text):
+            return message
+        return (
+            f"{message} | quota_hint: OAuth token has no API quota. "
+            f"Configure {OPENAI_API_KEY_ENV} with API billing or use another token."
+        )
+
+    async def _post_chat_completion(
+        self,
+        *,
+        target_url: str,
+        headers: dict[str, str],
+        body: dict[str, object],
+    ) -> httpx.Response:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            return await client.post(target_url, headers=headers, json=body)
+
     def auth_status(self) -> dict[str, object]:
         try:
-            mode, _ = self._resolve_auth()
+            candidates = self._auth_candidates()
+            modes = [mode for mode, _token in candidates]
             return {
                 "configured": True,
-                "mode": mode,
+                "mode": modes[0],
+                "available_modes": modes,
             }
         except AgentAuthError as error:
             return {
@@ -220,13 +334,10 @@ class OpenRouterClient:
         tools: list[dict[str, object]] | None,
         tool_choice: str | None,
     ) -> dict[str, object]:
-        auth_mode, auth_token = self._resolve_auth()
+        auth_candidates = self._auth_candidates()
+        attempted_modes: list[str] = []
 
         body: dict[str, object]
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {auth_token}",
-        }
         body = {
             "model": self._resolve_openai_model(model),
             "messages": messages,
@@ -241,19 +352,45 @@ class OpenRouterClient:
             body["tools"] = tools
             body["tool_choice"] = tool_choice or "auto"
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        total_candidates = len(auth_candidates)
+        for index, (auth_mode, auth_token) in enumerate(auth_candidates):
+            attempted_modes.append(auth_mode)
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {auth_token}",
+            }
             try:
-                response = await client.post(target_url, headers=headers, json=body)
+                response = await self._post_chat_completion(
+                    target_url=target_url,
+                    headers=headers,
+                    body=body,
+                )
             except httpx.HTTPError as error:
                 raise LlmRequestError(
                     status_code=502,
                     message=f"llm_network_error[{auth_mode}]: {error}",
                 ) from error
+
             if response.status_code >= 400:
+                message = f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}"
+                message = self._append_quota_hint(
+                    message=message,
+                    auth_mode=auth_mode,
+                    status_code=response.status_code,
+                    response_text=response.text,
+                )
+
+                if index + 1 < total_candidates and self._can_try_next_auth(
+                    status_code=response.status_code,
+                    response_text=response.text,
+                ):
+                    continue
+
                 raise LlmRequestError(
                     status_code=response.status_code,
-                    message=f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}",
+                    message=f"{message} | attempted_auth={','.join(attempted_modes)}",
                 )
+
             try:
                 return response.json()
             except ValueError as error:
@@ -261,6 +398,11 @@ class OpenRouterClient:
                     status_code=502,
                     message=f"llm_invalid_json[{auth_mode}]: {response.text[:300]}",
                 ) from error
+
+        raise LlmRequestError(
+            status_code=500,
+            message="llm_error[unknown]: no_auth_candidate_succeeded",
+        )
 
 
 @dataclass(slots=True)

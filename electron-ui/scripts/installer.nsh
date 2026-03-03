@@ -22,6 +22,5 @@
     RMDir /r "$LOCALAPPDATA\${APP_FILENAME}-updater"
     RMDir /r "$LOCALAPPDATA\${PRODUCT_NAME}-updater"
 
-    SetShellVarContext lastused
   ${endIf}
 !macroend

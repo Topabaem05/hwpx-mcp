@@ -382,6 +382,53 @@ const callAgentChat = async (message, signal) => {
   return payload;
 };
 
+const syncAgentAuth = async () => {
+  const maxAttempts = 8;
+  const delayMs = 750;
+  let lastError = "auth sync failed";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(endpointUrl("/agent/auth"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify({
+          openai_api_key: config.openaiApiKey || "",
+          openai_oauth_token: config.gptOauthToken || "",
+          codex_oauth_token: config.gptOauthToken || "",
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.detail;
+        const reason =
+          payload?.error ||
+          payload?.message ||
+          (typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+            ? JSON.stringify(detail)
+            : "") ||
+          `HTTP ${response.status}`;
+        throw new Error(String(reason));
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error?.message || String(error);
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw new Error(lastError);
+};
+
 const runToolOnlyAgent = async (userText, botMsg, signal) => {
   if (signal.aborted) throw new Error("Cancelled");
   const payload = await callAgentChat(userText, signal);
@@ -521,19 +568,30 @@ openSettingsHeaderBtn?.addEventListener("click", openSettings);
 closeSettingsBtn?.addEventListener("click", closeSettings);
 settingsOverlay?.addEventListener("click", closeSettings);
 
-saveSettingsBtn?.addEventListener("click", () => {
+saveSettingsBtn?.addEventListener("click", async () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
   config.openaiApiKey = (openaiApiKeyInput?.value || "").trim();
   config.gptOauthToken = (gptOauthTokenInput?.value || "").trim();
   persistConfig();
   status("Settings saved. Restarting backend...");
-  restartBackendWithCurrentCredentials()
-    .then((result) => {
-      status(`Backend restarted (pid ${result?.pid || "?"}).`);
-    })
-    .catch((error) => {
-      status(`Backend restart failed: ${error?.message || String(error)}`);
-    });
+  let restartText = "";
+
+  try {
+    const result = await restartBackendWithCurrentCredentials();
+    restartText = `Backend restarted (pid ${result?.pid || "?"}).`;
+  } catch (error) {
+    restartText = `Backend restart failed: ${error?.message || String(error)}`;
+  }
+
+  await waitForBackend(10, 1000);
+
+  try {
+    const authSync = await syncAgentAuth();
+    const mode = authSync?.auth?.mode || "unknown";
+    status(`${restartText} Auth synced (${mode}).`);
+  } catch (error) {
+    status(`${restartText} Auth sync failed: ${error?.message || String(error)}`);
+  }
 });
 
 resetSettingsBtn?.addEventListener("click", () => {
@@ -664,8 +722,28 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
         ? `OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`
         : "OpenAI OAuth verified. Restarting backend..."
     );
-    const restart = await restartBackendWithCurrentCredentials();
-    status(`OpenAI OAuth connected (pid ${restart?.pid || "?"}).`);
+    let restartInfo = null;
+    let restartError = null;
+
+    try {
+      restartInfo = await restartBackendWithCurrentCredentials();
+    } catch (error) {
+      restartError = error;
+    }
+
+    await waitForBackend(10, 1000);
+
+    const authSync = await syncAgentAuth();
+    const mode = authSync?.auth?.mode || "unknown";
+    if (restartError) {
+      status(
+        `OAuth token synced (${mode}). Backend restart failed: ${restartError?.message || String(
+          restartError
+        )}`
+      );
+    } else {
+      status(`OpenAI OAuth connected (pid ${restartInfo?.pid || "?"}, ${mode}).`);
+    }
   } catch (error) {
     status(`OpenAI OAuth login failed: ${error?.message || String(error)}`);
   } finally {
@@ -697,6 +775,14 @@ restartBackendBtn?.addEventListener("click", async () => {
   }
   await new Promise((resolve) => setTimeout(resolve, 3000));
   await waitForBackend(10, 2000);
+
+  try {
+    const authSync = await syncAgentAuth();
+    const mode = authSync?.auth?.mode || "unknown";
+    status(`Auth synced (${mode}).`);
+  } catch (error) {
+    status(`Auth sync failed: ${error?.message || String(error)}`);
+  }
 });
 
 chatForm?.addEventListener("submit", (event) => {
@@ -758,5 +844,13 @@ updateSendBtn();
       status(`Backend restart failed: ${error?.message || String(error)}`);
     }
   }
-  await waitForBackend(15, 2000);
+  const ready = await waitForBackend(15, 2000);
+
+  if (ready && (config.openaiApiKey || config.gptOauthToken)) {
+    try {
+      await syncAgentAuth();
+    } catch (error) {
+      status(`Auth sync failed: ${error?.message || String(error)}`);
+    }
+  }
 })();

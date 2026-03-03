@@ -163,23 +163,64 @@ def _tool_record_to_openai_tool(record: object) -> dict[str, object]:
 class OpenRouterClient:
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key
+        self._runtime_openai_api_key = ""
+        self._runtime_openai_oauth_token = ""
+        self._runtime_codex_oauth_token = ""
+
+    @staticmethod
+    def _normalize_token(value: str | None, *, trim_bearer: bool = False) -> str:
+        normalized = value.strip() if isinstance(value, str) else ""
+        if trim_bearer and normalized.lower().startswith("bearer "):
+            return normalized[7:].strip()
+        return normalized
+
+    def set_runtime_auth(
+        self,
+        *,
+        openai_api_key: str | None = None,
+        openai_oauth_token: str | None = None,
+        codex_oauth_token: str | None = None,
+    ) -> None:
+        if openai_api_key is not None:
+            self._runtime_openai_api_key = self._normalize_token(openai_api_key)
+
+        if openai_oauth_token is not None:
+            self._runtime_openai_oauth_token = self._normalize_token(
+                openai_oauth_token,
+                trim_bearer=True,
+            )
+
+        if codex_oauth_token is not None:
+            self._runtime_codex_oauth_token = self._normalize_token(
+                codex_oauth_token,
+                trim_bearer=True,
+            )
 
     def _auth_candidates(self) -> list[tuple[str, str]]:
         candidates: list[tuple[str, str]] = []
 
-        oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
+        oauth_token = (
+            self._runtime_openai_oauth_token
+            or os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
+        )
         if oauth_token.lower().startswith("bearer "):
             oauth_token = oauth_token[7:].strip()
         if oauth_token:
             candidates.append(("openai-oauth", oauth_token))
 
-        codex_oauth_token = os.getenv(CODEX_OAUTH_TOKEN_ENV, "").strip()
+        codex_oauth_token = (
+            self._runtime_codex_oauth_token
+            or os.getenv(CODEX_OAUTH_TOKEN_ENV, "").strip()
+        )
         if codex_oauth_token.lower().startswith("bearer "):
             codex_oauth_token = codex_oauth_token[7:].strip()
         if codex_oauth_token:
             candidates.append(("codex-oauth", codex_oauth_token))
 
-        openai_api_key = (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
+        openai_api_key = (
+            self._runtime_openai_api_key
+            or (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
+        )
         if openai_api_key:
             candidates.append(("openai-api-key", openai_api_key))
 
@@ -531,6 +572,19 @@ class OpenRouterToolAgent:
 
     def auth_status(self) -> dict[str, object]:
         return self.client.auth_status()
+
+    def set_runtime_auth(
+        self,
+        *,
+        openai_api_key: str | None = None,
+        openai_oauth_token: str | None = None,
+        codex_oauth_token: str | None = None,
+    ) -> None:
+        self.client.set_runtime_auth(
+            openai_api_key=openai_api_key,
+            openai_oauth_token=openai_oauth_token,
+            codex_oauth_token=codex_oauth_token,
+        )
 
     async def _call_tool_by_name(self, name: str, arguments: JsonObject) -> object:
         for record in self._gateway.registry:

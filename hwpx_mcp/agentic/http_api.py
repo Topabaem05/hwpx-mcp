@@ -19,6 +19,12 @@ class ChatRequest(BaseModel):
     session_id: str = ""
 
 
+class AuthRequest(BaseModel):
+    openai_api_key: str | None = None
+    openai_oauth_token: str | None = None
+    codex_oauth_token: str | None = None
+
+
 class AgentHttpSurface:
     def __init__(
         self,
@@ -41,6 +47,17 @@ class AgentHttpSurface:
                 "model": DEFAULT_MODEL,
             },
             "auth": auth,
+        }
+
+    async def set_auth(self, payload: AuthRequest) -> dict[str, object]:
+        self._agent.set_runtime_auth(
+            openai_api_key=payload.openai_api_key,
+            openai_oauth_token=payload.openai_oauth_token,
+            codex_oauth_token=payload.codex_oauth_token,
+        )
+        return {
+            "success": True,
+            "auth": self._agent.auth_status(),
         }
 
     async def chat(self, payload: ChatRequest) -> dict[str, object]:
@@ -82,6 +99,10 @@ def build_agent_http_router(
     @router.get("/agent/health")
     async def agent_health() -> dict[str, object]:
         return await surface.health()
+
+    @router.post("/agent/auth")
+    async def agent_auth(payload: AuthRequest) -> dict[str, object]:
+        return await surface.set_auth(payload)
 
     @router.post("/agent/chat")
     async def agent_chat(payload: ChatRequest) -> dict[str, object]:

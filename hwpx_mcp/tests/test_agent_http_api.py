@@ -147,6 +147,47 @@ def test_agent_health_endpoint_uses_expected_defaults():
     assert payload["auth"]["mode"] == "openai-api-key"
 
 
+def test_agent_auth_endpoint_sets_runtime_oauth_token(monkeypatch):
+    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    app.include_router(build_agent_http_router(backend))
+    client = TestClient(app)
+
+    with client:
+        health_before = client.get("/agent/health")
+        assert health_before.status_code == 200
+        assert health_before.json()["auth"]["configured"] is False
+
+        auth_set = client.post(
+            "/agent/auth",
+            json={
+                "openai_oauth_token": "Bearer runtime-oauth-token",
+                "openai_api_key": "",
+                "codex_oauth_token": "",
+            },
+        )
+        assert auth_set.status_code == 200
+        auth_payload = auth_set.json()
+        assert auth_payload["success"] is True
+        assert auth_payload["auth"]["configured"] is True
+        assert auth_payload["auth"]["mode"] == "openai-oauth"
+
+        auth_noop = client.post("/agent/auth", json={})
+        assert auth_noop.status_code == 200
+        noop_payload = auth_noop.json()
+        assert noop_payload["auth"]["configured"] is True
+        assert noop_payload["auth"]["mode"] == "openai-oauth"
+
+        health_after = client.get("/agent/health")
+        assert health_after.status_code == 200
+        assert health_after.json()["auth"]["configured"] is True
+        assert health_after.json()["auth"]["mode"] == "openai-oauth"
+
+
 def test_agent_chat_endpoint_runs_tool_only_agent_directly():
     client, backend, calls = _create_client()
 

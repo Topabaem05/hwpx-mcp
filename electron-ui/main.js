@@ -104,6 +104,7 @@ const setBackendCredentials = (opts) => {
 
   setOptionalEnv("OPENAI_API_KEY", opts.openaiApiKey);
   setOptionalEnv("OPENAI_OAUTH_TOKEN", opts.gptOauthToken);
+  setOptionalEnv("CODEX_OAUTH_TOKEN", opts.gptOauthToken);
 };
 
 const log = (msg) => {
@@ -533,6 +534,7 @@ ipcMain.handle("auth:openai-oauth-login", async () => {
     emitProgress({ stage: "starting" });
     const login = await runOpenAiOauthLogin(emitProgress);
     setOptionalEnv("OPENAI_OAUTH_TOKEN", login.accessToken);
+    setOptionalEnv("CODEX_OAUTH_TOKEN", login.accessToken);
     emitProgress({ stage: "completed", ...login });
     return { success: true, ...login };
   } catch (error) {

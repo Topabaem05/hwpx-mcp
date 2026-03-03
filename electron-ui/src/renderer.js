@@ -343,6 +343,18 @@ const checkAgentEndpoint = async () => {
   return response.json();
 };
 
+const authStatusLabel = (auth) => {
+  if (!auth || typeof auth !== "object") {
+    return "auth:unknown";
+  }
+
+  if (auth.configured) {
+    return `auth:${auth.mode || "configured"}`;
+  }
+
+  return `auth:missing (${auth.detail || "token not set"})`;
+};
+
 const callAgentChat = async (message, signal) => {
   const response = await fetch(endpointUrl("/agent/chat"), {
     method: "POST",
@@ -427,7 +439,11 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
     try {
       const health = await checkAgentEndpoint();
       const defaults = health?.defaults || {};
-      status(`Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`);
+      status(
+        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+          health?.auth
+        )})`
+      );
       return true;
     } catch {
       status(`Agent starting... (${attempt}/${maxAttempts})`);
@@ -653,7 +669,11 @@ checkGatewayBtn?.addEventListener("click", async () => {
   try {
     const health = await checkAgentEndpoint();
     const defaults = health?.defaults || {};
-    status(`Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`);
+    status(
+      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+        health?.auth
+      )})`
+    );
   } catch (error) {
     status(`Agent check failed: ${error?.message || String(error)}`);
   }

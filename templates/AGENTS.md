@@ -7,8 +7,7 @@ Built-in HWPX templates shipped with the project, plus a manifest (`template_ind
 ```
 templates/
 ├── template_index.json           # template catalog (IDs, filenames, categories, keywords)
-├── h01/..h06/                    # per-template docs + preview images
-└── *.hwpx                        # built-in HWPX template files
+└── h01/..h06/                    # per-template .hwpx + README + preview images
 ```
 
 ## Where To Look
@@ -23,6 +22,11 @@ templates/
 - Placeholders:
   - HWPX file templates: replaced via `replace_text_in_runs()`.
   - Text templates (in code): mustache-style `{{key}}` replacement.
+- Keep per-template `README.md` + preview images alongside each `.hwpx` file.
 
 ## Anti-Patterns
 - Don’t rely on Windows-only features inside templates; templates must work in Docker/Linux (HWPX creation path).
+
+## Related
+- Root invariants: `AGENTS.md`
+- Template tool bridge: `hwpx_mcp/tools/template_tools.py`

@@ -28,6 +28,7 @@ scripts/
 - Keep POSIX and PowerShell script pairs behaviorally aligned when updating flows.
 - Scripts assume repo-root-relative paths; preserve `REPO_ROOT` resolution patterns.
 - Prefer explicit prerequisite checks (`uv`, `python`, `npm`, `bunx`, `wine`) with actionable error messages.
+- Keep stack bootstrap transport assumptions aligned with `electron-ui/scripts/start-stack.js`.
 
 ## Boundaries
 - Scripts are local dev/build automation, not production deployment orchestration.
@@ -38,3 +39,7 @@ scripts/
 - Changing output directories (`dist/...`) without updating Electron packaging references.
 - Adding platform-specific behavior to only one of `.sh`/`.ps1` variants.
 - Allowing partial-success behavior in build scripts after required step failures.
+
+## Related
+- Root build/release overview: `AGENTS.md`
+- UI packaging boundary: `electron-ui/AGENTS.md`

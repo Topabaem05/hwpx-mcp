@@ -15,6 +15,11 @@ Deterministic Tool-RAG gateway: builds a registry of backend tools, retrieves ca
 ## Conventions
 - Tool identity is schema-sensitive: changes to input/output schema change `schema_hash` and thus `tool_id`.
 - Gateway expects a backend server implementing `list_tools()` + `call_tool()` (see `BackendServer` protocol).
+- Group routing must remain reproducible for a given query + registry snapshot.
 
 ## Anti-Patterns
 - Don’t make routing depend on nondeterministic state; Phase 1 is intended to be deterministic and testable.
+
+## Related
+- Parent package boundaries: `hwpx_mcp/AGENTS.md`
+- Router regressions: `hwpx_mcp/tests/test_agentic_router.py`

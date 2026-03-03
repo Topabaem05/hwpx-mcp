@@ -3,6 +3,8 @@
 ## Overview
 Python package containing backend runtime, deterministic gateway, tool modules, XML helpers, and test suite.
 
+Inherits root conventions; this file records `hwpx_mcp/`-local boundaries only.
+
 ## Where To Look
 | Task | Location | Notes |
 |------|----------|-------|
@@ -15,8 +17,9 @@ Python package containing backend runtime, deterministic gateway, tool modules, 
 
 ## Conventions
 - `server.py` remains composition root; feature/tool logic should live outside it.
-- Script entrypoints are from `pyproject.toml` (`hwpx-mcp`, `hwpx-mcp-gateway`, `hwpx-mcp-eval`).
-- Async tests rely on pytest-asyncio with `asyncio_mode = auto`.
+- Prefer module registration (`register_*_tools`) and keep `server.py` wiring-focused.
+- Keep gateway paths deterministic; no request-time randomization/stateful routing shortcuts.
+- XML parse/edit flows must route through `core/xml_parser.py` + `core/validator.py`.
 
 ## Local Boundaries
 - `tools/` owns capability-specific business logic and platform branching.
@@ -27,3 +30,8 @@ Python package containing backend runtime, deterministic gateway, tool modules, 
 - Registering/implementing new tool logic directly in `server.py`.
 - Adding nondeterministic behavior to routing/retrieval paths.
 - Bypassing `core/xml_parser.py` for XML parse/edit operations.
+
+## Related
+- Root shared rules: `AGENTS.md`
+- Tool-layer specifics: `hwpx_mcp/tools/AGENTS.md`
+- Routing/gateway specifics: `hwpx_mcp/agentic/AGENTS.md`

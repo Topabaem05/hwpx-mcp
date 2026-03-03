@@ -17,8 +17,12 @@ Platform abstraction layer + MCP tool registration. Windows uses a COM-backed co
 - Capability gating: implement new functionality by adding a `Capability` and advertising it via controller `capabilities`.
 - Errors: unsupported ops should raise `NotSupportedError(capability=..., current_platform=...)`.
 - Tool registration pattern: `def register_X_tools(mcp, ...) -> None:` then define `@mcp.tool()` functions inside.
+- Keep payload compatibility in wrappers (`success`/`status` + `message`) for MCP client stability.
 
 ## Common Pitfalls
 - Cross-platform cannot open existing docs (`open_document` raises); only supports creating/saving HWPX.
 - Cross-platform `save_document()` needs a path at least once; otherwise it raises.
-- Keep tool wrapper responses stable (dicts with `success`/`status` + `message`) because clients may depend on shapes.
+
+## Related
+- Parent package boundaries: `hwpx_mcp/AGENTS.md`
+- Root invariants: `AGENTS.md`

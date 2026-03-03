@@ -1,57 +1,65 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-02-19 20:31:09 KST
-**Commit:** 5660768
-**Branch:** main
+**Generated:** 2026-03-02 18:59:58 KST
+**Commit:** 5d03014
+**Branch:** wt/oauth
 
 ## OVERVIEW
-FastMCP-based backend for HWP/HWPX operations with two surfaces: full backend tools and a deterministic agentic gateway.
-Priority is deterministic routing, stable tool schemas, and cross-platform behavior (Windows COM vs Linux/macOS HWPX-first).
+FastMCP-based backend for HWP/HWPX operations with two execution surfaces: full backend tools and a deterministic agentic gateway.
+The repository is intentionally mixed: Python backend/runtime, template assets, build/release scripts, and optional Electron UI.
 
 ## STRUCTURE
 ```
 hwpx-mcp/
-├── hwpx_mcp/              # backend package: server, config, tools, agentic, tests
-├── templates/             # built-in .hwpx templates + catalog + previews
-├── scripts/               # build/bootstrap/cleanup/release helpers
-├── electron-ui/           # optional desktop UI for streamable HTTP backend
-└── AGENTS.md              # root policy and navigation hub
+├── hwpx_mcp/              # backend package: server, tools, agentic routing, XML helpers, tests
+├── templates/             # built-in .hwpx templates + template_index.json + preview images
+├── scripts/               # build/installer/bootstrap/cleanup helpers (.sh/.ps1)
+├── electron-ui/           # desktop shell for streamable HTTP MCP backend
+├── .github/workflows/     # CI/release pipelines (Windows x64 release build)
+├── src/                   # legacy package mirror (small; no active domain split)
+└── security_module/       # Windows COM sample DLL asset
 ```
 
 ## WHERE TO LOOK
 | Task | Location | Notes |
 |------|----------|-------|
-| Server startup/transport | `hwpx_mcp/server.py`, `hwpx_mcp/config.py` | `main()` chooses stdio/http/sse/streamable-http |
-| Tool registration | `hwpx_mcp/tools/` | Prefer `register_*_tools(...)` modules over ad-hoc server edits |
-| Gateway routing | `hwpx_mcp/agentic/` | Registry hash + deterministic group routing |
-| XML safety/query/edit | `hwpx_mcp/core/`, `hwpx_mcp/features/` | Secure parser, validator, smart edit/query helpers |
-| Tests and regressions | `hwpx_mcp/tests/` | pytest + pytest-asyncio (`asyncio_mode=auto`) |
-| Templates and catalog | `templates/`, `hwpx_mcp/tools/template_tools.py` | `template_index.json` is source of truth |
-| UI + local stack bootstrap | `electron-ui/`, `scripts/quick-start-bunx.*` | UI expects streamable HTTP endpoint |
+| Backend startup/transport | `hwpx_mcp/server.py`, `hwpx_mcp/config.py` | `main()` selects `stdio/http/sse/streamable-http` |
+| Gateway startup | `hwpx_mcp/gateway_server.py` | deterministic gateway stdio process |
+| Tool registration and controllers | `hwpx_mcp/tools/` | prefer `register_*_tools(...)` modules over `server.py` edits |
+| Routing internals | `hwpx_mcp/agentic/` | registry hash + grouping + deterministic routing |
+| XML safety/query/edit | `hwpx_mcp/core/`, `hwpx_mcp/features/` | secure parser + validator + smart patch/query |
+| Tests and regressions | `hwpx_mcp/tests/`, `pyproject.toml` | pytest + pytest-asyncio (`asyncio_mode=auto`) |
+| Template source of truth | `templates/template_index.json` | template IDs/metadata map to `.hwpx` files |
+| UI bootstrap | `electron-ui/main.js`, `electron-ui/scripts/start-stack.js` | streamable HTTP bootstrap + readiness polling |
+| Release/build automation | `scripts/`, `.github/workflows/windows-x64-release.yml` | backend PyInstaller + Electron packaging |
 
 ## CODE MAP
-LSP document/workspace symbol APIs were unavailable during generation.
-Use direct entrypoints as central anchors:
-- `hwpx_mcp/server.py`: backend `FastMCP` app and registration chain.
-- `hwpx_mcp/gateway_server.py`: gateway `FastMCP` wrapper and stdio run path.
-- `hwpx_mcp/eval/run_eval.py`: offline routing eval against backend MCP surface.
+| Symbol | Type | Location | Role |
+|--------|------|----------|------|
+| `initialize_server` | function | `hwpx_mcp/server.py` | backend FastMCP registration chain |
+| `register_windows_tools` | function | `hwpx_mcp/server.py` | Windows-only COM tool surface wiring |
+| `main` | function | `hwpx_mcp/server.py` | runtime entrypoint and transport dispatch |
+| `main` | function | `hwpx_mcp/gateway_server.py` | gateway runtime entrypoint |
+| `main` | function | `hwpx_mcp/eval/run_eval.py` | offline routing eval CLI |
 
 ## CONVENTIONS
-- Packaging/scripts live in `pyproject.toml` (`hwpx-mcp`, `hwpx-mcp-gateway`, `hwpx-mcp-eval`).
-- Baseline verification is pytest (`pdm run test`); no repo-wide lint/typecheck command is configured.
-- Keep response shape compatibility in tool wrappers (`success`/`status` + `message` style).
-- Use capability gating and explicit unsupported errors for platform differences.
+- Packaging, script entrypoints, and pytest config are centralized in `pyproject.toml`.
+- Backend/gateway/eval CLIs are `hwpx-mcp`, `hwpx-mcp-gateway`, `hwpx-mcp-eval`.
+- Tool wrappers keep response-shape compatibility (`success`/`status` + `message`).
+- Cross-platform behavior is explicit: Windows COM path vs Linux/macOS HWPX-first path.
+- Child AGENTS files are deltas; avoid restating root-wide rules.
 
 ## ANTI-PATTERNS (THIS PROJECT)
-- Adding new tools directly in `server.py` when a `register_*_tools()` module can be used.
-- Changing tool schema without updating deterministic registry/hash expectations.
-- Introducing nondeterministic state into gateway routing decisions.
-- Assuming Windows-only behavior in Linux/Docker template or cross-platform flows.
+- Adding new tools directly in `hwpx_mcp/server.py` when `register_*_tools()` modules are available.
+- Changing tool schema without accounting for deterministic registry/hash expectations.
+- Introducing nondeterministic state into agentic routing paths.
+- Assuming Windows-only behavior in Docker/Linux or template flows.
+- Committing generated artifacts (`.venv/`, caches, `dist/`, installer outputs).
 
 ## UNIQUE STYLES
-- Dual surface architecture: broad backend toolset plus reduced deterministic gateway meta-tools.
-- Mixed repository: Python backend + template assets + Electron UI + packaging scripts in one tree.
-- Strong command-level operational docs (desktop configs, docker flow, installer flow) in README.
+- Dual-surface architecture: broad backend surface plus narrow deterministic gateway surface.
+- Deterministic Tool-RAG router focused on testable group routing and schema-sensitive IDs.
+- Strong operational docs in README files for desktop/bootstrap/distribution workflows.
 
 ## COMMANDS
 ```bash
@@ -81,6 +89,6 @@ npm --prefix electron-ui run start-stack
 - `electron-ui/AGENTS.md`
 
 ## NOTES
-- Root governs shared invariants only; child AGENTS must document local deltas.
-- Do not commit generated artifacts: `.venv/`, `.pytest_cache/`, `__pycache__/`, `.pdm-build/`, `.ruff_cache/`, `.mypy_cache/`, `dist/`, installer outputs.
-- If commands/workflows change, update the nearest AGENTS file in the same commit.
+- Root covers shared invariants only; child files should contain local behavior and exceptions.
+- If runtime/build/test workflow changes, update the nearest AGENTS file in the same commit.
+- `src/` is currently low-complexity/legacy and is intentionally covered by root guidance.

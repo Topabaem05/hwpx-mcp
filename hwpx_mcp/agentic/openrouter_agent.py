@@ -163,14 +163,42 @@ class OpenRouterClient:
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key
 
-    def _resolve_auth(self) -> tuple[str, str]:
+    def _auth_candidate(self) -> tuple[str, str, str] | None:
         oauth_token = os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
         if oauth_token:
-            return "openai-oauth", oauth_token
+            return ("openai-oauth", oauth_token, f"env:{OPENAI_OAUTH_TOKEN_ENV}")
 
-        openai_api_key = (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
+        configured_api_key = (self._api_key or "").strip()
+        if configured_api_key:
+            return ("openai-api-key", configured_api_key, "client-config")
+
+        openai_api_key = os.getenv(OPENAI_API_KEY_ENV, "").strip()
         if openai_api_key:
-            return "openai-api-key", openai_api_key
+            return ("openai-api-key", openai_api_key, f"env:{OPENAI_API_KEY_ENV}")
+
+        return None
+
+    def auth_status(self) -> dict[str, object]:
+        candidate = self._auth_candidate()
+        if candidate is None:
+            return {
+                "configured": False,
+                "accepted_env": [OPENAI_OAUTH_TOKEN_ENV, OPENAI_API_KEY_ENV],
+            }
+
+        mode, _token, source = candidate
+        return {
+            "configured": True,
+            "mode": mode,
+            "source": source,
+            "accepted_env": [OPENAI_OAUTH_TOKEN_ENV, OPENAI_API_KEY_ENV],
+        }
+
+    def _resolve_auth(self) -> tuple[str, str]:
+        candidate = self._auth_candidate()
+        if candidate is not None:
+            mode, token, _source = candidate
+            return mode, token
 
         raise AgentAuthError(
             f"{OPENAI_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"

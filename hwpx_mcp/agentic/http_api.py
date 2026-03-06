@@ -11,6 +11,7 @@ from .openrouter_agent import DEFAULT_MODEL
 from .openrouter_agent import DEFAULT_PROVIDER
 from .openrouter_agent import AgentAuthError
 from .openrouter_agent import LlmRequestError
+from .openrouter_agent import OpenRouterClient
 from .openrouter_agent import OpenRouterToolAgent
 
 
@@ -32,6 +33,15 @@ class AgentHttpSurface:
         )
 
     async def health(self) -> dict[str, object]:
+        client = getattr(self._agent, "client", None)
+        if isinstance(client, OpenRouterClient):
+            auth = client.auth_status()
+        else:
+            auth = {
+                "configured": False,
+                "accepted_env": ["OPENAI_OAUTH_TOKEN", "OPENAI_API_KEY"],
+            }
+
         return {
             "status": "ok",
             "surface": "agent-http",
@@ -39,6 +49,7 @@ class AgentHttpSurface:
                 "provider": DEFAULT_PROVIDER,
                 "model": DEFAULT_MODEL,
             },
+            "auth": auth,
         }
 
     async def chat(self, payload: ChatRequest) -> dict[str, object]:

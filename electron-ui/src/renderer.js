@@ -85,6 +85,45 @@ const status = (msg) => {
   }
 };
 
+const describeAgentHealth = (health, prefix = "Agent connected") => {
+  const defaults = health?.defaults || {};
+  const provider = defaults.provider || "openai";
+  const model = defaults.model || "gpt-4o-mini";
+  const auth = health?.auth;
+  const base = `${prefix} (${provider} / ${model})`;
+
+  if (!auth || typeof auth !== "object") {
+    return base;
+  }
+
+  if (auth.configured === true) {
+    const mode = auth.mode || "configured";
+    const source = auth.source ? ` via ${auth.source}` : "";
+    return `${base}, auth ${mode}${source}`;
+  }
+
+  const acceptedEnv = Array.isArray(auth.accepted_env) && auth.accepted_env.length
+    ? auth.accepted_env.join(" or ")
+    : "credentials missing";
+  return `${base}, auth missing: ${acceptedEnv}`;
+};
+
+const describeRestartResult = (result, successLabel = "Backend restarted") => {
+  if (!result || typeof result !== "object") {
+    return `${successLabel} (pid ?).`;
+  }
+
+  if (result.restarted === false && result.managed === false) {
+    return "Backend management is disabled in this app. Restart the active backend manually so new credentials apply.";
+  }
+
+  if (result.restarted === false) {
+    return "Backend restart failed. Check backend logs and startup command.";
+  }
+
+  return `${successLabel} (pid ${result.pid || "?"}).`;
+};
+
 const hideOauthCodePanel = () => {
   oauthCodePanel?.classList.add("hidden");
 };
@@ -418,6 +457,8 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
     const backendStatus = await window.hwpxUi.getBackendStatus();
     if (backendStatus.running) {
       status(`Backend process running (pid ${backendStatus.pid}). Connecting...`);
+    } else if (backendStatus.managed === false) {
+      status("Backend process is externally managed. Trying to connect...");
     } else {
       status("Backend process not running. Trying to connect anyway...");
     }
@@ -426,8 +467,7 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const health = await checkAgentEndpoint();
-      const defaults = health?.defaults || {};
-      status(`Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`);
+      status(describeAgentHealth(health));
       return true;
     } catch {
       status(`Agent starting... (${attempt}/${maxAttempts})`);
@@ -505,7 +545,7 @@ saveSettingsBtn?.addEventListener("click", () => {
   status("Settings saved. Restarting backend...");
   restartBackendWithCurrentCredentials()
     .then((result) => {
-      status(`Backend restarted (pid ${result?.pid || "?"}).`);
+      status(describeRestartResult(result));
     })
     .catch((error) => {
       status(`Backend restart failed: ${error?.message || String(error)}`);
@@ -641,7 +681,7 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
         : "OpenAI OAuth verified. Restarting backend..."
     );
     const restart = await restartBackendWithCurrentCredentials();
-    status(`OpenAI OAuth connected (pid ${restart?.pid || "?"}).`);
+    status(describeRestartResult(restart, "OpenAI OAuth connected"));
   } catch (error) {
     status(`OpenAI OAuth login failed: ${error?.message || String(error)}`);
   } finally {
@@ -652,8 +692,7 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
 checkGatewayBtn?.addEventListener("click", async () => {
   try {
     const health = await checkAgentEndpoint();
-    const defaults = health?.defaults || {};
-    status(`Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"})`);
+    status(describeAgentHealth(health, "Agent healthy"));
   } catch (error) {
     status(`Agent check failed: ${error?.message || String(error)}`);
   }
@@ -663,7 +702,7 @@ restartBackendBtn?.addEventListener("click", async () => {
   status("Restarting backend...");
   try {
     const result = await restartBackendWithCurrentCredentials();
-    status(`Backend restarted (pid ${result?.pid || "?"}). Waiting...`);
+    status(`${describeRestartResult(result)} Waiting...`);
   } catch (error) {
     status(`Restart failed: ${error?.message || String(error)}`);
   }

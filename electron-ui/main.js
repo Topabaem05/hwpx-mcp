@@ -345,8 +345,10 @@ const findBackendCommand = () => {
   return null;
 };
 
+const isBackendManaged = () => process.env.HWPX_MCP_START_BACKEND !== "0";
+
 const startBackend = () => {
-  if (process.env.HWPX_MCP_START_BACKEND === "0") {
+  if (!isBackendManaged()) {
     log("Backend start skipped (HWPX_MCP_START_BACKEND=0)");
     return;
   }
@@ -504,6 +506,7 @@ ipcMain.handle("dialog:selectFolder", async (_, opts) => {
 });
 
 ipcMain.handle("backend:status", () => ({
+  managed: isBackendManaged(),
   running: backendProcess !== null && !backendProcess.killed,
   pid: backendProcess?.pid ?? null,
   url: BACKEND_URL,
@@ -513,12 +516,29 @@ ipcMain.handle("backend:status", () => ({
 
 ipcMain.handle("backend:restart", async (_, opts) => {
   setBackendCredentials(opts);
+  if (!isBackendManaged()) {
+    log("Backend restart skipped because backend management is disabled.");
+    return {
+      restarted: false,
+      managed: false,
+      url: BACKEND_URL,
+      pid: null,
+      message: "backend_management_disabled",
+    };
+  }
+
   await stopBackend({ waitForExit: true });
   if (process.platform === "win32") {
     await sleep(450);
   }
   startBackend();
-  return { restarted: true, url: BACKEND_URL, pid: backendProcess?.pid ?? null };
+  return {
+    restarted: backendProcess !== null,
+    managed: true,
+    url: BACKEND_URL,
+    pid: backendProcess?.pid ?? null,
+    message: backendProcess !== null ? "backend_restarted" : "backend_start_failed",
+  };
 });
 
 ipcMain.handle("auth:openai-oauth-login", async () => {

@@ -409,27 +409,18 @@ const printBootstrapSummary = () => {
   console.log(`MCP transport: ${requestedTransport} -> ${MCP_TRANSPORT}`);
   console.log(`Backend URL: ${backendUrl}`);
   console.log(`Backend start command: ${backendCommand}`);
-  console.log(`Start backend process: ${runWithBackend}`);
+  console.log(`Let Electron manage backend start: ${runWithBackend}`);
 };
 
-let backendProcess = null;
 let electronProcess = null;
 
 const stopAll = () => {
-  stopProcess(backendProcess);
   stopProcess(electronProcess);
 };
 
 (async () => {
   try {
     printBootstrapSummary();
-    backendProcess = launchBackend();
-
-    if (backendProcess) {
-      await waitForEndpoint();
-      isBackendReady = true;
-    }
-
     electronProcess = launchElectron();
   } catch (error) {
     stopAll();

@@ -1,6 +1,7 @@
 {
   "name": "hwpx-mcp-electron-ui",
-  "version": "0.3.6",
+  "version": "3.11.0",
+  "buildVersionLabel": "3.11d",
   "private": true,
   "description": "Electron desktop client for HWPX-MCP document workbench",
   "author": {

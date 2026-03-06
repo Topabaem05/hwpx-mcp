@@ -2,6 +2,8 @@ name: Windows x64 Release Build
 
 on:
   push:
+    branches:
+      - "**"
     tags:
       - "v*"
   workflow_dispatch:

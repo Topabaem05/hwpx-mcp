@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to upload asset (e.g. v0.3.1)"
+        description: "Existing release tag to upload asset (e.g. v3.11d)"
         required: false
         type: string
 
@@ -36,10 +36,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Resolve release tag
+      - name: Resolve release and build versions
         shell: pwsh
         run: |
           $tag = ""
+          $package = Get-Content (Join-Path $env:GITHUB_WORKSPACE "electron-ui/package.json") | ConvertFrom-Json
+          $buildVersion = if ($package.buildVersionLabel) { "$($package.buildVersionLabel)" } else { "$($package.version)" }
 
           if ("${{ github.event_name }}" -eq "push" -and "${{ github.ref_type }}" -eq "tag") {
             $tag = "${{ github.ref_name }}"
@@ -48,6 +50,7 @@ jobs:
           }
 
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=$buildVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install backend build dependencies
         shell: pwsh
@@ -111,7 +114,7 @@ jobs:
             throw "Installer .exe not found in $outputDir"
           }
 
-          $version = if ($env:RELEASE_TAG -ne "") { $env:RELEASE_TAG.TrimStart('v') } else { "dev-$env:GITHUB_RUN_NUMBER" }
+          $version = if ($env:RELEASE_TAG -ne "") { $env:RELEASE_TAG.TrimStart('v') } else { $env:BUILD_VERSION }
           $assetName = "HWPX.MCP-$version-win-x64.exe"
           $assetPath = Join-Path $outputDir $assetName
 

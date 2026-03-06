@@ -21,6 +21,7 @@ import platform
 import logging
 from typing import Optional
 from pathlib import Path
+from . import __version__
 from .core.validator import XmlValidator
 from .core.xml_parser import SecureXmlParser
 from .features.query import HwpxQueryEngine
@@ -895,7 +896,7 @@ def hwp_ping() -> dict:
     return {
         "status": "connected",
         "server": "HWP-Extended",
-        "version": "0.3.1",
+        "version": __version__,
         "platform": platform.system(),
         "is_windows": IS_WINDOWS,
         "pyhwp_status": pyhwp_status,
@@ -925,7 +926,7 @@ def hwp_get_capabilities() -> dict:
     """
     return {
         "server": "HWP-Extended",
-        "version": "0.3.1",
+        "version": __version__,
         "platform": platform.system(),
         "is_windows": IS_WINDOWS,
         "capabilities": {

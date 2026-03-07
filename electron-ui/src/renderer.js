@@ -114,6 +114,34 @@ const normalizeBaseUrl = (value) => {
   return base.replace(/\/+$/, "");
 };
 
+const backendBaseFromMcpUrl = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.replace(/\/mcp\/?$/i, "").replace(/\/+$/, "");
+};
+
+const applyBackendBaseUrl = (value) => {
+  const backendBase = backendBaseFromMcpUrl(value);
+  if (!backendBase) {
+    return "";
+  }
+
+  if (backendBase !== normalizeBaseUrl(config.backendBaseUrl)) {
+    config.backendBaseUrl = backendBase;
+    persistConfig();
+    renderConfig();
+  }
+
+  return backendBase;
+};
+
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
 
 const closeSidebar = () => {
@@ -323,13 +351,31 @@ const restartBackendWithCurrentCredentials = async () => {
   if (!window.hwpxUi?.restartBackend) {
     return null;
   }
-  return window.hwpxUi.restartBackend({
+
+  const result = await window.hwpxUi.restartBackend({
     openaiApiKey: config.openaiApiKey,
     gptOauthToken: config.gptOauthToken,
   });
+
+  applyBackendBaseUrl(result?.url);
+  return result;
+};
+
+const syncBaseUrlWithBackendStatus = async () => {
+  if (!window.hwpxUi?.getBackendStatus) {
+    return "";
+  }
+
+  const backendStatus = await window.hwpxUi.getBackendStatus();
+  if (!backendStatus?.running) {
+    return "";
+  }
+
+  return applyBackendBaseUrl(backendStatus.url);
 };
 
 const checkAgentEndpoint = async () => {
+  await syncBaseUrlWithBackendStatus();
   const response = await fetch(endpointUrl("/agent/health"), {
     method: "GET",
     headers: { accept: "application/json" },
@@ -370,6 +416,7 @@ const isAuthMissingErrorMessage = (message) => {
 };
 
 const callAgentChat = async (message, signal) => {
+  await syncBaseUrlWithBackendStatus();
   const response = await fetch(endpointUrl("/agent/chat"), {
     method: "POST",
     signal,
@@ -403,6 +450,7 @@ const syncAgentAuth = async () => {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      await syncBaseUrlWithBackendStatus();
       const response = await fetch(endpointUrl("/agent/auth"), {
         method: "POST",
         headers: {
@@ -514,8 +562,10 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
   if (window.hwpxUi?.getBackendStatus) {
     const backendStatus = await window.hwpxUi.getBackendStatus();
+    const backendBase = backendStatus.running ? applyBackendBaseUrl(backendStatus.url) : "";
     if (backendStatus.running) {
-      status(`Backend process running (pid ${backendStatus.pid}). Connecting...`);
+      const baseHint = backendBase ? ` ${backendBase}` : "";
+      status(`Backend process running (pid ${backendStatus.pid}). Connecting...${baseHint}`);
     } else {
       status("Backend process not running. Trying to connect anyway...");
     }

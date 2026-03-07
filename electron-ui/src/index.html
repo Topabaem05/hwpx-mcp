@@ -156,7 +156,7 @@
             id="chatTitle"
             class="flex items-center gap-2 text-lg font-semibold text-zinc-200 hover:text-white px-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors"
           >
-            OpenAI (gpt-4o-mini)
+            Codex Proxy (gpt-5)
             <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>
           </button>
         </div>
@@ -174,7 +174,7 @@
               <i data-lucide="bot" class="w-10 h-10"></i>
             </div>
             <h1 class="text-3xl font-bold text-white mb-2">무엇을 도와드릴까요?</h1>
-            <p class="text-zinc-400 text-sm mb-8">OpenAI OAuth 기반으로 문서 작업을 시작해보세요.</p>
+            <p class="text-zinc-400 text-sm mb-8">Codex Proxy, OpenRouter, 또는 OpenAI 기반으로 문서 작업을 시작해보세요.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
               <button class="suggestion-prompt text-left p-4 rounded-2xl border border-zinc-800 bg-zinc-850/50 hover:bg-zinc-800 transition-colors group" data-prompt="전자상거래 쇼핑몰 초기 기획서를 작성해줘">
@@ -242,6 +242,39 @@
           </div>
 
           <div class="space-y-2">
+            <label class="text-xs text-zinc-400" for="providerSelect">LLM Provider</label>
+            <select id="providerSelect" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500">
+              <option value="codex-proxy">Codex Proxy</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs text-zinc-400" for="modelInput">Model</label>
+            <input id="modelInput" type="text" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="gpt-5" />
+          </div>
+
+          <div id="codexProxySection" class="space-y-4">
+            <div class="space-y-2">
+              <label class="text-xs text-zinc-400" for="codexProxyUrlInput">Codex Proxy URL</label>
+              <input id="codexProxyUrlInput" type="url" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="http://127.0.0.1:2455/v1/chat/completions" />
+              <p class="text-[11px] text-zinc-500">`codex-lb` 기본값은 `http://127.0.0.1:2455/v1/chat/completions`, Codex Proxy Server는 보통 `http://127.0.0.1:5011/chat/completions` 입니다.</p>
+            </div>
+
+            <div class="space-y-2">
+              <label class="text-xs text-zinc-400" for="codexProxyAccessTokenInput">Proxy Access Token</label>
+              <input id="codexProxyAccessTokenInput" type="password" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="Bearer token or sk-clb-..." />
+            </div>
+          </div>
+
+          <div id="openrouterKeyRow" class="space-y-2">
+            <label class="text-xs text-zinc-400" for="openrouterApiKeyInput">OpenRouter API Key</label>
+            <input id="openrouterApiKeyInput" type="password" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="sk-or-..." />
+          </div>
+
+          <div id="openaiAuthSection" class="space-y-4">
+          <div class="space-y-2">
             <label class="text-xs text-zinc-400" for="openaiApiKeyInput">OpenAI API Key (Fallback)</label>
             <input id="openaiApiKeyInput" type="password" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="sk-..." />
           </div>
@@ -269,6 +302,7 @@
                 인증 페이지 열기
               </button>
             </div>
+          </div>
           </div>
 
           <div class="grid grid-cols-2 gap-2">

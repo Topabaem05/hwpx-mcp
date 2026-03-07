@@ -1,8 +1,62 @@
 const CONFIG_KEY = "hwpxUi.config.v6";
 
+const PROVIDER_OPTIONS = {
+  "codex-proxy": {
+    label: "Codex Proxy",
+    defaultModel: "gpt-5",
+  },
+  openrouter: {
+    label: "OpenRouter",
+    defaultModel: "openai/gpt-oss-120b",
+  },
+  openai: {
+    label: "OpenAI",
+    defaultModel: "gpt-4o-mini",
+  },
+};
+
+const normalizeProviderValue = (value) =>
+  typeof value === "string" && Object.prototype.hasOwnProperty.call(PROVIDER_OPTIONS, value)
+    ? value
+    : "openrouter";
+
+const defaultModelForProvider = (provider) =>
+  PROVIDER_OPTIONS[normalizeProviderValue(provider)].defaultModel;
+
+const providerLabel = (provider) => PROVIDER_OPTIONS[normalizeProviderValue(provider)].label;
+
+const normalizeModelValue = (provider, value) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || defaultModelForProvider(provider);
+};
+
+const defaultCodexProxyUrl = () =>
+  window.hwpxUi?.getConfig?.()?.codexProxyUrl || "http://127.0.0.1:2455/v1/chat/completions";
+
+const normalizeCodexProxyUrl = (value) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  const base = trimmed || defaultCodexProxyUrl();
+  const normalized = base.replace(/\/+$/, "");
+  if (/\/chat\/completions$/i.test(normalized)) {
+    return normalized;
+  }
+  if (/\/v1$/i.test(normalized)) {
+    return `${normalized}/chat/completions`;
+  }
+  return `${normalized}/chat/completions`;
+};
+
 const defaultConfig = {
   backendBaseUrl:
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
+  provider: normalizeProviderValue(window.hwpxUi?.getConfig?.()?.provider),
+  model: normalizeModelValue(
+    window.hwpxUi?.getConfig?.()?.provider,
+    window.hwpxUi?.getConfig?.()?.model
+  ),
+  codexProxyUrl: normalizeCodexProxyUrl(window.hwpxUi?.getConfig?.()?.codexProxyUrl),
+  codexProxyAccessToken: "",
+  openrouterApiKey: "",
   openaiApiKey: "",
   gptOauthToken: "",
 };
@@ -19,10 +73,31 @@ const loadConfig = () => {
         }
         if (
           typeof migrated.openrouterKey === "string" &&
-          typeof migrated.openaiApiKey !== "string"
+          typeof migrated.openrouterApiKey !== "string"
         ) {
-          migrated.openaiApiKey = migrated.openrouterKey;
+          migrated.openrouterApiKey = migrated.openrouterKey;
         }
+        if (typeof migrated.codexProxyUrl !== "string" && typeof migrated.proxyUrl === "string") {
+          migrated.codexProxyUrl = migrated.proxyUrl;
+        }
+        if (
+          typeof migrated.codexProxyAccessToken !== "string" &&
+          typeof migrated.proxyAccessToken === "string"
+        ) {
+          migrated.codexProxyAccessToken = migrated.proxyAccessToken;
+        }
+        if (typeof migrated.provider !== "string") {
+          if ((migrated.codexProxyAccessToken || "").trim()) {
+            migrated.provider = "codex-proxy";
+          } else if ((migrated.openrouterApiKey || "").trim()) {
+            migrated.provider = "openrouter";
+          } else if ((migrated.openaiApiKey || "").trim() || (migrated.gptOauthToken || "").trim()) {
+            migrated.provider = "openai";
+          }
+        }
+        migrated.provider = normalizeProviderValue(migrated.provider);
+        migrated.model = normalizeModelValue(migrated.provider, migrated.model);
+        migrated.codexProxyUrl = normalizeCodexProxyUrl(migrated.codexProxyUrl);
         return { ...defaultConfig, ...migrated };
       }
     }
@@ -58,6 +133,14 @@ const settingsOverlay = $("settingsOverlay");
 const closeSettingsBtn = $("closeSettingsBtn");
 
 const backendBaseUrlInput = $("backendBaseUrlInput");
+const providerSelect = $("providerSelect");
+const modelInput = $("modelInput");
+const codexProxySection = $("codexProxySection");
+const codexProxyUrlInput = $("codexProxyUrlInput");
+const codexProxyAccessTokenInput = $("codexProxyAccessTokenInput");
+const openrouterApiKeyInput = $("openrouterApiKeyInput");
+const openrouterKeyRow = $("openrouterKeyRow");
+const openaiAuthSection = $("openaiAuthSection");
 const openaiApiKeyInput = $("openaiApiKeyInput");
 const gptOauthTokenInput = $("gptOauthTokenInput");
 const openAiOauthLoginBtn = $("openAiOauthLoginBtn");
@@ -92,6 +175,51 @@ const setAppUpdateText = (msg) => {
   }
 };
 
+const currentProvider = () => normalizeProviderValue(config.provider);
+
+const currentModel = () => normalizeModelValue(currentProvider(), config.model);
+
+const currentCodexProxyUrl = () => normalizeCodexProxyUrl(config.codexProxyUrl);
+
+const visibleAuthModeLabel = () => {
+  if (currentProvider() === "codex-proxy") {
+    return "Codex Proxy Access Token";
+  }
+  if (currentProvider() === "openrouter") {
+    return "OpenRouter API Key";
+  }
+  return "OpenAI OAuth / API Key";
+};
+
+const runtimeConfigFromHealth = (health) => {
+  const runtime = health?.runtime && typeof health.runtime === "object" ? health.runtime : null;
+  const defaults = health?.defaults && typeof health.defaults === "object" ? health.defaults : null;
+  const provider = normalizeProviderValue(runtime?.provider || defaults?.provider || config.provider);
+  const model = normalizeModelValue(provider, runtime?.model || defaults?.model || config.model);
+  const proxyUrl =
+    provider === "codex-proxy"
+      ? normalizeCodexProxyUrl(runtime?.proxy_url || config.codexProxyUrl)
+      : "";
+  return { provider, model, proxyUrl };
+};
+
+const updateProviderUi = () => {
+  const provider = currentProvider();
+  const isCodexProxy = provider === "codex-proxy";
+  const isOpenRouter = provider === "openrouter";
+
+  codexProxySection?.classList.toggle("hidden", !isCodexProxy);
+  openrouterKeyRow?.classList.toggle("hidden", !isOpenRouter);
+  openaiAuthSection?.classList.toggle("hidden", isCodexProxy || isOpenRouter);
+  if (modelInput) {
+    modelInput.placeholder = defaultModelForProvider(provider);
+  }
+
+  if (chatTitle) {
+    chatTitle.innerHTML = `${escapeHtml(`${providerLabel(provider)} (${currentModel()})`)} <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>`;
+  }
+};
+
 const describeAppUpdateStatus = (payload) => {
   if (!payload || typeof payload !== "object") {
     return "앱 자동 업데이트 상태를 확인하지 못했습니다.";
@@ -118,9 +246,9 @@ const describeAppUpdateStatus = (payload) => {
 };
 
 const describeAgentHealth = (health, prefix = "Agent connected") => {
-  const defaults = health?.defaults || {};
-  const provider = defaults.provider || "openai";
-  const model = defaults.model || "gpt-4o-mini";
+  const runtime = runtimeConfigFromHealth(health);
+  const provider = runtime.provider;
+  const model = runtime.model;
   const auth = health?.auth;
   const base = `${prefix} (${provider} / ${model})`;
 
@@ -134,9 +262,10 @@ const describeAgentHealth = (health, prefix = "Agent connected") => {
     return `${base}, auth ${mode}${source}`;
   }
 
-  const acceptedEnv = Array.isArray(auth.accepted_env) && auth.accepted_env.length
-    ? auth.accepted_env.join(" or ")
-    : "credentials missing";
+  const acceptedEnv =
+    Array.isArray(auth.accepted_env) && auth.accepted_env.length
+      ? auth.accepted_env.join(" or ")
+      : visibleAuthModeLabel();
   return `${base}, auth missing: ${acceptedEnv}`;
 };
 
@@ -225,8 +354,17 @@ const authStatusLabel = (auth) => {
   return `auth:missing (${auth.detail || "token not set"})`;
 };
 
-const hasStoredAuth = () =>
-  Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
+const hasStoredAuth = (provider = currentProvider()) => {
+  if (normalizeProviderValue(provider) === "codex-proxy") {
+    return Boolean((config.codexProxyAccessToken || "").trim());
+  }
+
+  if (normalizeProviderValue(provider) === "openrouter") {
+    return Boolean((config.openrouterApiKey || "").trim());
+  }
+
+  return Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
+};
 
 const isAuthMissingErrorMessage = (message) => {
   if (typeof message !== "string") {
@@ -234,6 +372,8 @@ const isAuthMissingErrorMessage = (message) => {
   }
 
   return (
+    message.includes("HWPX_CODEX_PROXY_ACCESS_TOKEN") ||
+    message.includes("OPENROUTER_API_KEY") ||
     message.includes("OPENAI_OAUTH_TOKEN") ||
     message.includes("CODEX_OAUTH_TOKEN") ||
     message.includes("OPENAI_API_KEY")
@@ -248,12 +388,21 @@ const authAvailableModes = (health) => {
 const hasAvailableAuthMode = (health, mode) => authAvailableModes(health).includes(mode);
 
 const shouldSyncStoredAuth = (health) => {
-  if (!hasStoredAuth()) {
+  const runtime = runtimeConfigFromHealth(health);
+  if (!hasStoredAuth(runtime.provider)) {
     return false;
   }
 
   if (!health?.auth?.configured) {
     return true;
+  }
+
+  if (runtime.provider === "openrouter") {
+    return !hasAvailableAuthMode(health, "openrouter-api-key");
+  }
+
+  if (runtime.provider === "codex-proxy") {
+    return !hasAvailableAuthMode(health, "codex-proxy-token");
   }
 
   if ((config.gptOauthToken || "").trim()) {
@@ -299,7 +448,8 @@ const isQuotaErrorMessage = (message) => {
 };
 
 const shouldRetryWithAuthSyncForError = (message) => {
-  if (!hasStoredAuth()) {
+  const provider = currentProvider();
+  if (!hasStoredAuth(provider)) {
     return false;
   }
 
@@ -307,7 +457,7 @@ const shouldRetryWithAuthSyncForError = (message) => {
     return true;
   }
 
-  if (!isQuotaErrorMessage(message)) {
+  if (provider !== "openai" || !isQuotaErrorMessage(message)) {
     return false;
   }
 
@@ -506,14 +656,20 @@ const renderMessages = () => {
 
 const renderConfig = () => {
   if (backendBaseUrlInput) backendBaseUrlInput.value = config.backendBaseUrl;
+  if (providerSelect) providerSelect.value = currentProvider();
+  if (modelInput) modelInput.value = currentModel();
+  if (codexProxyUrlInput) codexProxyUrlInput.value = currentCodexProxyUrl();
+  if (codexProxyAccessTokenInput) codexProxyAccessTokenInput.value = config.codexProxyAccessToken;
+  if (openrouterApiKeyInput) openrouterApiKeyInput.value = config.openrouterApiKey;
   if (openaiApiKeyInput) openaiApiKeyInput.value = config.openaiApiKey;
   if (gptOauthTokenInput) gptOauthTokenInput.value = config.gptOauthToken;
+  updateProviderUi();
 };
 
 const renderAll = () => {
   renderSessionList();
   renderMessages();
-  const title = activeSession()?.title ?? "OpenAI (gpt-4o-mini)";
+  const title = activeSession()?.title ?? `${providerLabel(currentProvider())} (${currentModel()})`;
   if (chatTitle) {
     chatTitle.innerHTML = `${escapeHtml(title)} <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>`;
   }
@@ -528,6 +684,11 @@ const restartBackendWithCurrentCredentials = async () => {
   }
 
   const result = await window.hwpxUi.restartBackend({
+    provider: currentProvider(),
+    model: currentModel(),
+    codexProxyUrl: currentCodexProxyUrl(),
+    codexProxyAccessToken: config.codexProxyAccessToken,
+    openrouterApiKey: config.openrouterApiKey,
     openaiApiKey: config.openaiApiKey,
     gptOauthToken: config.gptOauthToken,
   });
@@ -613,9 +774,64 @@ const syncAgentAuth = async () => {
           accept: "application/json",
         },
         body: JSON.stringify({
+          codex_proxy_access_token: config.codexProxyAccessToken || "",
+          openrouter_api_key: config.openrouterApiKey || "",
           openai_api_key: config.openaiApiKey || "",
           openai_oauth_token: config.gptOauthToken || "",
           codex_oauth_token: config.gptOauthToken || "",
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.detail;
+        const reason =
+          payload?.error ||
+          payload?.message ||
+          (typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+            ? JSON.stringify(detail)
+            : "") ||
+          `HTTP ${response.status}`;
+        throw new Error(String(reason));
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error?.message || String(error);
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw new Error(lastError);
+};
+
+const shouldSyncRuntimeConfig = (health) => {
+  const runtime = runtimeConfigFromHealth(health);
+  return runtime.provider !== currentProvider() || runtime.model !== currentModel();
+};
+
+const syncAgentConfig = async () => {
+  const maxAttempts = 8;
+  const delayMs = 750;
+  let lastError = "config sync failed";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await syncBaseUrlWithBackendStatus();
+      const response = await fetch(endpointUrl("/agent/config"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify({
+          provider: currentProvider(),
+          model: currentModel(),
+          proxy_url: currentProvider() === "codex-proxy" ? currentCodexProxyUrl() : "",
         }),
       });
 
@@ -660,6 +876,7 @@ const runToolOnlyAgent = async (userText, botMsg, signal) => {
       throw error;
     }
 
+    await syncAgentConfig();
     await syncAgentAuth();
     if (signal.aborted) {
       throw new Error("Cancelled");
@@ -731,6 +948,14 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
     try {
       let health = await checkAgentEndpoint();
 
+      if (shouldSyncRuntimeConfig(health)) {
+        try {
+          await syncAgentConfig();
+          health = await checkAgentEndpoint();
+        } catch {
+        }
+      }
+
       if (shouldSyncStoredAuth(health)) {
         try {
           await syncAgentAuth();
@@ -739,9 +964,8 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
         }
       }
 
-      const defaults = health?.defaults || {};
       status(
-        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+        `Agent connected (${runtimeConfigFromHealth(health).provider} / ${runtimeConfigFromHealth(health).model}, ${authStatusLabel(
           health?.auth
         )})`
       );
@@ -816,9 +1040,15 @@ settingsOverlay?.addEventListener("click", closeSettings);
 
 saveSettingsBtn?.addEventListener("click", async () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
+  config.provider = normalizeProviderValue(providerSelect?.value);
+  config.model = normalizeModelValue(config.provider, modelInput?.value);
+  config.codexProxyUrl = normalizeCodexProxyUrl(codexProxyUrlInput?.value || "");
+  config.codexProxyAccessToken = (codexProxyAccessTokenInput?.value || "").trim();
+  config.openrouterApiKey = (openrouterApiKeyInput?.value || "").trim();
   config.openaiApiKey = (openaiApiKeyInput?.value || "").trim();
   config.gptOauthToken = (gptOauthTokenInput?.value || "").trim();
   persistConfig();
+  renderConfig();
   status("Settings saved. Restarting backend...");
   let restartText = "";
 
@@ -838,7 +1068,8 @@ saveSettingsBtn?.addEventListener("click", async () => {
   await waitForBackend(10, 1000);
 
   try {
-    const authSync = await syncAgentAuth();
+    await syncAgentConfig();
+    const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
     const mode = authSync?.auth?.mode || "unknown";
     status(`${restartText} Auth synced (${mode}).`);
   } catch (error) {
@@ -852,6 +1083,18 @@ resetSettingsBtn?.addEventListener("click", () => {
   renderConfig();
   hideOauthCodePanel();
   status("Settings reset");
+});
+
+providerSelect?.addEventListener("change", () => {
+  const nextProvider = normalizeProviderValue(providerSelect.value);
+  const previousProvider = currentProvider();
+  config.provider = nextProvider;
+  if (!modelInput?.value || normalizeModelValue(previousProvider, modelInput.value) === defaultModelForProvider(previousProvider)) {
+    config.model = defaultModelForProvider(nextProvider);
+  } else {
+    config.model = normalizeModelValue(nextProvider, modelInput.value);
+  }
+  renderConfig();
 });
 
 oauthCopyCodeBtn?.addEventListener("click", async () => {
@@ -985,8 +1228,9 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
 
     await waitForBackend(10, 1000);
 
-    const authSync = await syncAgentAuth();
-    const mode = authSync?.auth?.mode || "unknown";
+    await syncAgentConfig();
+    const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
+    const mode = authSync?.auth?.mode || (currentProvider() === "openrouter" ? "openrouter-ready" : "unknown");
     if (restartError) {
       status(
         `OAuth token synced (${mode}). Backend restart failed: ${restartError?.message || String(
@@ -1011,6 +1255,14 @@ checkGatewayBtn?.addEventListener("click", async () => {
   try {
     let health = await checkAgentEndpoint();
 
+    if (shouldSyncRuntimeConfig(health)) {
+      try {
+        await syncAgentConfig();
+        health = await checkAgentEndpoint();
+      } catch {
+      }
+    }
+
     if (shouldSyncStoredAuth(health)) {
       try {
         await syncAgentAuth();
@@ -1018,10 +1270,8 @@ checkGatewayBtn?.addEventListener("click", async () => {
       } catch {
       }
     }
-
-    const defaults = health?.defaults || {};
     status(
-      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+      `Agent healthy (${runtimeConfigFromHealth(health).provider} / ${runtimeConfigFromHealth(health).model}, ${authStatusLabel(
         health?.auth
       )})`
     );
@@ -1048,7 +1298,8 @@ restartBackendBtn?.addEventListener("click", async () => {
   await waitForBackend(10, 2000);
 
   try {
-    const authSync = await syncAgentAuth();
+    await syncAgentConfig();
+    const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
     const mode = authSync?.auth?.mode || "unknown";
     status(`Auth synced (${mode}).`);
   } catch (error) {
@@ -1125,7 +1376,7 @@ updateSendBtn();
 
 (async () => {
   await new Promise((resolve) => setTimeout(resolve, 2000));
-  if (config.openaiApiKey || config.gptOauthToken) {
+  if (hasStoredAuth() || currentProvider() !== "openai") {
     try {
       await restartBackendWithCurrentCredentials();
     } catch (error) {
@@ -1134,9 +1385,12 @@ updateSendBtn();
   }
   const ready = await waitForBackend(15, 2000);
 
-  if (ready && (config.openaiApiKey || config.gptOauthToken)) {
+  if (ready) {
     try {
       const health = await checkAgentEndpoint().catch(() => null);
+      if (shouldSyncRuntimeConfig(health)) {
+        await syncAgentConfig();
+      }
       if (shouldSyncStoredAuth(health)) {
         await syncAgentAuth();
       }

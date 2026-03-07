@@ -73,8 +73,9 @@ def _create_client():
             messages: list[dict[str, object]],
             tools: list[dict[str, object]] | None,
             tool_choice: str | None,
+            proxy_url: str | None = None,
         ) -> dict[str, object]:
-            _ = (model, provider, messages, tools, tool_choice)
+            _ = (model, provider, messages, tools, tool_choice, proxy_url)
             self._step += 1
 
             if self._step == 1:
@@ -143,6 +144,10 @@ def test_agent_health_endpoint_uses_expected_defaults():
     assert payload["status"] == "ok"
     assert payload["defaults"]["provider"] == DEFAULT_PROVIDER
     assert payload["defaults"]["model"] == DEFAULT_MODEL
+    assert payload["runtime"] == {
+        "provider": DEFAULT_PROVIDER,
+        "model": DEFAULT_MODEL,
+    }
     assert payload["auth"] == {
         "configured": True,
         "mode": "openai-api-key",
@@ -180,6 +185,10 @@ def test_agent_health_endpoint_reports_missing_auth_for_default_client(monkeypat
             "CODEX_OAUTH_TOKEN",
             "OPENAI_API_KEY",
         ],
+    }
+    assert payload["runtime"] == {
+        "provider": DEFAULT_PROVIDER,
+        "model": DEFAULT_MODEL,
     }
 
 
@@ -223,6 +232,203 @@ def test_agent_auth_endpoint_sets_runtime_oauth_token(monkeypatch):
         assert health_after.status_code == 200
         assert health_after.json()["auth"]["configured"] is True
         assert health_after.json()["auth"]["mode"] == "openai-oauth"
+
+
+def test_agent_config_endpoint_switches_runtime_to_openrouter(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    app.include_router(build_agent_http_router(backend))
+    client = TestClient(app)
+
+    with client:
+        config_set = client.post(
+            "/agent/config",
+            json={
+                "provider": "openrouter",
+                "model": "openai/gpt-oss-120b",
+            },
+        )
+        assert config_set.status_code == 200
+        config_payload = config_set.json()
+        assert config_payload["success"] is True
+        assert config_payload["runtime"] == {
+            "provider": "openrouter",
+            "model": "openai/gpt-oss-120b",
+        }
+        assert config_payload["auth"] == {
+            "configured": False,
+            "mode": "none",
+            "detail": "OPENROUTER_API_KEY is not set",
+            "available_modes": [],
+            "accepted_env": ["OPENROUTER_API_KEY"],
+        }
+
+        health_after = client.get("/agent/health")
+        assert health_after.status_code == 200
+        health_payload = health_after.json()
+        assert health_payload["runtime"] == {
+            "provider": "openrouter",
+            "model": "openai/gpt-oss-120b",
+        }
+        assert health_payload["auth"]["accepted_env"] == ["OPENROUTER_API_KEY"]
+
+
+def test_agent_auth_endpoint_sets_runtime_openrouter_api_key(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    app.include_router(build_agent_http_router(backend))
+    client = TestClient(app)
+
+    with client:
+        config_set = client.post(
+            "/agent/config",
+            json={
+                "provider": "openrouter",
+                "model": "openai/gpt-oss-120b",
+            },
+        )
+        assert config_set.status_code == 200
+
+        auth_set = client.post(
+            "/agent/auth",
+            json={
+                "openrouter_api_key": "or-key",
+            },
+        )
+        assert auth_set.status_code == 200
+        auth_payload = auth_set.json()
+        assert auth_payload["success"] is True
+        assert auth_payload["runtime"] == {
+            "provider": "openrouter",
+            "model": "openai/gpt-oss-120b",
+        }
+        assert auth_payload["auth"] == {
+            "configured": True,
+            "mode": "openrouter-api-key",
+            "available_modes": ["openrouter-api-key"],
+            "accepted_env": ["OPENROUTER_API_KEY"],
+        }
+
+
+def test_agent_config_endpoint_switches_runtime_to_codex_proxy(monkeypatch):
+    monkeypatch.delenv("HWPX_CODEX_PROXY_ACCESS_TOKEN", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    app.include_router(build_agent_http_router(backend))
+    client = TestClient(app)
+
+    with client:
+        config_set = client.post(
+            "/agent/config",
+            json={
+                "provider": "codex-proxy",
+                "model": "gpt-5",
+                "proxy_url": "http://127.0.0.1:5011",
+            },
+        )
+        assert config_set.status_code == 200
+        config_payload = config_set.json()
+        assert config_payload["runtime"] == {
+            "provider": "codex-proxy",
+            "model": "gpt-5",
+            "proxy_url": "http://127.0.0.1:5011/chat/completions",
+        }
+        assert config_payload["auth"] == {
+            "configured": False,
+            "mode": "none",
+            "detail": "HWPX_CODEX_PROXY_ACCESS_TOKEN is not set",
+            "available_modes": [],
+            "accepted_env": ["HWPX_CODEX_PROXY_ACCESS_TOKEN"],
+        }
+
+
+def test_agent_auth_endpoint_sets_runtime_codex_proxy_access_token(monkeypatch):
+    monkeypatch.delenv("HWPX_CODEX_PROXY_ACCESS_TOKEN", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    app.include_router(build_agent_http_router(backend))
+    client = TestClient(app)
+
+    with client:
+        config_set = client.post(
+            "/agent/config",
+            json={
+                "provider": "codex-proxy",
+                "model": "gpt-5",
+                "proxy_url": "http://127.0.0.1:2455/v1",
+            },
+        )
+        assert config_set.status_code == 200
+
+        auth_set = client.post(
+            "/agent/auth",
+            json={
+                "codex_proxy_access_token": "Bearer proxy-token",
+            },
+        )
+        assert auth_set.status_code == 200
+        auth_payload = auth_set.json()
+        assert auth_payload["runtime"] == {
+            "provider": "codex-proxy",
+            "model": "gpt-5",
+            "proxy_url": "http://127.0.0.1:2455/v1/chat/completions",
+        }
+        assert auth_payload["auth"] == {
+            "configured": True,
+            "mode": "codex-proxy-token",
+            "available_modes": ["codex-proxy-token"],
+            "accepted_env": ["HWPX_CODEX_PROXY_ACCESS_TOKEN"],
+        }
+
+
+def test_openrouter_agent_uses_openrouter_default_model_when_only_provider_env_is_set(
+    monkeypatch,
+):
+    monkeypatch.setenv("HWPX_AGENT_PROVIDER", "openrouter")
+    monkeypatch.delenv("HWPX_AGENT_MODEL", raising=False)
+
+    agent = OpenRouterToolAgent(DummyBackend([]))
+
+    assert agent.runtime_config() == {
+        "provider": "openrouter",
+        "model": "openai/gpt-oss-120b",
+    }
+
+
+def test_openrouter_agent_uses_codex_proxy_defaults_when_provider_env_is_set(
+    monkeypatch,
+):
+    monkeypatch.setenv("HWPX_AGENT_PROVIDER", "codex-proxy")
+    monkeypatch.delenv("HWPX_AGENT_MODEL", raising=False)
+    monkeypatch.delenv("HWPX_CODEX_PROXY_URL", raising=False)
+
+    agent = OpenRouterToolAgent(DummyBackend([]))
+
+    assert agent.runtime_config() == {
+        "provider": "codex-proxy",
+        "model": "gpt-5",
+        "proxy_url": "http://127.0.0.1:2455/v1/chat/completions",
+    }
+
+
+def test_agent_config_normalizes_openai_provider_style_model_id():
+    agent = OpenRouterToolAgent(DummyBackend([]))
+
+    runtime = agent.set_runtime_config(
+        provider="openai",
+        model="openai/gpt-4o-mini",
+    )
+
+    assert runtime == {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+    }
 
 
 def test_agent_chat_endpoint_runs_tool_only_agent_directly():
@@ -332,7 +538,7 @@ def test_openrouter_client_resolves_codex_oauth_token(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     client = OpenRouterClient()
-    mode, token = client._resolve_auth()
+    mode, token = client._resolve_auth("openai")
 
     assert mode == "codex-oauth"
     assert token == "codex-token-value"
@@ -344,7 +550,7 @@ def test_openrouter_client_trims_bearer_prefix(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     client = OpenRouterClient()
-    mode, token = client._resolve_auth()
+    mode, token = client._resolve_auth("openai")
 
     assert mode == "openai-oauth"
     assert token == "oauth-token-value"
@@ -359,6 +565,7 @@ async def test_openrouter_client_falls_back_to_api_key_on_oauth_insufficient_quo
             super().__init__(api_key="api-token")
             self._responses = responses
             self.auth_headers: list[str] = []
+            self.target_urls: list[str] = []
 
         async def _post_chat_completion(
             self,
@@ -367,8 +574,9 @@ async def test_openrouter_client_falls_back_to_api_key_on_oauth_insufficient_quo
             headers: dict[str, str],
             body: dict[str, object],
         ) -> httpx.Response:
-            _ = (target_url, body)
+            _ = body
             self.auth_headers.append(headers.get("Authorization", ""))
+            self.target_urls.append(target_url)
             return self._responses.pop(0)
 
     monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "oauth-token")
@@ -394,6 +602,7 @@ async def test_openrouter_client_falls_back_to_api_key_on_oauth_insufficient_quo
         messages=[{"role": "user", "content": "hello"}],
         tools=None,
         tool_choice=None,
+        proxy_url=None,
     )
 
     choices = payload.get("choices") if isinstance(payload, dict) else None
@@ -404,6 +613,113 @@ async def test_openrouter_client_falls_back_to_api_key_on_oauth_insufficient_quo
     assert isinstance(message, dict)
     assert message.get("content") == "ok"
     assert client.auth_headers == ["Bearer oauth-token", "Bearer api-token"]
+    assert client.target_urls == [
+        "https://api.openai.com/v1/chat/completions",
+        "https://api.openai.com/v1/chat/completions",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_openrouter_client_uses_openrouter_url_and_model(monkeypatch):
+    class RecordingClient(OpenRouterClient):
+        def __init__(self):
+            super().__init__()
+            self.target_url = ""
+            self.body: dict[str, object] = {}
+            self.headers: dict[str, str] = {}
+
+        async def _post_chat_completion(
+            self,
+            *,
+            target_url: str,
+            headers: dict[str, str],
+            body: dict[str, object],
+        ) -> httpx.Response:
+            self.target_url = target_url
+            self.headers = headers
+            self.body = body
+            request = httpx.Request("POST", target_url)
+            return httpx.Response(
+                status_code=200,
+                request=request,
+                json={"choices": [{"message": {"role": "assistant", "content": "ok"}}]},
+            )
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-token")
+
+    client = RecordingClient()
+    payload = await client.chat_completions(
+        model="openai/gpt-oss-120b",
+        provider="openrouter",
+        messages=[{"role": "user", "content": "hello"}],
+        tools=None,
+        tool_choice=None,
+        proxy_url=None,
+    )
+
+    assert isinstance(payload, dict)
+    choices = payload.get("choices")
+    assert isinstance(choices, list) and choices
+    first_choice = choices[0]
+    assert isinstance(first_choice, dict)
+    message = first_choice.get("message")
+    assert isinstance(message, dict)
+    assert message.get("content") == "ok"
+    assert client.target_url == "https://openrouter.ai/api/v1/chat/completions"
+    assert client.headers["Authorization"] == "Bearer openrouter-token"
+    assert client.headers["X-Title"] == "HWPX MCP"
+    assert client.body["model"] == "openai/gpt-oss-120b"
+
+
+@pytest.mark.asyncio
+async def test_openrouter_client_uses_codex_proxy_url_and_token(monkeypatch):
+    class RecordingClient(OpenRouterClient):
+        def __init__(self):
+            super().__init__()
+            self.target_url = ""
+            self.body: dict[str, object] = {}
+            self.headers: dict[str, str] = {}
+
+        async def _post_chat_completion(
+            self,
+            *,
+            target_url: str,
+            headers: dict[str, str],
+            body: dict[str, object],
+        ) -> httpx.Response:
+            self.target_url = target_url
+            self.headers = headers
+            self.body = body
+            request = httpx.Request("POST", target_url)
+            return httpx.Response(
+                status_code=200,
+                request=request,
+                json={"choices": [{"message": {"role": "assistant", "content": "ok"}}]},
+            )
+
+    monkeypatch.setenv("HWPX_CODEX_PROXY_ACCESS_TOKEN", "proxy-token")
+
+    client = RecordingClient()
+    payload = await client.chat_completions(
+        model="gpt-5",
+        provider="codex-proxy",
+        proxy_url="http://127.0.0.1:5011",
+        messages=[{"role": "user", "content": "hello"}],
+        tools=None,
+        tool_choice=None,
+    )
+
+    assert isinstance(payload, dict)
+    choices = payload.get("choices")
+    assert isinstance(choices, list) and choices
+    first_choice = choices[0]
+    assert isinstance(first_choice, dict)
+    message = first_choice.get("message")
+    assert isinstance(message, dict)
+    assert message.get("content") == "ok"
+    assert client.target_url == "http://127.0.0.1:5011/chat/completions"
+    assert client.headers["Authorization"] == "Bearer proxy-token"
+    assert client.body["model"] == "gpt-5"
 
 
 @pytest.mark.asyncio
@@ -447,6 +763,7 @@ async def test_openrouter_client_adds_quota_hint_when_no_fallback_available(
             messages=[{"role": "user", "content": "hello"}],
             tools=None,
             tool_choice=None,
+            proxy_url=None,
         )
 
     error = exc_info.value
@@ -494,6 +811,7 @@ async def test_openrouter_client_does_not_fallback_on_rate_limit_429(monkeypatch
             messages=[{"role": "user", "content": "hello"}],
             tools=None,
             tool_choice=None,
+            proxy_url=None,
         )
 
     error = exc_info.value
@@ -542,6 +860,7 @@ async def test_openrouter_client_does_not_fallback_on_policy_403(monkeypatch):
             messages=[{"role": "user", "content": "hello"}],
             tools=None,
             tool_choice=None,
+            proxy_url=None,
         )
 
     error = exc_info.value

@@ -18,13 +18,27 @@ from .tool_only_agent import IntentName
 from .tool_only_agent import SubagentName
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_OAUTH_TOKEN_ENV = "OPENAI_OAUTH_TOKEN"
 CODEX_OAUTH_TOKEN_ENV = "CODEX_OAUTH_TOKEN"
+OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
+AGENT_PROVIDER_ENV = "HWPX_AGENT_PROVIDER"
+AGENT_MODEL_ENV = "HWPX_AGENT_MODEL"
+CODEX_PROXY_URL_ENV = "HWPX_CODEX_PROXY_URL"
+CODEX_PROXY_ACCESS_TOKEN_ENV = "HWPX_CODEX_PROXY_ACCESS_TOKEN"
 OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+OPENROUTER_DEFAULT_MODEL = "openai/gpt-oss-120b"
+CODEX_PROXY_DEFAULT_MODEL = "gpt-5"
+CODEX_PROXY_DEFAULT_URL = "http://127.0.0.1:2455/v1/chat/completions"
+
+OPENAI_PROVIDER = "openai"
+OPENROUTER_PROVIDER = "openrouter"
+CODEX_PROXY_PROVIDER = "codex-proxy"
+SUPPORTED_PROVIDERS = {OPENAI_PROVIDER, OPENROUTER_PROVIDER, CODEX_PROXY_PROVIDER}
 
 DEFAULT_MODEL = OPENAI_DEFAULT_MODEL
-DEFAULT_PROVIDER = "openai"
+DEFAULT_PROVIDER = OPENAI_PROVIDER
 
 
 JsonObject = dict[str, JsonValue]
@@ -166,6 +180,15 @@ class OpenRouterClient:
         self._runtime_openai_api_key = ""
         self._runtime_openai_oauth_token = ""
         self._runtime_codex_oauth_token = ""
+        self._runtime_openrouter_api_key = ""
+        self._runtime_codex_proxy_access_token = ""
+
+    @staticmethod
+    def normalize_provider(value: str | None) -> str:
+        normalized = value.strip().lower() if isinstance(value, str) else ""
+        if normalized in SUPPORTED_PROVIDERS:
+            return normalized
+        return DEFAULT_PROVIDER
 
     @staticmethod
     def _normalize_token(value: str | None, *, trim_bearer: bool = False) -> str:
@@ -180,6 +203,8 @@ class OpenRouterClient:
         openai_api_key: str | None = None,
         openai_oauth_token: str | None = None,
         codex_oauth_token: str | None = None,
+        openrouter_api_key: str | None = None,
+        codex_proxy_access_token: str | None = None,
     ) -> None:
         if openai_api_key is not None:
             self._runtime_openai_api_key = self._normalize_token(openai_api_key)
@@ -196,7 +221,40 @@ class OpenRouterClient:
                 trim_bearer=True,
             )
 
-    def _auth_candidates(self) -> list[tuple[str, str]]:
+        if openrouter_api_key is not None:
+            self._runtime_openrouter_api_key = self._normalize_token(openrouter_api_key)
+
+        if codex_proxy_access_token is not None:
+            self._runtime_codex_proxy_access_token = self._normalize_token(
+                codex_proxy_access_token,
+                trim_bearer=True,
+            )
+
+    def _auth_candidates(self, provider: str) -> list[tuple[str, str]]:
+        normalized_provider = self.normalize_provider(provider)
+
+        if normalized_provider == CODEX_PROXY_PROVIDER:
+            codex_proxy_access_token = (
+                self._runtime_codex_proxy_access_token
+                or os.getenv(CODEX_PROXY_ACCESS_TOKEN_ENV, "").strip()
+            )
+            if codex_proxy_access_token.lower().startswith("bearer "):
+                codex_proxy_access_token = codex_proxy_access_token[7:].strip()
+            if codex_proxy_access_token:
+                return [("codex-proxy-token", codex_proxy_access_token)]
+
+            raise AgentAuthError(f"{CODEX_PROXY_ACCESS_TOKEN_ENV} is not set")
+
+        if normalized_provider == OPENROUTER_PROVIDER:
+            openrouter_api_key = (
+                self._runtime_openrouter_api_key
+                or os.getenv(OPENROUTER_API_KEY_ENV, "").strip()
+            )
+            if openrouter_api_key:
+                return [("openrouter-api-key", openrouter_api_key)]
+
+            raise AgentAuthError(f"{OPENROUTER_API_KEY_ENV} is not set")
+
         candidates: list[tuple[str, str]] = []
 
         oauth_token = (
@@ -239,15 +297,21 @@ class OpenRouterClient:
             f"{OPENAI_OAUTH_TOKEN_ENV} or {CODEX_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
         )
 
-    def auth_status(self) -> dict[str, object]:
-        accepted_env = [
-            OPENAI_OAUTH_TOKEN_ENV,
-            CODEX_OAUTH_TOKEN_ENV,
-            OPENAI_API_KEY_ENV,
-        ]
+    def auth_status(self, provider: str) -> dict[str, object]:
+        normalized_provider = self.normalize_provider(provider)
+        if normalized_provider == CODEX_PROXY_PROVIDER:
+            accepted_env = [CODEX_PROXY_ACCESS_TOKEN_ENV]
+        elif normalized_provider == OPENROUTER_PROVIDER:
+            accepted_env = [OPENROUTER_API_KEY_ENV]
+        else:
+            accepted_env = [
+                OPENAI_OAUTH_TOKEN_ENV,
+                CODEX_OAUTH_TOKEN_ENV,
+                OPENAI_API_KEY_ENV,
+            ]
 
         try:
-            candidates = self._auth_candidates()
+            candidates = self._auth_candidates(normalized_provider)
         except AgentAuthError as error:
             return {
                 "configured": False,
@@ -265,8 +329,8 @@ class OpenRouterClient:
             "accepted_env": accepted_env,
         }
 
-    def _resolve_auth(self) -> tuple[str, str]:
-        return self._auth_candidates()[0]
+    def _resolve_auth(self, provider: str) -> tuple[str, str]:
+        return self._auth_candidates(provider)[0]
 
     @staticmethod
     def _is_insufficient_quota(status_code: int, response_text: str) -> bool:
@@ -376,6 +440,61 @@ class OpenRouterClient:
 
         return OPENAI_DEFAULT_MODEL
 
+    @staticmethod
+    def _resolve_openrouter_model(model: str) -> str:
+        candidate = model.strip()
+        if candidate:
+            return candidate
+
+        override = os.getenv("OPENROUTER_MODEL", "").strip()
+        if override:
+            return override
+
+        return OPENROUTER_DEFAULT_MODEL
+
+    @staticmethod
+    def _resolve_codex_proxy_model(model: str) -> str:
+        candidate = model.strip()
+        if candidate:
+            return candidate
+
+        return CODEX_PROXY_DEFAULT_MODEL
+
+    @staticmethod
+    def _resolve_codex_proxy_url(proxy_url: str | None) -> str:
+        candidate = proxy_url.strip() if isinstance(proxy_url, str) else ""
+        if not candidate:
+            candidate = os.getenv(CODEX_PROXY_URL_ENV, "").strip()
+        if not candidate:
+            candidate = CODEX_PROXY_DEFAULT_URL
+
+        normalized = candidate.rstrip("/")
+        if normalized.lower().endswith("/chat/completions"):
+            return normalized
+        if normalized.lower().endswith("/v1"):
+            return f"{normalized}/chat/completions"
+        return f"{normalized}/chat/completions"
+
+    @classmethod
+    def _resolve_model(cls, provider: str, model: str) -> str:
+        normalized_provider = cls.normalize_provider(provider)
+        if normalized_provider == CODEX_PROXY_PROVIDER:
+            return cls._resolve_codex_proxy_model(model)
+        if normalized_provider == OPENROUTER_PROVIDER:
+            return cls._resolve_openrouter_model(model)
+        return cls._resolve_openai_model(model)
+
+    @classmethod
+    def _target_url_for_provider(
+        cls, provider: str, proxy_url: str | None = None
+    ) -> str:
+        normalized_provider = cls.normalize_provider(provider)
+        if normalized_provider == CODEX_PROXY_PROVIDER:
+            return cls._resolve_codex_proxy_url(proxy_url)
+        if normalized_provider == OPENROUTER_PROVIDER:
+            return OPENROUTER_URL
+        return OPENAI_URL
+
     async def chat_completions(
         self,
         *,
@@ -384,20 +503,19 @@ class OpenRouterClient:
         messages: list[dict[str, object]],
         tools: list[dict[str, object]] | None,
         tool_choice: str | None,
+        proxy_url: str | None = None,
     ) -> dict[str, object]:
-        auth_candidates = self._auth_candidates()
+        normalized_provider = self.normalize_provider(provider)
+        auth_candidates = self._auth_candidates(normalized_provider)
         attempted_modes: list[str] = []
 
         body: dict[str, object]
         body = {
-            "model": self._resolve_openai_model(model),
+            "model": self._resolve_model(normalized_provider, model),
             "messages": messages,
             "stream": False,
         }
-        target_url = OPENAI_URL
-
-        if provider:
-            _ = provider
+        target_url = self._target_url_for_provider(normalized_provider, proxy_url)
 
         if tools:
             body["tools"] = tools
@@ -410,6 +528,9 @@ class OpenRouterClient:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {auth_token}",
             }
+
+            if normalized_provider == OPENROUTER_PROVIDER:
+                headers["X-Title"] = "HWPX MCP"
             try:
                 response = await self._post_chat_completion(
                     target_url=target_url,
@@ -460,13 +581,92 @@ class OpenRouterClient:
 class OpenRouterToolAgent:
     backend_server: BackendServer
     client: OpenRouterClient = field(default_factory=OpenRouterClient)
-    model: str = DEFAULT_MODEL
+    model: str = ""
     provider: str = DEFAULT_PROVIDER
+    codex_proxy_url: str = ""
     max_rounds: int = 8
     _gateway: AgenticGateway = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        configured_provider = self.provider
+        env_provider = os.getenv(AGENT_PROVIDER_ENV, "").strip()
+        if env_provider:
+            configured_provider = env_provider
+
+        configured_model = self.model
+        env_model = os.getenv(AGENT_MODEL_ENV, "").strip()
+        if env_model:
+            configured_model = env_model
+
+        configured_codex_proxy_url = self.codex_proxy_url
+        env_codex_proxy_url = os.getenv(CODEX_PROXY_URL_ENV, "").strip()
+        if env_codex_proxy_url:
+            configured_codex_proxy_url = env_codex_proxy_url
+
+        self.provider = self.client.normalize_provider(configured_provider)
+        self.model = self._normalize_model_for_provider(
+            self.provider,
+            configured_model,
+        )
+        self.codex_proxy_url = self._normalize_codex_proxy_url(
+            self.provider,
+            configured_codex_proxy_url,
+        )
         self._gateway = AgenticGateway(self.backend_server)
+
+    @classmethod
+    def _normalize_model_for_provider(cls, provider: str, model: str | None) -> str:
+        candidate = model.strip() if isinstance(model, str) else ""
+        if provider == CODEX_PROXY_PROVIDER:
+            return OpenRouterClient._resolve_codex_proxy_model(candidate)
+        if provider == OPENROUTER_PROVIDER:
+            return OpenRouterClient._resolve_openrouter_model(candidate)
+        return OpenRouterClient._resolve_openai_model(candidate)
+
+    @staticmethod
+    def _normalize_codex_proxy_url(provider: str, proxy_url: str | None) -> str:
+        if provider != CODEX_PROXY_PROVIDER and not proxy_url:
+            return ""
+        return OpenRouterClient._resolve_codex_proxy_url(proxy_url)
+
+    def runtime_config(self) -> dict[str, str]:
+        runtime: dict[str, str] = {
+            "provider": self.provider,
+            "model": self.model,
+        }
+        if self.provider == CODEX_PROXY_PROVIDER:
+            runtime["proxy_url"] = self.codex_proxy_url
+        return runtime
+
+    def set_runtime_config(
+        self,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+        proxy_url: str | None = None,
+    ) -> dict[str, str]:
+        next_provider = self.provider
+        if provider is not None:
+            next_provider = self.client.normalize_provider(provider)
+
+        next_model = self.model
+        if model is not None or provider is not None:
+            next_model = self._normalize_model_for_provider(next_provider, model)
+
+        next_codex_proxy_url = self.codex_proxy_url
+        if next_provider == CODEX_PROXY_PROVIDER:
+            if proxy_url is not None or provider is not None:
+                next_codex_proxy_url = self._normalize_codex_proxy_url(
+                    next_provider,
+                    proxy_url if proxy_url is not None else self.codex_proxy_url,
+                )
+        else:
+            next_codex_proxy_url = ""
+
+        self.provider = next_provider
+        self.model = next_model
+        self.codex_proxy_url = next_codex_proxy_url
+        return self.runtime_config()
 
     async def run(self, *, message: str, session_id: str = "") -> dict[str, object]:
         await self._gateway.refresh_registry()
@@ -503,6 +703,7 @@ class OpenRouterToolAgent:
             response = await self.client.chat_completions(
                 model=self.model,
                 provider=self.provider,
+                proxy_url=self.codex_proxy_url,
                 messages=messages,
                 tools=tool_defs if tool_defs else None,
                 tool_choice="auto" if tool_defs else None,
@@ -581,7 +782,7 @@ class OpenRouterToolAgent:
         }
 
     def auth_status(self) -> dict[str, object]:
-        return self.client.auth_status()
+        return self.client.auth_status(self.provider)
 
     def set_runtime_auth(
         self,
@@ -589,11 +790,15 @@ class OpenRouterToolAgent:
         openai_api_key: str | None = None,
         openai_oauth_token: str | None = None,
         codex_oauth_token: str | None = None,
+        openrouter_api_key: str | None = None,
+        codex_proxy_access_token: str | None = None,
     ) -> None:
         self.client.set_runtime_auth(
             openai_api_key=openai_api_key,
             openai_oauth_token=openai_oauth_token,
             codex_oauth_token=codex_oauth_token,
+            openrouter_api_key=openrouter_api_key,
+            codex_proxy_access_token=codex_proxy_access_token,
         )
 
     async def _call_tool_by_name(self, name: str, arguments: JsonObject) -> object:

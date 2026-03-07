@@ -23,6 +23,14 @@ class AuthRequest(BaseModel):
     openai_api_key: str | None = None
     openai_oauth_token: str | None = None
     codex_oauth_token: str | None = None
+    openrouter_api_key: str | None = None
+    codex_proxy_access_token: str | None = None
+
+
+class ConfigRequest(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    proxy_url: str | None = None
 
 
 class AgentHttpSurface:
@@ -46,6 +54,7 @@ class AgentHttpSurface:
                 "provider": DEFAULT_PROVIDER,
                 "model": DEFAULT_MODEL,
             },
+            "runtime": self._agent.runtime_config(),
             "auth": auth,
         }
 
@@ -54,9 +63,24 @@ class AgentHttpSurface:
             openai_api_key=payload.openai_api_key,
             openai_oauth_token=payload.openai_oauth_token,
             codex_oauth_token=payload.codex_oauth_token,
+            openrouter_api_key=payload.openrouter_api_key,
+            codex_proxy_access_token=payload.codex_proxy_access_token,
         )
         return {
             "success": True,
+            "runtime": self._agent.runtime_config(),
+            "auth": self._agent.auth_status(),
+        }
+
+    async def set_config(self, payload: ConfigRequest) -> dict[str, object]:
+        runtime = self._agent.set_runtime_config(
+            provider=payload.provider,
+            model=payload.model,
+            proxy_url=payload.proxy_url,
+        )
+        return {
+            "success": True,
+            "runtime": runtime,
             "auth": self._agent.auth_status(),
         }
 
@@ -81,10 +105,7 @@ class AgentHttpSurface:
             ) from error
         return {
             **result,
-            "runtime": {
-                "provider": DEFAULT_PROVIDER,
-                "model": DEFAULT_MODEL,
-            },
+            "runtime": self._agent.runtime_config(),
         }
 
 
@@ -103,6 +124,10 @@ def build_agent_http_router(
     @router.post("/agent/auth")
     async def agent_auth(payload: AuthRequest) -> dict[str, object]:
         return await surface.set_auth(payload)
+
+    @router.post("/agent/config")
+    async def agent_config(payload: ConfigRequest) -> dict[str, object]:
+        return await surface.set_config(payload)
 
     @router.post("/agent/chat")
     async def agent_chat(payload: ChatRequest) -> dict[str, object]:

@@ -22,6 +22,13 @@ const OPENAI_OAUTH_TIMEOUT_MS = Number.parseInt(
 );
 const OPENAI_OAUTH_API_BASE = `${OPENAI_OAUTH_ISSUER}/api/accounts`;
 const OPENAI_OAUTH_DEVICE_URL = `${OPENAI_OAUTH_ISSUER}/codex/device`;
+const DEFAULT_AGENT_PROVIDER = (process.env.HWPX_AGENT_PROVIDER || "codex-proxy").trim();
+const DEFAULT_AGENT_MODEL = (process.env.HWPX_AGENT_MODEL || "gpt-5").trim();
+const DEFAULT_CODEX_PROXY_URL = (
+  process.env.HWPX_CODEX_PROXY_URL || "http://127.0.0.1:2455/v1/chat/completions"
+).trim();
+const DEFAULT_CODEX_PROXY_START = process.env.HWPX_CODEX_PROXY_START !== "0";
+const DEFAULT_CODEX_PROXY_COMMAND = (process.env.HWPX_CODEX_PROXY_COMMAND || "").trim();
 
 const readUrlField = (value) => {
   if (typeof value !== "string") {
@@ -49,6 +56,7 @@ const resolveOpenAiVerificationUrls = (payload) => {
 };
 
 let backendProcess = null;
+let codexProxyProcess = null;
 let backendLog = [];
 let mainWindow = null;
 let backendEnvOverrides = {};
@@ -119,9 +127,80 @@ const setBackendCredentials = (opts) => {
     return;
   }
 
-  setOptionalEnv("OPENAI_API_KEY", opts.openaiApiKey);
-  setOptionalEnv("OPENAI_OAUTH_TOKEN", opts.gptOauthToken);
-  setOptionalEnv("CODEX_OAUTH_TOKEN", opts.gptOauthToken);
+  const provider = typeof opts.provider === "string" && opts.provider.trim() ? opts.provider.trim() : DEFAULT_AGENT_PROVIDER;
+  const model = typeof opts.model === "string" && opts.model.trim() ? opts.model.trim() : DEFAULT_AGENT_MODEL;
+
+  setOptionalEnv("HWPX_AGENT_PROVIDER", provider);
+  setOptionalEnv("HWPX_AGENT_MODEL", model);
+  setOptionalEnv(
+    "HWPX_CODEX_PROXY_URL",
+    provider === "codex-proxy" ? opts.codexProxyUrl || DEFAULT_CODEX_PROXY_URL : ""
+  );
+  setOptionalEnv(
+    "HWPX_CODEX_PROXY_ACCESS_TOKEN",
+    provider === "codex-proxy" ? opts.codexProxyAccessToken : ""
+  );
+  setOptionalEnv("OPENROUTER_API_KEY", provider === "openrouter" ? opts.openrouterApiKey : "");
+  setOptionalEnv("OPENAI_API_KEY", provider === "openai" ? opts.openaiApiKey : "");
+  setOptionalEnv("OPENAI_OAUTH_TOKEN", provider === "openai" ? opts.gptOauthToken : "");
+  setOptionalEnv("CODEX_OAUTH_TOKEN", provider === "openai" ? opts.gptOauthToken : "");
+};
+
+const effectiveEnv = (name, fallback = "") => {
+  if (typeof backendEnvOverrides[name] === "string" && backendEnvOverrides[name].trim()) {
+    return backendEnvOverrides[name].trim();
+  }
+  const raw = process.env[name];
+  return typeof raw === "string" && raw.trim() ? raw.trim() : fallback;
+};
+
+const currentAgentProvider = () => effectiveEnv("HWPX_AGENT_PROVIDER", DEFAULT_AGENT_PROVIDER);
+
+const normalizeCodexProxyUrl = (value) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  const base = trimmed || DEFAULT_CODEX_PROXY_URL;
+  const normalized = base.replace(/\/+$/, "");
+  if (/\/chat\/completions$/i.test(normalized)) {
+    return normalized;
+  }
+  if (/\/v1$/i.test(normalized)) {
+    return `${normalized}/chat/completions`;
+  }
+  return `${normalized}/chat/completions`;
+};
+
+const currentCodexProxyUrl = () =>
+  normalizeCodexProxyUrl(effectiveEnv("HWPX_CODEX_PROXY_URL", DEFAULT_CODEX_PROXY_URL));
+
+const isCodexProxyAutoStartEnabled = () => {
+  const raw = effectiveEnv(
+    "HWPX_CODEX_PROXY_START",
+    DEFAULT_CODEX_PROXY_START ? "1" : "0"
+  );
+  return raw !== "0";
+};
+
+const isCodexProxyProviderActive = () => currentAgentProvider() === "codex-proxy";
+
+const isLocalUrl = (value) => {
+  try {
+    const parsed = new URL(value);
+    return ["127.0.0.1", "localhost", "::1"].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+};
+
+const codexProxyProbeUrls = (chatUrl) => {
+  try {
+    const parsed = new URL(chatUrl);
+    return [
+      `${parsed.origin}/health`,
+      `${parsed.origin}/v1/models`,
+    ];
+  } catch {
+    return [];
+  }
 };
 
 const log = (msg) => {
@@ -415,9 +494,264 @@ const waitForProcessExit = (proc, timeoutMs = 2500) =>
     setTimeout(finish, timeoutMs);
   });
 
+const waitForUrl = async (probeUrls, { attempts = 15, delayMs = 1000 } = {}) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    for (const probeUrl of probeUrls) {
+      try {
+        const response = await fetch(probeUrl, {
+          method: "GET",
+          headers: { accept: "application/json" },
+        });
+        if (response.ok) {
+          return true;
+        }
+      } catch {
+      }
+    }
+
+    if (attempt + 1 < attempts) {
+      await sleep(delayMs);
+    }
+  }
+
+  return false;
+};
+
+const defaultProxyWorkingDir = () => {
+  try {
+    return app.getPath("userData");
+  } catch {
+    return process.cwd();
+  }
+};
+
 const isCmd = (cmd) => {
   const check = process.platform === "win32" ? "where" : "which";
   return spawnSync(check, [cmd], { stdio: "ignore" }).status === 0;
+};
+
+const isCodexProxyReachable = async (chatUrl) => {
+  const probeUrls = codexProxyProbeUrls(chatUrl);
+  if (probeUrls.length === 0) {
+    return false;
+  }
+  return waitForUrl(probeUrls, { attempts: 1, delayMs: 0 });
+};
+
+const findCodexProxyCommand = () => {
+  const isWin = process.platform === "win32";
+  const binaryName = isWin ? "codex-proxy-server.exe" : "codex-proxy-server";
+  const batName = "codex-proxy.bat";
+  const resPath = typeof process.resourcesPath === "string" && process.resourcesPath
+    ? process.resourcesPath
+    : null;
+  const appDir = __dirname;
+  const repoRoot = resolve(appDir, "..");
+
+  if (DEFAULT_CODEX_PROXY_COMMAND) {
+    log(`[proxy] Using configured command: ${DEFAULT_CODEX_PROXY_COMMAND}`);
+    return {
+      cmd: DEFAULT_CODEX_PROXY_COMMAND,
+      type: "shell",
+      cwd: defaultProxyWorkingDir(),
+    };
+  }
+
+  const candidates = [];
+
+  if (resPath) {
+    if (isWin) candidates.push({ path: join(resPath, "codex-proxy-win", batName), type: "bat" });
+    candidates.push({ path: join(resPath, "codex-proxy-win", binaryName), type: "bin" });
+    candidates.push({ path: join(resPath, "codex-proxy", binaryName), type: "bin" });
+  }
+
+  if (isWin) candidates.push({ path: join(appDir, "resources", "codex-proxy-win", batName), type: "bat" });
+  candidates.push({ path: join(appDir, "resources", "codex-proxy-win", binaryName), type: "bin" });
+  candidates.push({ path: join(appDir, "resources", "codex-proxy", binaryName), type: "bin" });
+  if (isWin) candidates.push({ path: join(repoRoot, "dist", "codex-proxy-win", batName), type: "bat" });
+  candidates.push({ path: join(repoRoot, "dist", "codex-proxy-win", binaryName), type: "bin" });
+  candidates.push({ path: join(repoRoot, "dist", "codex-proxy", binaryName), type: "bin" });
+
+  for (const candidate of candidates) {
+    log(`[proxy] Checking: ${candidate.path} → ${existsSync(candidate.path) ? "FOUND" : "not found"}`);
+    if (existsSync(candidate.path)) {
+      return {
+        cmd: candidate.path,
+        type: candidate.type,
+        cwd: dirname(candidate.path),
+      };
+    }
+  }
+
+  if (isCmd("codex-lb")) {
+    log("[proxy] Fallback: codex-lb");
+    return { cmd: "codex-lb", type: "shell", cwd: defaultProxyWorkingDir() };
+  }
+
+  if (isCmd("uvx")) {
+    log("[proxy] Fallback: uvx codex-lb");
+    return { cmd: "uvx codex-lb", type: "shell", cwd: defaultProxyWorkingDir() };
+  }
+
+  if (isCmd("uv")) {
+    log("[proxy] Fallback: uv tool run codex-lb");
+    return { cmd: "uv tool run codex-lb", type: "shell", cwd: defaultProxyWorkingDir() };
+  }
+
+  log("[proxy] No Codex proxy command found.");
+  return null;
+};
+
+const startCodexProxy = async () => {
+  if (!isCodexProxyAutoStartEnabled()) {
+    log("[proxy] Auto-start skipped (HWPX_CODEX_PROXY_START=0)");
+    return { started: false, skipped: true, reason: "disabled" };
+  }
+
+  if (!isCodexProxyProviderActive()) {
+    return { started: false, skipped: true, reason: "provider_not_codex_proxy" };
+  }
+
+  const proxyUrl = currentCodexProxyUrl();
+  if (!isLocalUrl(proxyUrl)) {
+    log(`[proxy] Auto-start skipped for non-local proxy URL: ${proxyUrl}`);
+    return { started: false, skipped: true, reason: "non_local_url", url: proxyUrl };
+  }
+
+  if (await isCodexProxyReachable(proxyUrl)) {
+    log(`[proxy] Proxy already reachable at ${proxyUrl}`);
+    return { started: false, reachable: true, url: proxyUrl };
+  }
+
+  if (codexProxyProcess && !codexProxyProcess.killed) {
+    const ready = await waitForUrl(codexProxyProbeUrls(proxyUrl), {
+      attempts: 6,
+      delayMs: 500,
+    });
+    if (ready) {
+      return { started: false, reachable: true, url: proxyUrl, pid: codexProxyProcess.pid };
+    }
+  }
+
+  const found = findCodexProxyCommand();
+  if (!found) {
+    log(
+      "[proxy] Unable to auto-start Codex proxy. Provide HWPX_CODEX_PROXY_COMMAND or bundle codex-proxy-win."
+    );
+    return { started: false, url: proxyUrl, error: "command_not_found" };
+  }
+
+  const { cmd, type, cwd } = found;
+  const isWin = process.platform === "win32";
+  let spawnCmd = cmd;
+  let spawnArgs = [];
+
+  if (type === "bat") {
+    spawnCmd = "cmd.exe";
+    spawnArgs = ["/c", `"${cmd}"`];
+  }
+
+  log(`[proxy] Starting Codex proxy: ${spawnCmd}`);
+  log(`[proxy]   cwd: ${cwd}`);
+  log(`[proxy]   type: ${type}`);
+
+  try {
+    codexProxyProcess = spawn(spawnCmd, spawnArgs, {
+      cwd,
+      shell: type !== "bin",
+      windowsVerbatimArguments: isWin && type === "bat",
+      env: {
+        ...process.env,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    codexProxyProcess.stdout?.on("data", (d) => {
+      const s = d.toString();
+      process.stdout.write(`[proxy] ${s}`);
+      const line = `[proxy/out] ${s.trim()}`;
+      backendLog.push(line);
+      appendBackendFileLog(line);
+    });
+    codexProxyProcess.stderr?.on("data", (d) => {
+      const s = d.toString();
+      process.stderr.write(`[proxy] ${s}`);
+      const line = `[proxy/err] ${s.trim()}`;
+      backendLog.push(line);
+      appendBackendFileLog(line);
+    });
+    codexProxyProcess.on("error", (e) => {
+      log(`[proxy] Spawn error: ${e.message}`);
+      codexProxyProcess = null;
+    });
+    codexProxyProcess.on("exit", (code, signal) => {
+      log(`[proxy] Exited: code=${code} signal=${signal}`);
+      codexProxyProcess = null;
+    });
+
+    log(`[proxy] Process started (pid=${codexProxyProcess.pid})`);
+  } catch (e) {
+    log(`[proxy] Spawn failed: ${e.message}`);
+    codexProxyProcess = null;
+    return { started: false, url: proxyUrl, error: "spawn_failed" };
+  }
+
+  const ready = await waitForUrl(codexProxyProbeUrls(proxyUrl), {
+    attempts: 20,
+    delayMs: 1000,
+  });
+  if (ready) {
+    log(`[proxy] Ready at ${proxyUrl}`);
+  } else {
+    log(`[proxy] Startup did not expose a healthy endpoint at ${proxyUrl}`);
+  }
+
+  return {
+    started: codexProxyProcess !== null,
+    ready,
+    pid: codexProxyProcess?.pid ?? null,
+    url: proxyUrl,
+  };
+};
+
+const stopCodexProxy = async ({ waitForExit = false } = {}) => {
+  if (!codexProxyProcess || codexProxyProcess.killed) return;
+  const proc = codexProxyProcess;
+  log("[proxy] Stopping Codex proxy...");
+  try {
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/pid", String(proc.pid), "/f", "/t"], { stdio: "ignore" });
+    } else {
+      proc.kill("SIGTERM");
+    }
+  } catch (e) {
+    log(`[proxy] Stop error: ${e.message}`);
+  }
+
+  if (waitForExit) {
+    await waitForProcessExit(proc);
+  }
+
+  codexProxyProcess = null;
+};
+
+const syncCodexProxyLifecycle = async () => {
+  if (!isCodexProxyProviderActive()) {
+    await stopCodexProxy({ waitForExit: true });
+    return { started: false, skipped: true, reason: "provider_not_codex_proxy" };
+  }
+
+  if (!isCodexProxyAutoStartEnabled()) {
+    await stopCodexProxy({ waitForExit: true });
+    return { started: false, skipped: true, reason: "disabled" };
+  }
+
+  if (!isLocalUrl(currentCodexProxyUrl())) {
+    await stopCodexProxy({ waitForExit: true });
+    return { started: false, skipped: true, reason: "non_local_url", url: currentCodexProxyUrl() };
+  }
+
+  return startCodexProxy();
 };
 
 const findBackendCommand = () => {
@@ -634,6 +968,12 @@ ipcMain.handle("backend:status", () => ({
   running: backendProcess !== null && !backendProcess.killed,
   pid: backendProcess?.pid ?? null,
   url: BACKEND_URL,
+   proxy: {
+    managed: isCodexProxyAutoStartEnabled() && isCodexProxyProviderActive(),
+    running: codexProxyProcess !== null && !codexProxyProcess.killed,
+    pid: codexProxyProcess?.pid ?? null,
+    url: currentCodexProxyUrl(),
+  },
   logPath: resolveBackendLogFilePath(),
   log: backendLog.slice(-30),
 }));
@@ -642,6 +982,7 @@ ipcMain.handle("app:update-status", () => appUpdateStatus);
 
 ipcMain.handle("backend:restart", async (_, opts) => {
   setBackendCredentials(opts);
+  const proxyStatus = await syncCodexProxyLifecycle();
   if (!isBackendManaged()) {
     log("Backend restart skipped because backend management is disabled.");
     return {
@@ -649,6 +990,7 @@ ipcMain.handle("backend:restart", async (_, opts) => {
       managed: false,
       url: BACKEND_URL,
       pid: null,
+      proxy: proxyStatus,
       message: "backend_management_disabled",
     };
   }
@@ -663,6 +1005,7 @@ ipcMain.handle("backend:restart", async (_, opts) => {
     managed: true,
     url: BACKEND_URL,
     pid: backendProcess?.pid ?? null,
+    proxy: proxyStatus,
     message: backendProcess !== null ? "backend_restarted" : "backend_start_failed",
   };
 });
@@ -695,8 +1038,9 @@ ipcMain.handle("auth:openai-oauth-login", async () => {
 });
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  await syncCodexProxyLifecycle();
   startBackend();
   createWindow();
   setupAutoUpdater();
@@ -707,8 +1051,12 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  stopCodexProxy();
   stopBackend();
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", stopBackend);
+app.on("before-quit", () => {
+  stopCodexProxy();
+  stopBackend();
+});

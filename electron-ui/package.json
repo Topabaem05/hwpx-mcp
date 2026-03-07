@@ -1,6 +1,6 @@
 {
   "name": "hwpx-mcp-electron-ui",
-  "version": "3.12.3",
+  "version": "3.13.0",
   "private": true,
   "description": "Electron desktop client for HWPX-MCP document workbench",
   "author": {
@@ -46,7 +46,9 @@
       {
         "from": "../dist/hwpx-mcp-backend",
         "to": "backend",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "extraFiles": [],
@@ -57,7 +59,9 @@
         {
           "from": "../dist/hwpx-mcp-backend-win",
           "to": "backend-win",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
@@ -75,7 +79,10 @@
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Office",
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     },

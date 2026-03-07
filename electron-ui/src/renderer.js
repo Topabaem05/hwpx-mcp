@@ -71,6 +71,7 @@ const resetSettingsBtn = $("resetSettings");
 const checkGatewayBtn = $("checkGateway");
 const restartBackendBtn = $("restartBackend");
 const statusText = $("statusText");
+const appUpdateText = $("appUpdateText");
 
 const suggestionButtons = document.querySelectorAll(".suggestion-prompt");
 
@@ -82,6 +83,37 @@ let oauthVerificationUrl = "";
 const status = (msg) => {
   if (statusText) {
     statusText.textContent = String(msg);
+  }
+};
+
+const setAppUpdateText = (msg) => {
+  if (appUpdateText) {
+    appUpdateText.textContent = String(msg);
+  }
+};
+
+const describeAppUpdateStatus = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return "앱 자동 업데이트 상태를 확인하지 못했습니다.";
+  }
+
+  switch (payload.state) {
+    case "disabled-dev":
+      return "개발 모드에서는 앱 자동 업데이트를 사용하지 않습니다.";
+    case "checking":
+      return "앱 업데이트 확인 중...";
+    case "available":
+      return `새 앱 버전 ${payload.version || ""} 다운로드 중...`.trim();
+    case "downloading":
+      return `앱 업데이트 다운로드 중... ${Number(payload.percent || 0).toFixed(1)}%`;
+    case "downloaded":
+      return `앱 업데이트 ${payload.version || ""} 준비 완료 - 재시작 시 설치됩니다.`.trim();
+    case "not-available":
+      return `앱 최신 상태 (${payload.version || "현재 버전"})`;
+    case "error":
+      return payload.message || "앱 자동 업데이트 확인에 실패했습니다.";
+    default:
+      return payload.message || "앱 자동 업데이트 대기 중";
   }
 };
 
@@ -926,6 +958,23 @@ suggestionButtons.forEach((button) => {
 
 if (window.lucide?.createIcons) {
   window.lucide.createIcons();
+}
+
+if (window.hwpxUi?.getAppUpdateStatus) {
+  window.hwpxUi
+    .getAppUpdateStatus()
+    .then((payload) => {
+      setAppUpdateText(describeAppUpdateStatus(payload));
+    })
+    .catch((error) => {
+      setAppUpdateText(`앱 자동 업데이트 상태 확인 실패: ${error?.message || String(error)}`);
+    });
+}
+
+if (window.hwpxUi?.onAppUpdateStatus) {
+  window.hwpxUi.onAppUpdateStatus((payload) => {
+    setAppUpdateText(describeAppUpdateStatus(payload));
+  });
 }
 
 if (sessions.length === 0) createSession();

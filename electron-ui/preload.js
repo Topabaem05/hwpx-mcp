@@ -16,7 +16,20 @@ contextBridge.exposeInMainWorld("hwpxUi", {
 
   getBackendStatus: () => ipcRenderer.invoke("backend:status"),
   restartBackend: (opts) => ipcRenderer.invoke("backend:restart", opts),
+  getAppUpdateStatus: () => ipcRenderer.invoke("app:update-status"),
   openAiOauthLogin: () => ipcRenderer.invoke("auth:openai-oauth-login"),
+  onAppUpdateStatus: (callback) => {
+    if (typeof callback !== "function") {
+      return () => {};
+    }
+
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("app:update-status", listener);
+
+    return () => {
+      ipcRenderer.removeListener("app:update-status", listener);
+    };
+  },
   onOpenAiOauthProgress: (callback) => {
     if (typeof callback !== "function") {
       return () => {};

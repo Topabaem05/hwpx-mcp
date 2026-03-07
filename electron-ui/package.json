@@ -1,7 +1,7 @@
 {
   "name": "hwpx-mcp-electron-ui",
-  "version": "3.11.0",
-  "buildVersionLabel": "3.11d",
+  "version": "3.13.0",
+  "buildVersionLabel": "3.13",
   "private": true,
   "description": "Electron desktop client for HWPX-MCP document workbench",
   "author": {
@@ -25,6 +25,14 @@
   "build": {
     "appId": "io.topabaem05.hwpx-mcp",
     "productName": "HWPX MCP",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Topabaem05",
+        "repo": "hwpx-mcp",
+        "releaseType": "release"
+      }
+    ],
     "directories": {
       "output": "../dist/electron-installer"
     },
@@ -39,18 +47,22 @@
       {
         "from": "../dist/hwpx-mcp-backend",
         "to": "backend",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "extraFiles": [],
     "win": {
       "target": "nsis",
-      "artifactName": "${productName}-${version}-win-${arch}.${ext}",
+      "artifactName": "HWPX.MCP-${version}-win-${arch}.${ext}",
       "extraResources": [
         {
           "from": "../dist/hwpx-mcp-backend-win",
           "to": "backend-win",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
@@ -66,11 +78,17 @@
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Office",
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     },
     "afterPack": "./scripts/after-pack.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "electron": "^34.0.0",

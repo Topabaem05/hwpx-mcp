@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const { join, resolve, dirname } = require("path");
 const { spawn, spawnSync } = require("child_process");
 const { existsSync, appendFileSync, mkdirSync } = require("fs");
@@ -53,6 +54,22 @@ let mainWindow = null;
 let backendEnvOverrides = {};
 let backendLogFilePath = null;
 let backendFileLogFailed = false;
+let appUpdateStatus = {
+  state: "idle",
+  message: "Automatic updates are available in installed builds.",
+};
+
+const emitAppUpdateStatus = (payload) => {
+  appUpdateStatus = {
+    ...appUpdateStatus,
+    ...payload,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("app:update-status", appUpdateStatus);
+  }
+};
 
 const resolveBackendLogFilePath = () => {
   if (backendLogFilePath) {
@@ -104,6 +121,7 @@ const setBackendCredentials = (opts) => {
 
   setOptionalEnv("OPENAI_API_KEY", opts.openaiApiKey);
   setOptionalEnv("OPENAI_OAUTH_TOKEN", opts.gptOauthToken);
+  setOptionalEnv("CODEX_OAUTH_TOKEN", opts.gptOauthToken);
 };
 
 const log = (msg) => {
@@ -114,7 +132,110 @@ const log = (msg) => {
   appendBackendFileLog(line);
 };
 
+const updaterLogger = {
+  info: (msg) => log(`[updater] ${msg}`),
+  warn: (msg) => log(`[updater][warn] ${msg}`),
+  error: (msg) => log(`[updater][error] ${msg}`),
+  debug: (msg) => log(`[updater][debug] ${msg}`),
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const formatUpdateVersion = (value) => {
+  if (typeof value !== "string") {
+    return app.getVersion();
+  }
+
+  const trimmed = value.trim();
+  return trimmed || app.getVersion();
+};
+
+const setupAutoUpdater = () => {
+  if (!app.isPackaged) {
+    emitAppUpdateStatus({
+      state: "disabled-dev",
+      message: "Automatic updates are disabled in development builds.",
+    });
+    return;
+  }
+
+  autoUpdater.logger = updaterLogger;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    emitAppUpdateStatus({
+      state: "checking",
+      message: "Checking for app updates...",
+    });
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    emitAppUpdateStatus({
+      state: "available",
+      version: formatUpdateVersion(info?.version),
+      message: `Update ${formatUpdateVersion(info?.version)} found. Downloading now...`,
+    });
+  });
+
+  autoUpdater.on("update-not-available", (info) => {
+    emitAppUpdateStatus({
+      state: "not-available",
+      version: formatUpdateVersion(info?.version),
+      message: `App is up to date (${formatUpdateVersion(info?.version)}).`,
+    });
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    const percent = Number.isFinite(progress?.percent) ? progress.percent : 0;
+    emitAppUpdateStatus({
+      state: "downloading",
+      percent,
+      message: `Downloading app update... ${percent.toFixed(1)}%`,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", async (info) => {
+    emitAppUpdateStatus({
+      state: "downloaded",
+      version: formatUpdateVersion(info?.version),
+      message: `Update ${formatUpdateVersion(info?.version)} is ready. Restart to install.`,
+    });
+
+    const targetWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+    const choice = await dialog.showMessageBox(targetWindow, {
+      type: "info",
+      buttons: ["Restart now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+      title: "Update ready",
+      message: `HWPX MCP ${formatUpdateVersion(info?.version)} has been downloaded.`,
+      detail: "The update will be installed after the app restarts.",
+    });
+
+    if (choice.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+
+  autoUpdater.on("error", (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    emitAppUpdateStatus({
+      state: "error",
+      message: `Automatic update failed: ${message}`,
+    });
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      emitAppUpdateStatus({
+        state: "error",
+        message: `Automatic update failed: ${message}`,
+      });
+    });
+  }, 12000);
+};
 
 const requestOpenAiDeviceCode = async () => {
   if (!OPENAI_OAUTH_CLIENT_ID) {
@@ -463,6 +584,9 @@ const createWindow = () => {
 
   mainWindow.loadFile(join(__dirname, "src", "index.html"));
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.webContents.on("did-finish-load", () => {
+    emitAppUpdateStatus(appUpdateStatus);
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -514,6 +638,8 @@ ipcMain.handle("backend:status", () => ({
   log: backendLog.slice(-30),
 }));
 
+ipcMain.handle("app:update-status", () => appUpdateStatus);
+
 ipcMain.handle("backend:restart", async (_, opts) => {
   setBackendCredentials(opts);
   if (!isBackendManaged()) {
@@ -553,6 +679,7 @@ ipcMain.handle("auth:openai-oauth-login", async () => {
     emitProgress({ stage: "starting" });
     const login = await runOpenAiOauthLogin(emitProgress);
     setOptionalEnv("OPENAI_OAUTH_TOKEN", login.accessToken);
+    setOptionalEnv("CODEX_OAUTH_TOKEN", login.accessToken);
     emitProgress({ stage: "completed", ...login });
     return { success: true, ...login };
   } catch (error) {
@@ -572,6 +699,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   startBackend();
   createWindow();
+  setupAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -142,13 +146,18 @@ def test_agent_health_endpoint_uses_expected_defaults():
     assert payload["auth"] == {
         "configured": True,
         "mode": "openai-api-key",
-        "source": "client-config",
-        "accepted_env": ["OPENAI_OAUTH_TOKEN", "OPENAI_API_KEY"],
+        "available_modes": ["openai-api-key"],
+        "accepted_env": [
+            "OPENAI_OAUTH_TOKEN",
+            "CODEX_OAUTH_TOKEN",
+            "OPENAI_API_KEY",
+        ],
     }
 
 
 def test_agent_health_endpoint_reports_missing_auth_for_default_client(monkeypatch):
     monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     backend = DummyBackend([])
@@ -163,8 +172,57 @@ def test_agent_health_endpoint_reports_missing_auth_for_default_client(monkeypat
     payload = response.json()
     assert payload["auth"] == {
         "configured": False,
-        "accepted_env": ["OPENAI_OAUTH_TOKEN", "OPENAI_API_KEY"],
+        "mode": "none",
+        "detail": "OPENAI_OAUTH_TOKEN or CODEX_OAUTH_TOKEN or OPENAI_API_KEY is not set",
+        "available_modes": [],
+        "accepted_env": [
+            "OPENAI_OAUTH_TOKEN",
+            "CODEX_OAUTH_TOKEN",
+            "OPENAI_API_KEY",
+        ],
     }
+
+
+def test_agent_auth_endpoint_sets_runtime_oauth_token(monkeypatch):
+    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    app.include_router(build_agent_http_router(backend))
+    client = TestClient(app)
+
+    with client:
+        health_before = client.get("/agent/health")
+        assert health_before.status_code == 200
+        assert health_before.json()["auth"]["configured"] is False
+
+        auth_set = client.post(
+            "/agent/auth",
+            json={
+                "openai_oauth_token": "Bearer runtime-oauth-token",
+                "openai_api_key": "",
+                "codex_oauth_token": "",
+            },
+        )
+        assert auth_set.status_code == 200
+        auth_payload = auth_set.json()
+        assert auth_payload["success"] is True
+        assert auth_payload["auth"]["configured"] is True
+        assert auth_payload["auth"]["mode"] == "openai-oauth"
+        assert auth_payload["auth"]["available_modes"] == ["openai-oauth"]
+
+        auth_noop = client.post("/agent/auth", json={})
+        assert auth_noop.status_code == 200
+        noop_payload = auth_noop.json()
+        assert noop_payload["auth"]["configured"] is True
+        assert noop_payload["auth"]["mode"] == "openai-oauth"
+
+        health_after = client.get("/agent/health")
+        assert health_after.status_code == 200
+        assert health_after.json()["auth"]["configured"] is True
+        assert health_after.json()["auth"]["mode"] == "openai-oauth"
 
 
 def test_agent_chat_endpoint_runs_tool_only_agent_directly():
@@ -218,7 +276,9 @@ def test_agent_chat_returns_400_for_auth_error():
     def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
         return ErrorAgent(
             backend_server=server,
-            error=AgentAuthError("OPENAI_OAUTH_TOKEN or OPENAI_API_KEY is not set"),
+            error=AgentAuthError(
+                "OPENAI_OAUTH_TOKEN or CODEX_OAUTH_TOKEN or OPENAI_API_KEY is not set"
+            ),
         )
 
     app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
@@ -229,7 +289,8 @@ def test_agent_chat_returns_400_for_auth_error():
 
     assert response.status_code == 400
     assert (
-        "OPENAI_OAUTH_TOKEN or OPENAI_API_KEY is not set" in response.json()["detail"]
+        "OPENAI_OAUTH_TOKEN or CODEX_OAUTH_TOKEN or OPENAI_API_KEY is not set"
+        in response.json()["detail"]
     )
 
 
@@ -263,3 +324,227 @@ def test_agent_chat_maps_upstream_llm_500_to_502():
 
     assert response.status_code == 502
     assert "llm_error[openai-api-key]" in response.json()["detail"]
+
+
+def test_openrouter_client_resolves_codex_oauth_token(monkeypatch):
+    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.setenv("CODEX_OAUTH_TOKEN", "codex-token-value")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    client = OpenRouterClient()
+    mode, token = client._resolve_auth()
+
+    assert mode == "codex-oauth"
+    assert token == "codex-token-value"
+
+
+def test_openrouter_client_trims_bearer_prefix(monkeypatch):
+    monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "Bearer oauth-token-value")
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    client = OpenRouterClient()
+    mode, token = client._resolve_auth()
+
+    assert mode == "openai-oauth"
+    assert token == "oauth-token-value"
+
+
+@pytest.mark.asyncio
+async def test_openrouter_client_falls_back_to_api_key_on_oauth_insufficient_quota(
+    monkeypatch,
+):
+    class SequenceClient(OpenRouterClient):
+        def __init__(self, responses: list[httpx.Response]):
+            super().__init__(api_key="api-token")
+            self._responses = responses
+            self.auth_headers: list[str] = []
+
+        async def _post_chat_completion(
+            self,
+            *,
+            target_url: str,
+            headers: dict[str, str],
+            body: dict[str, object],
+        ) -> httpx.Response:
+            _ = (target_url, body)
+            self.auth_headers.append(headers.get("Authorization", ""))
+            return self._responses.pop(0)
+
+    monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "oauth-token")
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    first = httpx.Response(
+        status_code=429,
+        request=request,
+        json={"error": {"type": "insufficient_quota", "message": "quota exhausted"}},
+    )
+    second = httpx.Response(
+        status_code=200,
+        request=request,
+        json={"choices": [{"message": {"role": "assistant", "content": "ok"}}]},
+    )
+
+    client = SequenceClient([first, second])
+    payload = await client.chat_completions(
+        model=DEFAULT_MODEL,
+        provider="openai",
+        messages=[{"role": "user", "content": "hello"}],
+        tools=None,
+        tool_choice=None,
+    )
+
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    assert isinstance(choices, list) and choices
+    first_choice = choices[0]
+    assert isinstance(first_choice, dict)
+    message = first_choice.get("message")
+    assert isinstance(message, dict)
+    assert message.get("content") == "ok"
+    assert client.auth_headers == ["Bearer oauth-token", "Bearer api-token"]
+
+
+@pytest.mark.asyncio
+async def test_openrouter_client_adds_quota_hint_when_no_fallback_available(
+    monkeypatch,
+):
+    class SequenceClient(OpenRouterClient):
+        def __init__(self, responses: list[httpx.Response]):
+            super().__init__()
+            self._responses = responses
+
+        async def _post_chat_completion(
+            self,
+            *,
+            target_url: str,
+            headers: dict[str, str],
+            body: dict[str, object],
+        ) -> httpx.Response:
+            _ = (target_url, headers, body)
+            return self._responses.pop(0)
+
+    monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "oauth-only-token")
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(
+        status_code=429,
+        request=request,
+        text=json.dumps(
+            {"error": {"type": "insufficient_quota", "message": "quota exhausted"}}
+        ),
+    )
+
+    client = SequenceClient([response])
+
+    with pytest.raises(LlmRequestError) as exc_info:
+        await client.chat_completions(
+            model=DEFAULT_MODEL,
+            provider="openai",
+            messages=[{"role": "user", "content": "hello"}],
+            tools=None,
+            tool_choice=None,
+        )
+
+    error = exc_info.value
+    assert error.status_code == 429
+    assert "quota_hint" in str(error)
+    assert "attempted_auth=openai-oauth" in str(error)
+
+
+@pytest.mark.asyncio
+async def test_openrouter_client_does_not_fallback_on_rate_limit_429(monkeypatch):
+    class SequenceClient(OpenRouterClient):
+        def __init__(self, responses: list[httpx.Response]):
+            super().__init__(api_key="api-token")
+            self._responses = responses
+            self.calls = 0
+
+        async def _post_chat_completion(
+            self,
+            *,
+            target_url: str,
+            headers: dict[str, str],
+            body: dict[str, object],
+        ) -> httpx.Response:
+            _ = (target_url, headers, body)
+            self.calls += 1
+            return self._responses.pop(0)
+
+    monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "oauth-token")
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(
+        status_code=429,
+        request=request,
+        json={"error": {"type": "rate_limit_reached", "message": "too many requests"}},
+    )
+
+    client = SequenceClient([response])
+
+    with pytest.raises(LlmRequestError) as exc_info:
+        await client.chat_completions(
+            model=DEFAULT_MODEL,
+            provider="openai",
+            messages=[{"role": "user", "content": "hello"}],
+            tools=None,
+            tool_choice=None,
+        )
+
+    error = exc_info.value
+    assert error.status_code == 429
+    assert "quota_hint" not in str(error)
+    assert "attempted_auth=openai-oauth" in str(error)
+    assert client.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_openrouter_client_does_not_fallback_on_policy_403(monkeypatch):
+    class SequenceClient(OpenRouterClient):
+        def __init__(self, responses: list[httpx.Response]):
+            super().__init__(api_key="api-token")
+            self._responses = responses
+            self.calls = 0
+
+        async def _post_chat_completion(
+            self,
+            *,
+            target_url: str,
+            headers: dict[str, str],
+            body: dict[str, object],
+        ) -> httpx.Response:
+            _ = (target_url, headers, body)
+            self.calls += 1
+            return self._responses.pop(0)
+
+    monkeypatch.setenv("OPENAI_OAUTH_TOKEN", "oauth-token")
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(
+        status_code=403,
+        request=request,
+        json={"error": {"type": "policy_violation", "message": "blocked"}},
+    )
+
+    client = SequenceClient([response])
+
+    with pytest.raises(LlmRequestError) as exc_info:
+        await client.chat_completions(
+            model=DEFAULT_MODEL,
+            provider="openai",
+            messages=[{"role": "user", "content": "hello"}],
+            tools=None,
+            tool_choice=None,
+        )
+
+    error = exc_info.value
+    assert error.status_code == 403
+    assert "attempted_auth=openai-oauth" in str(error)
+    assert client.calls == 1

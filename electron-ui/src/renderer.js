@@ -71,6 +71,7 @@ const resetSettingsBtn = $("resetSettings");
 const checkGatewayBtn = $("checkGateway");
 const restartBackendBtn = $("restartBackend");
 const statusText = $("statusText");
+const appUpdateText = $("appUpdateText");
 
 const suggestionButtons = document.querySelectorAll(".suggestion-prompt");
 
@@ -82,6 +83,37 @@ let oauthVerificationUrl = "";
 const status = (msg) => {
   if (statusText) {
     statusText.textContent = String(msg);
+  }
+};
+
+const setAppUpdateText = (msg) => {
+  if (appUpdateText) {
+    appUpdateText.textContent = String(msg);
+  }
+};
+
+const describeAppUpdateStatus = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return "앱 자동 업데이트 상태를 확인하지 못했습니다.";
+  }
+
+  switch (payload.state) {
+    case "disabled-dev":
+      return "개발 모드에서는 앱 자동 업데이트를 사용하지 않습니다.";
+    case "checking":
+      return "앱 업데이트 확인 중...";
+    case "available":
+      return `새 앱 버전 ${payload.version || ""} 다운로드 중...`.trim();
+    case "downloading":
+      return `앱 업데이트 다운로드 중... ${Number(payload.percent || 0).toFixed(1)}%`;
+    case "downloaded":
+      return `앱 업데이트 ${payload.version || ""} 준비 완료 - 재시작 시 설치됩니다.`.trim();
+    case "not-available":
+      return `앱 최신 상태 (${payload.version || "현재 버전"})`;
+    case "error":
+      return payload.message || "앱 자동 업데이트 확인에 실패했습니다.";
+    default:
+      return payload.message || "앱 자동 업데이트 대기 중";
   }
 };
 
@@ -151,6 +183,138 @@ const normalizeBaseUrl = (value) => {
   const trimmed = (value || "").trim();
   const base = trimmed || defaultConfig.backendBaseUrl;
   return base.replace(/\/+$/, "");
+};
+
+const backendBaseFromMcpUrl = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.replace(/\/mcp\/?$/i, "").replace(/\/+$/, "");
+};
+
+const applyBackendBaseUrl = (value) => {
+  const backendBase = backendBaseFromMcpUrl(value);
+  if (!backendBase) {
+    return "";
+  }
+
+  if (backendBase !== normalizeBaseUrl(config.backendBaseUrl)) {
+    config.backendBaseUrl = backendBase;
+    persistConfig();
+    renderConfig();
+  }
+
+  return backendBase;
+};
+
+const authStatusLabel = (auth) => {
+  if (!auth || typeof auth !== "object") {
+    return "auth:unknown";
+  }
+
+  if (auth.configured) {
+    return `auth:${auth.mode || "configured"}`;
+  }
+
+  return `auth:missing (${auth.detail || "token not set"})`;
+};
+
+const hasStoredAuth = () =>
+  Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
+
+const isAuthMissingErrorMessage = (message) => {
+  if (typeof message !== "string") {
+    return false;
+  }
+
+  return (
+    message.includes("OPENAI_OAUTH_TOKEN") ||
+    message.includes("CODEX_OAUTH_TOKEN") ||
+    message.includes("OPENAI_API_KEY")
+  );
+};
+
+const authAvailableModes = (health) => {
+  const modes = health?.auth?.available_modes;
+  return Array.isArray(modes) ? modes.filter((value) => typeof value === "string") : [];
+};
+
+const hasAvailableAuthMode = (health, mode) => authAvailableModes(health).includes(mode);
+
+const shouldSyncStoredAuth = (health) => {
+  if (!hasStoredAuth()) {
+    return false;
+  }
+
+  if (!health?.auth?.configured) {
+    return true;
+  }
+
+  if ((config.gptOauthToken || "").trim()) {
+    const hasOAuthMode =
+      hasAvailableAuthMode(health, "openai-oauth") || hasAvailableAuthMode(health, "codex-oauth");
+    if (!hasOAuthMode) {
+      return true;
+    }
+  }
+
+  if ((config.openaiApiKey || "").trim() && !hasAvailableAuthMode(health, "openai-api-key")) {
+    return true;
+  }
+
+  return false;
+};
+
+const attemptedAuthModes = (message) => {
+  if (typeof message !== "string") {
+    return [];
+  }
+
+  const marker = "attempted_auth=";
+  const start = message.indexOf(marker);
+  if (start === -1) {
+    return [];
+  }
+
+  return message
+    .slice(start + marker.length)
+    .split("|")[0]
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+};
+
+const isQuotaErrorMessage = (message) => {
+  if (typeof message !== "string") {
+    return false;
+  }
+
+  return message.includes("insufficient_quota") || message.includes("quota_hint");
+};
+
+const shouldRetryWithAuthSyncForError = (message) => {
+  if (!hasStoredAuth()) {
+    return false;
+  }
+
+  if (isAuthMissingErrorMessage(message)) {
+    return true;
+  }
+
+  if (!isQuotaErrorMessage(message)) {
+    return false;
+  }
+
+  return (
+    !attemptedAuthModes(message).includes("openai-api-key") &&
+    Boolean((config.openaiApiKey || "").trim())
+  );
 };
 
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
@@ -362,13 +526,37 @@ const restartBackendWithCurrentCredentials = async () => {
   if (!window.hwpxUi?.restartBackend) {
     return null;
   }
-  return window.hwpxUi.restartBackend({
+
+  const result = await window.hwpxUi.restartBackend({
     openaiApiKey: config.openaiApiKey,
     gptOauthToken: config.gptOauthToken,
   });
+
+  if (result?.managed !== false) {
+    applyBackendBaseUrl(result?.url);
+  }
+  return result;
+};
+
+const syncBaseUrlWithBackendStatus = async () => {
+  if (!window.hwpxUi?.getBackendStatus) {
+    return "";
+  }
+
+  const backendStatus = await window.hwpxUi.getBackendStatus();
+  if (backendStatus?.managed !== false && backendStatus?.url) {
+    return applyBackendBaseUrl(backendStatus.url);
+  }
+
+  if (!backendStatus?.running) {
+    return "";
+  }
+
+  return applyBackendBaseUrl(backendStatus.url);
 };
 
 const checkAgentEndpoint = async () => {
+  await syncBaseUrlWithBackendStatus();
   const response = await fetch(endpointUrl("/agent/health"), {
     method: "GET",
     headers: { accept: "application/json" },
@@ -383,6 +571,7 @@ const checkAgentEndpoint = async () => {
 };
 
 const callAgentChat = async (message, signal) => {
+  await syncBaseUrlWithBackendStatus();
   const response = await fetch(endpointUrl("/agent/chat"), {
     method: "POST",
     signal,
@@ -409,9 +598,74 @@ const callAgentChat = async (message, signal) => {
   return payload;
 };
 
+const syncAgentAuth = async () => {
+  const maxAttempts = 8;
+  const delayMs = 750;
+  let lastError = "auth sync failed";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await syncBaseUrlWithBackendStatus();
+      const response = await fetch(endpointUrl("/agent/auth"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify({
+          openai_api_key: config.openaiApiKey || "",
+          openai_oauth_token: config.gptOauthToken || "",
+          codex_oauth_token: config.gptOauthToken || "",
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.detail;
+        const reason =
+          payload?.error ||
+          payload?.message ||
+          (typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+            ? JSON.stringify(detail)
+            : "") ||
+          `HTTP ${response.status}`;
+        throw new Error(String(reason));
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error?.message || String(error);
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw new Error(lastError);
+};
+
 const runToolOnlyAgent = async (userText, botMsg, signal) => {
   if (signal.aborted) throw new Error("Cancelled");
-  const payload = await callAgentChat(userText, signal);
+  let payload = null;
+
+  try {
+    payload = await callAgentChat(userText, signal);
+  } catch (error) {
+    const reason = error?.message || String(error);
+    const shouldRetryWithAuthSync = shouldRetryWithAuthSyncForError(reason);
+
+    if (!shouldRetryWithAuthSync || signal.aborted) {
+      throw error;
+    }
+
+    await syncAgentAuth();
+    if (signal.aborted) {
+      throw new Error("Cancelled");
+    }
+    payload = await callAgentChat(userText, signal);
+  }
 
   let reply = "";
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -439,8 +693,15 @@ const handleUserMessage = async (text) => {
     await runToolOnlyAgent(text, botMsg, controller.signal);
   } catch (error) {
     if (botMsg) {
-      botMsg.text =
-        controller.signal.aborted ? "Cancelled." : `Error: ${error?.message || String(error)}`;
+      const raw = error?.message || String(error);
+      const hasQuotaSignal =
+        typeof raw === "string" && (raw.includes("insufficient_quota") || raw.includes("quota_hint"));
+
+      const quotaHelp = hasQuotaSignal
+        ? "\n\nTip: OAuth quota is exhausted. Set 'OpenAI API Key (Fallback)' in settings and restart backend."
+        : "";
+
+      botMsg.text = controller.signal.aborted ? "Cancelled." : `Error: ${raw}${quotaHelp}`;
       botMsg.streaming = false;
     }
   } finally {
@@ -455,10 +716,12 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
   if (window.hwpxUi?.getBackendStatus) {
     const backendStatus = await window.hwpxUi.getBackendStatus();
+    const backendBase = await syncBaseUrlWithBackendStatus();
     if (backendStatus.running) {
-      status(`Backend process running (pid ${backendStatus.pid}). Connecting...`);
+      const baseHint = backendBase ? ` ${backendBase}` : "";
+      status(`Backend process running (pid ${backendStatus.pid}). Connecting...${baseHint}`);
     } else if (backendStatus.managed === false) {
-      status("Backend process is externally managed. Trying to connect...");
+      status("Backend process is externally managed. Trying to connect anyway...");
     } else {
       status("Backend process not running. Trying to connect anyway...");
     }
@@ -466,8 +729,22 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const health = await checkAgentEndpoint();
-      status(describeAgentHealth(health));
+      let health = await checkAgentEndpoint();
+
+      if (shouldSyncStoredAuth(health)) {
+        try {
+          await syncAgentAuth();
+          health = await checkAgentEndpoint();
+        } catch {
+        }
+      }
+
+      const defaults = health?.defaults || {};
+      status(
+        `Agent connected (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+          health?.auth
+        )})`
+      );
       return true;
     } catch {
       status(`Agent starting... (${attempt}/${maxAttempts})`);
@@ -537,19 +814,36 @@ openSettingsHeaderBtn?.addEventListener("click", openSettings);
 closeSettingsBtn?.addEventListener("click", closeSettings);
 settingsOverlay?.addEventListener("click", closeSettings);
 
-saveSettingsBtn?.addEventListener("click", () => {
+saveSettingsBtn?.addEventListener("click", async () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
   config.openaiApiKey = (openaiApiKeyInput?.value || "").trim();
   config.gptOauthToken = (gptOauthTokenInput?.value || "").trim();
   persistConfig();
   status("Settings saved. Restarting backend...");
-  restartBackendWithCurrentCredentials()
-    .then((result) => {
-      status(describeRestartResult(result));
-    })
-    .catch((error) => {
-      status(`Backend restart failed: ${error?.message || String(error)}`);
-    });
+  let restartText = "";
+
+  try {
+    const result = await restartBackendWithCurrentCredentials();
+    if (result?.managed === false) {
+      restartText = "Local backend management is disabled. Syncing credentials to the current backend...";
+    } else if (result?.restarted === false) {
+      restartText = "Backend restart did not complete. Trying auth sync anyway...";
+    } else {
+      restartText = `Backend restarted (pid ${result?.pid || "?"}).`;
+    }
+  } catch (error) {
+    restartText = `Backend restart failed: ${error?.message || String(error)}`;
+  }
+
+  await waitForBackend(10, 1000);
+
+  try {
+    const authSync = await syncAgentAuth();
+    const mode = authSync?.auth?.mode || "unknown";
+    status(`${restartText} Auth synced (${mode}).`);
+  } catch (error) {
+    status(`${restartText} Auth sync failed: ${error?.message || String(error)}`);
+  }
 });
 
 resetSettingsBtn?.addEventListener("click", () => {
@@ -680,8 +974,32 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
         ? `OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`
         : "OpenAI OAuth verified. Restarting backend..."
     );
-    const restart = await restartBackendWithCurrentCredentials();
-    status(describeRestartResult(restart, "OpenAI OAuth connected"));
+    let restartInfo = null;
+    let restartError = null;
+
+    try {
+      restartInfo = await restartBackendWithCurrentCredentials();
+    } catch (error) {
+      restartError = error;
+    }
+
+    await waitForBackend(10, 1000);
+
+    const authSync = await syncAgentAuth();
+    const mode = authSync?.auth?.mode || "unknown";
+    if (restartError) {
+      status(
+        `OAuth token synced (${mode}). Backend restart failed: ${restartError?.message || String(
+          restartError
+        )}`
+      );
+    } else if (restartInfo?.managed === false) {
+      status(`OpenAI OAuth synced to the current backend (${mode}).`);
+    } else if (restartInfo?.restarted === false) {
+      status(`OpenAI OAuth synced after a partial restart (${mode}).`);
+    } else {
+      status(`OpenAI OAuth connected (pid ${restartInfo?.pid || "?"}, ${mode}).`);
+    }
   } catch (error) {
     status(`OpenAI OAuth login failed: ${error?.message || String(error)}`);
   } finally {
@@ -691,8 +1009,22 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
 
 checkGatewayBtn?.addEventListener("click", async () => {
   try {
-    const health = await checkAgentEndpoint();
-    status(describeAgentHealth(health, "Agent healthy"));
+    let health = await checkAgentEndpoint();
+
+    if (shouldSyncStoredAuth(health)) {
+      try {
+        await syncAgentAuth();
+        health = await checkAgentEndpoint();
+      } catch {
+      }
+    }
+
+    const defaults = health?.defaults || {};
+    status(
+      `Agent healthy (${defaults.provider || "openai"} / ${defaults.model || "gpt-4o-mini"}, ${authStatusLabel(
+        health?.auth
+      )})`
+    );
   } catch (error) {
     status(`Agent check failed: ${error?.message || String(error)}`);
   }
@@ -702,12 +1034,26 @@ restartBackendBtn?.addEventListener("click", async () => {
   status("Restarting backend...");
   try {
     const result = await restartBackendWithCurrentCredentials();
-    status(`${describeRestartResult(result)} Waiting...`);
+    if (result?.managed === false) {
+      status("Local backend management is disabled. Syncing credentials to the current backend...");
+    } else if (result?.restarted === false) {
+      status("Backend restart did not complete. Waiting before retrying auth sync...");
+    } else {
+      status(`Backend restarted (pid ${result?.pid || "?"}). Waiting...`);
+    }
   } catch (error) {
     status(`Restart failed: ${error?.message || String(error)}`);
   }
   await new Promise((resolve) => setTimeout(resolve, 3000));
   await waitForBackend(10, 2000);
+
+  try {
+    const authSync = await syncAgentAuth();
+    const mode = authSync?.auth?.mode || "unknown";
+    status(`Auth synced (${mode}).`);
+  } catch (error) {
+    status(`Auth sync failed: ${error?.message || String(error)}`);
+  }
 });
 
 chatForm?.addEventListener("submit", (event) => {
@@ -754,6 +1100,23 @@ if (window.lucide?.createIcons) {
   window.lucide.createIcons();
 }
 
+if (window.hwpxUi?.getAppUpdateStatus) {
+  window.hwpxUi
+    .getAppUpdateStatus()
+    .then((payload) => {
+      setAppUpdateText(describeAppUpdateStatus(payload));
+    })
+    .catch((error) => {
+      setAppUpdateText(`앱 자동 업데이트 상태 확인 실패: ${error?.message || String(error)}`);
+    });
+}
+
+if (window.hwpxUi?.onAppUpdateStatus) {
+  window.hwpxUi.onAppUpdateStatus((payload) => {
+    setAppUpdateText(describeAppUpdateStatus(payload));
+  });
+}
+
 if (sessions.length === 0) createSession();
 renderConfig();
 renderAll();
@@ -769,5 +1132,16 @@ updateSendBtn();
       status(`Backend restart failed: ${error?.message || String(error)}`);
     }
   }
-  await waitForBackend(15, 2000);
+  const ready = await waitForBackend(15, 2000);
+
+  if (ready && (config.openaiApiKey || config.gptOauthToken)) {
+    try {
+      const health = await checkAgentEndpoint().catch(() => null);
+      if (shouldSyncStoredAuth(health)) {
+        await syncAgentAuth();
+      }
+    } catch (error) {
+      status(`Auth sync failed: ${error?.message || String(error)}`);
+    }
+  }
 })();

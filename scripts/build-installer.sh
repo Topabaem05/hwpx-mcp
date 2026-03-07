@@ -51,6 +51,8 @@ if [ "$SKIP_BACKEND" = false ]; then
   if [ "$TARGET_PLATFORM" = "win" ]; then
     echo "--- Step 1: Building Windows self-contained backend ---"
     bash "$REPO_ROOT/scripts/build-windows-backend.sh"
+    echo "--- Step 1b: Building Windows codex proxy bundle ---"
+    bash "$REPO_ROOT/scripts/build-windows-codex-proxy.sh"
   else
     echo "--- Step 1: Building backend binary ---"
     bash "$REPO_ROOT/scripts/build-backend.sh"
@@ -62,6 +64,10 @@ else
     echo "WARNING: No backend build found in dist/."
     echo "Electron installer will be built without bundled backend."
     echo "Users will need Python runtime to run the backend."
+  fi
+  if [ "$TARGET_PLATFORM" = "win" ] && [ ! -d "$DIST_DIR/codex-proxy-win" ]; then
+    echo "WARNING: No Windows codex proxy bundle found in dist/codex-proxy-win/."
+    echo "Electron installer will rely on an external codex-lb or configured proxy command."
   fi
   echo ""
 fi
@@ -128,6 +134,9 @@ echo ""
 
 if [ -d "$DIST_DIR/hwpx-mcp-backend" ]; then
   echo "Backend binary:  $DIST_DIR/hwpx-mcp-backend/"
+fi
+if [ -d "$DIST_DIR/codex-proxy-win" ]; then
+  echo "Codex proxy:     $DIST_DIR/codex-proxy-win/"
 fi
 
 INSTALLER_DIR="$DIST_DIR/electron-installer"

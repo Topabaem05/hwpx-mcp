@@ -45,6 +45,13 @@ if (-not $SkipBackend) {
         Write-Error "Backend build failed."
         exit 1
     }
+
+    Write-Host "--- Step 1b: Building Windows codex proxy bundle ---"
+    & (Join-Path $repoRoot "scripts" "build-windows-codex-proxy.ps1")
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Windows codex proxy bundle build failed."
+        exit 1
+    }
     Write-Host ""
 } else {
     Write-Host "--- Step 1: Skipping backend build ---"
@@ -53,6 +60,12 @@ if (-not $SkipBackend) {
         Write-Warning "dist\hwpx-mcp-backend\ not found."
         Write-Warning "Electron installer will be built without bundled backend."
         Write-Warning "Users will need Python runtime to run the backend."
+    }
+
+    $proxyDir = Join-Path $distDir "codex-proxy-win"
+    if (-not (Test-Path $proxyDir)) {
+        Write-Warning "dist\codex-proxy-win\ not found."
+        Write-Warning "Electron installer will rely on an external codex-lb or configured proxy command."
     }
     Write-Host ""
 }
@@ -100,6 +113,11 @@ Write-Host ""
 $backendOutputDir = Join-Path $distDir "hwpx-mcp-backend"
 if (Test-Path $backendOutputDir) {
     Write-Host "Backend binary:  $backendOutputDir"
+}
+
+$proxyOutputDir = Join-Path $distDir "codex-proxy-win"
+if (Test-Path $proxyOutputDir) {
+    Write-Host "Codex proxy:     $proxyOutputDir"
 }
 
 $installerDir = Join-Path $distDir "electron-installer"

@@ -677,6 +677,8 @@ Prerequisite notes:
 
 You can build a standalone installer that bundles the Python backend so end-users don't need Python installed.
 
+For the Windows GitHub Actions release flow that builds and uploads the x64 installer artifacts, see `WINDOWS_RELEASE_ACTIONS.md`.
+
 **Prerequisites:** Python 3.10+, Node.js 18+, npm
 
 **Full pipeline (backend + Electron installer):**

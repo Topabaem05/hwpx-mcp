@@ -130,6 +130,12 @@ jobs:
             throw "Bundled codex proxy launcher missing: $proxyLauncher"
           }
 
+          $proxyLogPath = Join-Path $env:RUNNER_TEMP "codex-proxy.log"
+          if (Test-Path $proxyLogPath) {
+            Remove-Item $proxyLogPath -Force
+          }
+          $env:CODEX_PROXY_LOG_PATH = $proxyLogPath
+
           $process = Start-Process -FilePath $proxyLauncher -WindowStyle Hidden -PassThru
           try {
             $healthy = $false
@@ -148,10 +154,15 @@ jobs:
             }
 
             if (-not $healthy) {
+              if (Test-Path $proxyLogPath) {
+                Write-Host "Bundled codex proxy log:"
+                Get-Content $proxyLogPath -Tail 200 | ForEach-Object { Write-Host $_ }
+              }
               throw "Bundled codex proxy did not become healthy on http://127.0.0.1:2455"
             }
           }
           finally {
+            Remove-Item Env:CODEX_PROXY_LOG_PATH -ErrorAction SilentlyContinue
             if ($process -and -not $process.HasExited) {
               taskkill /PID $process.Id /F /T | Out-Null
             }

@@ -154,7 +154,11 @@ if not defined HOST set "HOST=127.0.0.1"
 if not defined PORT set "PORT=2455"
 
 echo Starting bundled codex-lb proxy on http://%HOST%:%PORT% ...
-"%SCRIPT_DIR%python\python.exe" -m app.cli --host %HOST% --port %PORT% %* < NUL > NUL 2>&1
+if defined CODEX_PROXY_LOG_PATH (
+  "%SCRIPT_DIR%python\python.exe" -m app.cli --host %HOST% --port %PORT% %* < NUL >> "%CODEX_PROXY_LOG_PATH%" 2>&1
+) else (
+  "%SCRIPT_DIR%python\python.exe" -m app.cli --host %HOST% --port %PORT% %* < NUL > NUL 2>&1
+)
 '@
 Set-Content -Path (Join-Path $winProxyDir "codex-proxy.bat") -Value $bat -Encoding ASCII
 
@@ -168,7 +172,12 @@ if (-not $env:HOST) { $env:HOST = "127.0.0.1" }
 if (-not $env:PORT) { $env:PORT = "2455" }
 
 Write-Host "Starting bundled codex-lb proxy on http://$($env:HOST):$($env:PORT) ..."
-& (Join-Path $scriptDir "python\python.exe") -m app.cli --host $env:HOST --port $env:PORT @args *> $null
+$pythonExe = Join-Path $scriptDir "python\python.exe"
+if ($env:CODEX_PROXY_LOG_PATH) {
+    & $pythonExe -m app.cli --host $env:HOST --port $env:PORT @args *>> $env:CODEX_PROXY_LOG_PATH
+} else {
+    & $pythonExe -m app.cli --host $env:HOST --port $env:PORT @args *> $null
+}
 '@
 Set-Content -Path (Join-Path $winProxyDir "codex-proxy.ps1") -Value $ps -Encoding UTF8
 

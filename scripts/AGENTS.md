@@ -9,6 +9,7 @@ scripts/
 ├── build-backend.sh/.ps1         # PyInstaller backend build
 ├── build-installer.sh/.ps1       # full backend+Electron installer pipeline
 ├── build-windows-backend.sh      # self-contained Windows backend bundle
+├── build-windows-codex-proxy.sh/.ps1 # self-contained Windows codex proxy bundle
 ├── quick-start-bunx.sh/.ps1      # one-command local bootstrap
 ├── cleanup-workspace.sh/.ps1     # remove generated artifacts and caches
 └── commit-push.sh/.ps1           # local git commit+push helper
@@ -20,6 +21,7 @@ scripts/
 | Build backend binary | `build-backend.sh`, `build-backend.ps1` | Uses PyInstaller and writes `dist/hwpx-mcp-backend/` |
 | Build installers | `build-installer.sh`, `build-installer.ps1` | Orchestrates backend build + Electron package build |
 | Build Windows backend bundle | `build-windows-backend.sh` | Produces `dist/hwpx-mcp-backend-win/` with launcher scripts |
+| Build Windows codex proxy bundle | `build-windows-codex-proxy.sh`, `build-windows-codex-proxy.ps1` | Produces `dist/codex-proxy-win/` with embedded Python + launcher scripts |
 | Local bootstrap | `quick-start-bunx.sh`, `quick-start-bunx.ps1` | Installs deps and launches Electron stack |
 | Cleanup artifacts | `cleanup-workspace.sh`, `cleanup-workspace.ps1` | Removes caches/build outputs and UI deps |
 

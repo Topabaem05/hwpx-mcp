@@ -137,7 +137,8 @@ jobs:
               try {
                 $health = Invoke-RestMethod -Uri "http://127.0.0.1:2455/health" -TimeoutSec 2
                 $models = Invoke-RestMethod -Uri "http://127.0.0.1:2455/v1/models" -TimeoutSec 2
-                if ($health.status -and $models.data) {
+                $hasDataField = $null -ne $models -and $models.PSObject.Properties.Name -contains "data"
+                if ($health.status -eq "ok" -and $hasDataField) {
                   $healthy = $true
                   break
                 }

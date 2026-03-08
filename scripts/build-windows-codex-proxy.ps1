@@ -73,39 +73,45 @@ if ($pthFile) {
 Write-Host "--- Step 2: Downloading codex-lb wheels ---"
 python -m pip install --quiet --target $pipBootstrapDir "pip<24.1"
 $env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
-python - <<PY
+$downloadScriptPath = Join-Path $distDir "_win_codex_proxy_download.py"
+$downloadScript = @'
 import sys
-sys.path.insert(0, r"$pipBootstrapDir")
+
+bootstrap_dir, wheel_dir, codex_lb_version = sys.argv[1:4]
+sys.path.insert(0, bootstrap_dir)
+
 from pip._internal.cli.main import main as pip_main
+
 deps = [
-    r"aiohttp>=3.13.3",
-    r"aiohttp-retry>=2.9.1",
-    r"aiosqlite>=0.22.1",
-    r"alembic>=1.16.5",
-    r"asyncpg>=0.30.0",
-    r"bcrypt>=4.3.0",
-    r"brotli>=1.2.0",
-    r"codex-lb==$codexLbVersion",
-    r"cryptography>=46.0.3",
-    r"email-validator>=2.0.0",
-    r"fastapi>=0.128.0",
-    r"greenlet>=3.3.0",
-    r"jinja2>=3.1.5",
-    r"psycopg[binary]>=3.2.12",
-    r"pydantic>=2.12.5",
-    r"pydantic-settings>=2.12.0",
-    r"pyotp>=2.9.0",
-    r"python-dotenv>=1.2.1",
-    r"python-multipart>=0.0.21",
-    r"segno>=1.6.6",
-    r"sqlalchemy>=2.0.45",
-    r"uvicorn>=0.41.0",
-    r"zstandard>=0.25.0",
+    'aiohttp>=3.13.3',
+    'aiohttp-retry>=2.9.1',
+    'aiosqlite>=0.22.1',
+    'alembic>=1.16.5',
+    'asyncpg>=0.30.0',
+    'bcrypt>=4.3.0',
+    'brotli>=1.2.0',
+    f'codex-lb=={codex_lb_version}',
+    'cryptography>=46.0.3',
+    'email-validator>=2.0.0',
+    'fastapi>=0.128.0',
+    'greenlet>=3.3.0',
+    'jinja2>=3.1.5',
+    'psycopg[binary]>=3.2.12',
+    'pydantic>=2.12.5',
+    'pydantic-settings>=2.12.0',
+    'pyotp>=2.9.0',
+    'python-dotenv>=1.2.1',
+    'python-multipart>=0.0.21',
+    'segno>=1.6.6',
+    'sqlalchemy>=2.0.45',
+    'uvicorn>=0.41.0',
+    'zstandard>=0.25.0',
 ]
+
 for dep in deps:
     args = [
         'download',
-        '--dest', r'$wheelDir',
+        '--dest', wheel_dir,
         '--platform', 'win_amd64',
         '--python-version', '3.13',
         '--only-binary=:all:',
@@ -117,7 +123,14 @@ for dep in deps:
     code = pip_main(args)
     if code != 0:
         raise SystemExit(code)
-PY
+'@
+Set-Content -Path $downloadScriptPath -Value $downloadScript -Encoding ASCII
+try {
+    python $downloadScriptPath $pipBootstrapDir $wheelDir $codexLbVersion
+}
+finally {
+    if (Test-Path $downloadScriptPath) { Remove-Item $downloadScriptPath -Force }
+}
 Remove-Item Env:PIP_DISABLE_PIP_VERSION_CHECK -ErrorAction SilentlyContinue
 
 Write-Host "--- Step 3: Extracting wheels ---"

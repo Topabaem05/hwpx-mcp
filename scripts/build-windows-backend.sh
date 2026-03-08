@@ -85,6 +85,7 @@ echo "--- Step 2: Downloading Windows wheels ---"
 PY_MINOR="${PYTHON_VERSION%.*}"
 
 DEPS=(
+  "pyhwpx"
   "mcp>=1.0.0"
   "fastmcp>=0.2.0"
   "pyhwp>=0.1a"

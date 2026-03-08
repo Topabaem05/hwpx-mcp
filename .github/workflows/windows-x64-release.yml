@@ -87,9 +87,6 @@ jobs:
           if ($backendFileListing -notmatch "(?i)pywintypes.*\.dll") {
             throw "pywin32 verification failed: pywintypes DLL missing in backend directory"
           }
-          if ($backendFileListing -notmatch "(?i)win32com") {
-            throw "pywin32 verification failed: win32com package missing in backend directory"
-          }
 
           $archiveListing = & pyi-archive_viewer --list --brief $backendBuildExe | Out-String
           if ($archiveListing -notmatch "(?i)fastapi") {

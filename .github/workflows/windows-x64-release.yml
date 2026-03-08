@@ -88,6 +88,19 @@ jobs:
             throw "pywin32 verification failed: pywintypes DLL missing in backend directory"
           }
 
+          $bundledBackendDir = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend"
+          if (-not (Test-Path $bundledBackendDir)) {
+            throw "Bundled backend directory missing: $bundledBackendDir"
+          }
+
+          $bundledBackendListing = Get-ChildItem $bundledBackendDir -Recurse -Force | Select-Object -ExpandProperty FullName | Out-String
+          if ($bundledBackendListing -notmatch "(?i)pythoncom.*\.dll") {
+            throw "pywin32 verification failed: pythoncom DLL missing in bundled backend directory"
+          }
+          if ($bundledBackendListing -notmatch "(?i)pywintypes.*\.dll") {
+            throw "pywin32 verification failed: pywintypes DLL missing in bundled backend directory"
+          }
+
           $candidates = @(
             (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend.exe"),
             (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend")
@@ -223,6 +236,11 @@ jobs:
           $latestYml = Join-Path $outputDir "latest.yml"
           if (-not (Test-Path $latestYml)) {
             throw "Updater metadata missing: $latestYml"
+          }
+
+          $latestYmlContent = Get-Content $latestYml -Raw
+          if ($latestYmlContent -notmatch [regex]::Escape($installer.Name)) {
+            throw "Updater metadata does not reference installer: $($installer.Name)"
           }
 
           $blockmaps = Get-ChildItem $outputDir -File -Filter *.blockmap

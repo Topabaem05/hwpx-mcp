@@ -20,6 +20,7 @@ import os
 import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
@@ -88,8 +89,6 @@ hidden_imports = [
 ]
 
 collected_packages = [
-    "mcp",
-    "fastmcp",
     "fastapi",
     "starlette",
     "uvicorn",
@@ -107,6 +106,10 @@ collected_packages = [
     "hwpx",
 ]
 
+collected_submodule_packages = [
+    "mcp.server",
+]
+
 def collect_required_package(package_name: str) -> None:
     try:
         pkg_datas, pkg_binaries, pkg_hidden = collect_all(package_name)
@@ -118,8 +121,20 @@ def collect_required_package(package_name: str) -> None:
     hidden_imports.extend(pkg_hidden)
 
 
+def collect_required_submodule_package(package_name: str) -> None:
+    try:
+        hidden_imports.extend(collect_submodules(package_name))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to collect required submodules for '{package_name}': {exc}"
+        ) from exc
+
+
 for package_name in collected_packages:
     collect_required_package(package_name)
+
+for package_name in collected_submodule_packages:
+    collect_required_submodule_package(package_name)
 
 if sys.platform == "win32":
     hidden_imports.extend([

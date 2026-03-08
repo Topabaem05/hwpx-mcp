@@ -22,6 +22,7 @@ from .hwp_controller_base import (
     NotSupportedError,
     DocumentInfo,
 )
+from hwpx_mcp.runtime_paths import get_template_index_path, get_templates_dir
 
 logger = logging.getLogger("hwp-mcp.unified_tools")
 
@@ -38,6 +39,12 @@ def _ensure_document() -> HwpControllerBase:
     if not controller.has_document:
         controller.create_document()
     return controller
+
+
+def _get_templates_paths() -> tuple[str, str]:
+    templates_dir = str(get_templates_dir())
+    index_path = str(get_template_index_path())
+    return templates_dir, index_path
 
 
 def register_unified_tools(mcp) -> None:
@@ -2787,10 +2794,7 @@ def register_unified_tools(mcp) -> None:
         try:
             import json
 
-            templates_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
-            )
-            index_path = os.path.join(templates_dir, "template_index.json")
+            templates_dir, index_path = _get_templates_paths()
 
             if not os.path.exists(index_path):
                 return {
@@ -2844,10 +2848,7 @@ def register_unified_tools(mcp) -> None:
             import json
             import re
 
-            templates_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
-            )
-            index_path = os.path.join(templates_dir, "template_index.json")
+            templates_dir, index_path = _get_templates_paths()
 
             if not os.path.exists(index_path):
                 return {
@@ -2949,10 +2950,7 @@ def register_unified_tools(mcp) -> None:
             import shutil
             import json
 
-            templates_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
-            )
-            index_path = os.path.join(templates_dir, "template_index.json")
+            templates_dir, index_path = _get_templates_paths()
 
             template_filename = None
             if os.path.exists(index_path):
@@ -3020,10 +3018,7 @@ def register_unified_tools(mcp) -> None:
         try:
             import json
 
-            templates_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
-            )
-            index_path = os.path.join(templates_dir, "template_index.json")
+            templates_dir, index_path = _get_templates_paths()
 
             if not os.path.exists(index_path):
                 return {

@@ -15,6 +15,7 @@ dependencies = [
     "fastmcp>=0.2.0",
 
     "pywin32>=305; platform_system == 'Windows'",
+    "pyhwpx; platform_system == 'Windows'",
     
     # Cross-platform HWP processing
     "pyhwp>=0.1a",
@@ -54,12 +55,14 @@ dev = [
 ]
 windows = [
     "pywin32>=305; platform_system == 'Windows'",
+    "pyhwpx; platform_system == 'Windows'",
 ]
 installer = [
     "pyinstaller>=6.0.0",
 ]
 all = [
     "pywin32>=305; platform_system == 'Windows'",
+    "pyhwpx; platform_system == 'Windows'",
     "pyinstaller>=6.0.0",
 ]
 

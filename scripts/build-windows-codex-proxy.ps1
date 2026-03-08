@@ -67,7 +67,7 @@ if ($pthFile) {
     }
     if ($lines -notcontains "..\Lib\site-packages") { $lines += "..\Lib\site-packages" }
     if ($lines -notcontains "..") { $lines += ".." }
-    Set-Content -Path $pthFile.FullName -Value $lines -Encoding UTF8
+    Set-Content -Path $pthFile.FullName -Value $lines -Encoding ASCII
 }
 
 Write-Host "--- Step 2: Downloading codex-lb wheels ---"
@@ -146,6 +146,8 @@ $bat = @'
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
+set "PYTHONHOME="
+set "PYTHONPATH="
 set "PATH=%SCRIPT_DIR%python;%PATH%"
 
 if not defined HOST set "HOST=127.0.0.1"
@@ -162,6 +164,8 @@ Set-Content -Path (Join-Path $winProxyDir "codex-proxy.bat") -Value $bat -Encodi
 
 $ps = @'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$env:PYTHONHOME = $null
+$env:PYTHONPATH = $null
 $env:PATH = "$(Join-Path $scriptDir 'python');$env:PATH"
 
 if (-not $env:HOST) { $env:HOST = "127.0.0.1" }

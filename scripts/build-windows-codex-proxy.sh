@@ -150,6 +150,8 @@ cat > "$WIN_PROXY_DIR/codex-proxy.bat" <<'BATCH_EOF'
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
+set "PYTHONHOME="
+set "PYTHONPATH="
 set "PATH=%SCRIPT_DIR%python;%PATH%"
 
 if not defined HOST set "HOST=127.0.0.1"
@@ -165,6 +167,8 @@ BATCH_EOF
 
 cat > "$WIN_PROXY_DIR/codex-proxy.ps1" <<'PS_EOF'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$env:PYTHONHOME = $null
+$env:PYTHONPATH = $null
 $env:PATH = "$(Join-Path $scriptDir 'python');$env:PATH"
 
 if (-not $env:HOST) { $env:HOST = "127.0.0.1" }

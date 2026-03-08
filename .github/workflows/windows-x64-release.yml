@@ -89,6 +89,33 @@ jobs:
           if ($archiveListing -notmatch "(?i)win32com") {
             throw "pywin32 verification failed: win32com missing in backend archive"
           }
+          if ($archiveListing -notmatch "(?i)fastapi") {
+            throw "backend verification failed: fastapi missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)starlette") {
+            throw "backend verification failed: starlette missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)uvicorn") {
+            throw "backend verification failed: uvicorn missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)httpx") {
+            throw "backend verification failed: httpx missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)lxml") {
+            throw "backend verification failed: lxml missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)xmlschema") {
+            throw "backend verification failed: xmlschema missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)matplotlib") {
+            throw "backend verification failed: matplotlib missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)hwpx") {
+            throw "backend verification failed: hwpx missing in backend archive"
+          }
+          if ($archiveListing -notmatch "(?i)pyhwpx") {
+            throw "backend verification failed: pyhwpx missing in backend archive"
+          }
 
           $candidates = @(
             (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend.exe"),
@@ -120,6 +147,47 @@ jobs:
           $bundledProxyPython = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/codex-proxy-win/python/python.exe"
           if (-not (Test-Path $bundledProxyPython)) {
             throw "Bundled codex proxy Python runtime missing: $bundledProxyPython"
+          }
+
+      - name: Smoke test bundled backend executable
+        shell: pwsh
+        run: |
+          $backendExe = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend.exe"
+          if (-not (Test-Path $backendExe)) {
+            throw "Bundled backend executable missing: $backendExe"
+          }
+
+          $env:MCP_TRANSPORT = "streamable-http"
+          $env:MCP_HOST = "127.0.0.1"
+          $env:MCP_PORT = "18000"
+          $env:MCP_PATH = "/mcp"
+          $process = Start-Process -FilePath $backendExe -WindowStyle Hidden -PassThru
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 45; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18000/agent/health" -TimeoutSec 2
+                if ($health.status -eq "ok") {
+                  $healthy = $true
+                  break
+                }
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+
+            if (-not $healthy) {
+              throw "Bundled backend executable did not become healthy on http://127.0.0.1:18000/agent/health"
+            }
+          }
+          finally {
+            Remove-Item Env:MCP_TRANSPORT -ErrorAction SilentlyContinue
+            Remove-Item Env:MCP_HOST -ErrorAction SilentlyContinue
+            Remove-Item Env:MCP_PORT -ErrorAction SilentlyContinue
+            Remove-Item Env:MCP_PATH -ErrorAction SilentlyContinue
+            if ($process -and -not $process.HasExited) {
+              taskkill /PID $process.Id /F /T | Out-Null
+            }
           }
 
       - name: Smoke test bundled codex proxy launcher

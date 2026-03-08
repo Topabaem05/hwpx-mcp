@@ -72,7 +72,7 @@ pth = pathlib.Path(sys.argv[1])
 text = pth.read_text(encoding="utf-8")
 text = text.replace("#import site", "import site")
 lines = text.splitlines()
-for extra in ("../Lib/site-packages", ".."):
+for extra in (r"..\\Lib\\site-packages", ".."):
     if extra not in lines:
         lines.append(extra)
 pth.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -150,8 +150,6 @@ cat > "$WIN_PROXY_DIR/codex-proxy.bat" <<'BATCH_EOF'
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-set "PYTHONHOME=%SCRIPT_DIR%python"
-set "PYTHONPATH=%SCRIPT_DIR%;%SCRIPT_DIR%Lib\site-packages"
 set "PATH=%SCRIPT_DIR%python;%PATH%"
 
 if not defined HOST set "HOST=127.0.0.1"
@@ -167,8 +165,6 @@ BATCH_EOF
 
 cat > "$WIN_PROXY_DIR/codex-proxy.ps1" <<'PS_EOF'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$env:PYTHONHOME = Join-Path $scriptDir "python"
-$env:PYTHONPATH = "$scriptDir;$(Join-Path $scriptDir 'Lib\site-packages')"
 $env:PATH = "$(Join-Path $scriptDir 'python');$env:PATH"
 
 if (-not $env:HOST) { $env:HOST = "127.0.0.1" }

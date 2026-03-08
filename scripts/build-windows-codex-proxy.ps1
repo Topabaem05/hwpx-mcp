@@ -65,7 +65,7 @@ if ($pthFile) {
     $lines = $lines | ForEach-Object {
         if ($_ -eq "#import site") { "import site" } else { $_ }
     }
-    if ($lines -notcontains "../Lib/site-packages") { $lines += "../Lib/site-packages" }
+    if ($lines -notcontains "..\Lib\site-packages") { $lines += "..\Lib\site-packages" }
     if ($lines -notcontains "..") { $lines += ".." }
     Set-Content -Path $pthFile.FullName -Value $lines -Encoding UTF8
 }
@@ -146,8 +146,6 @@ $bat = @'
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-set "PYTHONHOME=%SCRIPT_DIR%python"
-set "PYTHONPATH=%SCRIPT_DIR%;%SCRIPT_DIR%Lib\site-packages"
 set "PATH=%SCRIPT_DIR%python;%PATH%"
 
 if not defined HOST set "HOST=127.0.0.1"
@@ -164,8 +162,6 @@ Set-Content -Path (Join-Path $winProxyDir "codex-proxy.bat") -Value $bat -Encodi
 
 $ps = @'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$env:PYTHONHOME = Join-Path $scriptDir "python"
-$env:PYTHONPATH = "$scriptDir;$(Join-Path $scriptDir 'Lib\site-packages')"
 $env:PATH = "$(Join-Path $scriptDir 'python');$env:PATH"
 
 if (-not $env:HOST) { $env:HOST = "127.0.0.1" }

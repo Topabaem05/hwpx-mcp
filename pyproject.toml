@@ -4,7 +4,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "hwp-mcp-extended"
-version = "4.0.0"
+version = "4.0.1"
 description = "HWP MCP Server with Chart, Equation, Document, and Template support"
 authors = [
     {name = "HWP MCP Team"}
@@ -60,10 +60,22 @@ windows = [
 installer = [
     "pyinstaller>=6.0.0",
 ]
+local_llm = [
+    "torch>=2.5.0",
+    "transformers>=4.49.0",
+    "accelerate>=1.2.0",
+    "safetensors>=0.5.0",
+    "huggingface_hub>=0.28.0",
+]
 all = [
     "pywin32>=305; platform_system == 'Windows'",
     "pyhwpx; platform_system == 'Windows'",
     "pyinstaller>=6.0.0",
+    "torch>=2.5.0",
+    "transformers>=4.49.0",
+    "accelerate>=1.2.0",
+    "safetensors>=0.5.0",
+    "huggingface_hub>=0.28.0",
 ]
 
 [project.scripts]

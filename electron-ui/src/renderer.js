@@ -4,7 +4,6 @@ const defaultConfig = {
   backendBaseUrl:
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
   openaiApiKey: "",
-  gptOauthToken: "",
 };
 
 const loadConfig = () => {
@@ -59,13 +58,6 @@ const closeSettingsBtn = $("closeSettingsBtn");
 
 const backendBaseUrlInput = $("backendBaseUrlInput");
 const openaiApiKeyInput = $("openaiApiKeyInput");
-const gptOauthTokenInput = $("gptOauthTokenInput");
-const openAiOauthLoginBtn = $("openAiOauthLoginBtn");
-const oauthCodePanel = $("oauthCodePanel");
-const oauthUserCode = $("oauthUserCode");
-const oauthManualHint = $("oauthManualHint");
-const oauthCopyCodeBtn = $("oauthCopyCodeBtn");
-const oauthOpenLinkBtn = $("oauthOpenLinkBtn");
 const saveSettingsBtn = $("saveSettings");
 const resetSettingsBtn = $("resetSettings");
 const checkGatewayBtn = $("checkGateway");
@@ -77,7 +69,6 @@ const suggestionButtons = document.querySelectorAll(".suggestion-prompt");
 let sessions = [];
 let activeSessionId = "";
 let currentAbort = null;
-let oauthVerificationUrl = "";
 
 const status = (msg) => {
   if (statusText) {
@@ -85,33 +76,23 @@ const status = (msg) => {
   }
 };
 
-const hideOauthCodePanel = () => {
-  oauthCodePanel?.classList.add("hidden");
-};
-
-const showOauthCodePanel = ({ userCode, verificationUrl, manualCodeRequired }) => {
-  if (!oauthCodePanel) {
-    return;
-  }
-
-  oauthVerificationUrl = (verificationUrl || "").trim();
-  oauthCodePanel.classList.remove("hidden");
-
-  if (oauthUserCode) {
-    oauthUserCode.textContent = userCode || "-";
-  }
-
-  if (oauthManualHint) {
-    oauthManualHint.textContent = manualCodeRequired
-      ? "브라우저에서 위 코드를 입력해 로그인하세요."
-      : "코드 입력 없이 자동 인증 링크로 로그인 진행 중입니다.";
-  }
-};
-
 const normalizeBaseUrl = (value) => {
   const trimmed = (value || "").trim();
   const base = trimmed || defaultConfig.backendBaseUrl;
   return base.replace(/\/+$/, "");
+};
+
+const backendBaseFromMcpUrl = (value) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.replace(/\/mcp\/?$/i, "").replace(/\/+$/, "");
 };
 
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
@@ -304,7 +285,6 @@ const renderMessages = () => {
 const renderConfig = () => {
   if (backendBaseUrlInput) backendBaseUrlInput.value = config.backendBaseUrl;
   if (openaiApiKeyInput) openaiApiKeyInput.value = config.openaiApiKey;
-  if (gptOauthTokenInput) gptOauthTokenInput.value = config.gptOauthToken;
 };
 
 const renderAll = () => {
@@ -323,10 +303,39 @@ const restartBackendWithCurrentCredentials = async () => {
   if (!window.hwpxUi?.restartBackend) {
     return null;
   }
-  return window.hwpxUi.restartBackend({
+
+  const result = await window.hwpxUi.restartBackend({
     openaiApiKey: config.openaiApiKey,
-    gptOauthToken: config.gptOauthToken,
   });
+
+  const backendBase = backendBaseFromMcpUrl(result?.url);
+  if (backendBase && backendBase !== normalizeBaseUrl(config.backendBaseUrl)) {
+    config.backendBaseUrl = backendBase;
+    persistConfig();
+    renderConfig();
+  }
+
+  return result;
+};
+
+const syncBaseUrlWithBackendStatus = async () => {
+  if (!window.hwpxUi?.getBackendStatus) {
+    return "";
+  }
+
+  const backendStatus = await window.hwpxUi.getBackendStatus();
+  const backendBase = backendBaseFromMcpUrl(backendStatus?.url);
+  if (!backendBase) {
+    return "";
+  }
+
+  if (backendBase !== normalizeBaseUrl(config.backendBaseUrl)) {
+    config.backendBaseUrl = backendBase;
+    persistConfig();
+    renderConfig();
+  }
+
+  return backendBase;
 };
 
 const checkAgentEndpoint = async () => {
@@ -355,7 +364,7 @@ const authStatusLabel = (auth) => {
   return `auth:missing (${auth.detail || "token not set"})`;
 };
 
-const hasStoredAuth = () => Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
+const hasStoredAuth = () => Boolean((config.openaiApiKey || "").trim());
 
 const isAuthMissingErrorMessage = (message) => {
   if (typeof message !== "string") {
@@ -363,8 +372,6 @@ const isAuthMissingErrorMessage = (message) => {
   }
 
   return (
-    message.includes("OPENAI_OAUTH_TOKEN") ||
-    message.includes("CODEX_OAUTH_TOKEN") ||
     message.includes("OPENAI_API_KEY")
   );
 };
@@ -411,8 +418,6 @@ const syncAgentAuth = async () => {
         },
         body: JSON.stringify({
           openai_api_key: config.openaiApiKey || "",
-          openai_oauth_token: config.gptOauthToken || "",
-          codex_oauth_token: config.gptOauthToken || "",
         }),
       });
 
@@ -496,7 +501,7 @@ const handleUserMessage = async (text) => {
         (raw.includes("insufficient_quota") || raw.includes("quota_hint"));
 
       const quotaHelp = hasQuotaSignal
-        ? "\n\nTip: OAuth quota is exhausted. Set 'OpenAI API Key (Fallback)' in settings and restart backend."
+        ? "\n\nTip: Check your OpenAI API key billing, then restart the backend."
         : "";
 
       botMsg.text = controller.signal.aborted ? "Cancelled." : `Error: ${raw}${quotaHelp}`;
@@ -514,8 +519,10 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
 
   if (window.hwpxUi?.getBackendStatus) {
     const backendStatus = await window.hwpxUi.getBackendStatus();
+    const backendBase = await syncBaseUrlWithBackendStatus();
     if (backendStatus.running) {
-      status(`Backend process running (pid ${backendStatus.pid}). Connecting...`);
+      const baseHint = backendBase ? ` ${backendBase}` : "";
+      status(`Backend process running (pid ${backendStatus.pid}). Connecting...${baseHint}`);
     } else {
       status("Backend process not running. Trying to connect anyway...");
     }
@@ -611,7 +618,6 @@ settingsOverlay?.addEventListener("click", closeSettings);
 saveSettingsBtn?.addEventListener("click", async () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
   config.openaiApiKey = (openaiApiKeyInput?.value || "").trim();
-  config.gptOauthToken = (gptOauthTokenInput?.value || "").trim();
   persistConfig();
   status("Settings saved. Restarting backend...");
   let restartText = "";
@@ -638,157 +644,7 @@ resetSettingsBtn?.addEventListener("click", () => {
   localStorage.removeItem(CONFIG_KEY);
   config = { ...defaultConfig };
   renderConfig();
-  hideOauthCodePanel();
   status("Settings reset");
-});
-
-oauthCopyCodeBtn?.addEventListener("click", async () => {
-  const code = (oauthUserCode?.textContent || "").trim();
-  if (!code || code === "-") {
-    status("복사할 인증 코드가 없습니다.");
-    return;
-  }
-
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(code);
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = code;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-    status("인증 코드를 클립보드에 복사했습니다.");
-  } catch (error) {
-    status(`코드 복사 실패: ${error?.message || String(error)}`);
-  }
-});
-
-oauthOpenLinkBtn?.addEventListener("click", async () => {
-  const url = oauthVerificationUrl;
-  if (!url) {
-    status("열 수 있는 인증 링크가 없습니다.");
-    return;
-  }
-
-  try {
-    if (window.hwpxUi?.openExternal) {
-      await window.hwpxUi.openExternal(url);
-      status("브라우저에서 인증 페이지를 열었습니다.");
-    }
-  } catch (error) {
-    status(`인증 페이지 열기 실패: ${error?.message || String(error)}`);
-  }
-});
-
-if (window.hwpxUi?.onOpenAiOauthProgress) {
-  window.hwpxUi.onOpenAiOauthProgress((payload) => {
-    if (!payload || typeof payload !== "object") {
-      return;
-    }
-
-    if (payload.stage === "starting") {
-      hideOauthCodePanel();
-      status("OpenAI OAuth 준비 중...");
-      return;
-    }
-
-    if (payload.stage === "code_issued") {
-      showOauthCodePanel({
-        userCode: payload.userCode,
-        verificationUrl: payload.verificationUrlComplete || payload.verificationUrl || payload.openUrl,
-        manualCodeRequired: Boolean(payload.manualCodeRequired),
-      });
-      status(
-        payload.manualCodeRequired
-          ? `OpenAI OAuth 코드 발급됨: ${payload.userCode || "-"}`
-          : "OpenAI OAuth 자동 인증 링크로 로그인 진행 중..."
-      );
-      return;
-    }
-
-    if (payload.stage === "browser_opened") {
-      status("브라우저에서 OpenAI 로그인 페이지를 열었습니다.");
-      return;
-    }
-
-    if (payload.stage === "token_ready") {
-      status("OpenAI OAuth 토큰 확인됨. 최종 연결 중...");
-      return;
-    }
-
-    if (payload.stage === "failed") {
-      status(`OpenAI OAuth 로그인 실패: ${payload.error || "unknown"}`);
-      return;
-    }
-
-    if (payload.stage === "completed") {
-      status("OpenAI OAuth 인증 완료.");
-    }
-  });
-}
-
-openAiOauthLoginBtn?.addEventListener("click", async () => {
-  status("Starting OpenAI OAuth login...");
-  openAiOauthLoginBtn.disabled = true;
-  try {
-    if (!window.hwpxUi?.openAiOauthLogin) {
-      throw new Error("OpenAI OAuth login is unavailable in this build");
-    }
-
-    const loginResult = await window.hwpxUi.openAiOauthLogin();
-    if (!loginResult?.success) {
-      throw new Error(loginResult?.error || "OpenAI OAuth login failed");
-    }
-
-    config.gptOauthToken =
-      typeof loginResult.accessToken === "string" ? loginResult.accessToken : "";
-    persistConfig();
-    renderConfig();
-
-    showOauthCodePanel({
-      userCode: loginResult.userCode,
-      verificationUrl:
-        loginResult.verificationUrlComplete || loginResult.verificationUrl || loginResult.openUrl,
-      manualCodeRequired: Boolean(loginResult.manualCodeRequired),
-    });
-
-    status(
-      loginResult.manualCodeRequired
-        ? `OpenAI OAuth verified (code ${loginResult.userCode || "issued"}). Restarting backend...`
-        : "OpenAI OAuth verified. Restarting backend..."
-    );
-    let restartInfo = null;
-    let restartError = null;
-
-    try {
-      restartInfo = await restartBackendWithCurrentCredentials();
-    } catch (error) {
-      restartError = error;
-    }
-
-    await waitForBackend(10, 1000);
-
-    const authSync = await syncAgentAuth();
-    const mode = authSync?.auth?.mode || "unknown";
-    if (restartError) {
-      status(
-        `OAuth token synced (${mode}). Backend restart failed: ${restartError?.message || String(
-          restartError
-        )}`
-      );
-    } else {
-      status(`OpenAI OAuth connected (pid ${restartInfo?.pid || "?"}, ${mode}).`);
-    }
-  } catch (error) {
-    status(`OpenAI OAuth login failed: ${error?.message || String(error)}`);
-  } finally {
-    openAiOauthLoginBtn.disabled = false;
-  }
 });
 
 checkGatewayBtn?.addEventListener("click", async () => {
@@ -886,7 +742,7 @@ updateSendBtn();
 
 (async () => {
   await new Promise((resolve) => setTimeout(resolve, 2000));
-  if (config.openaiApiKey || config.gptOauthToken) {
+  if (config.openaiApiKey) {
     try {
       await restartBackendWithCurrentCredentials();
     } catch (error) {
@@ -895,7 +751,7 @@ updateSendBtn();
   }
   const ready = await waitForBackend(15, 2000);
 
-  if (ready && (config.openaiApiKey || config.gptOauthToken)) {
+  if (ready && config.openaiApiKey) {
     try {
       await syncAgentAuth();
     } catch (error) {

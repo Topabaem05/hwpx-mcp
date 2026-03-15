@@ -174,7 +174,7 @@
               <i data-lucide="bot" class="w-10 h-10"></i>
             </div>
             <h1 class="text-3xl font-bold text-white mb-2">무엇을 도와드릴까요?</h1>
-            <p class="text-zinc-400 text-sm mb-8">OpenAI OAuth 기반으로 문서 작업을 시작해보세요.</p>
+            <p class="text-zinc-400 text-sm mb-8">문서 작업을 시작해보세요.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
               <button class="suggestion-prompt text-left p-4 rounded-2xl border border-zinc-800 bg-zinc-850/50 hover:bg-zinc-800 transition-colors group" data-prompt="전자상거래 쇼핑몰 초기 기획서를 작성해줘">
@@ -244,31 +244,6 @@
           <div class="space-y-2">
             <label class="text-xs text-zinc-400" for="openaiApiKeyInput">OpenAI API Key (Fallback)</label>
             <input id="openaiApiKeyInput" type="password" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="sk-..." />
-          </div>
-
-          <div class="space-y-2">
-            <label class="text-xs text-zinc-400" for="gptOauthTokenInput">GPT OAuth Token</label>
-            <input id="gptOauthTokenInput" type="password" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="OAuth token" />
-          </div>
-
-          <button id="openAiOauthLoginBtn" class="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 hover:bg-zinc-700 transition-colors">
-            OpenAI OAuth 로그인
-          </button>
-
-          <div id="oauthCodePanel" class="hidden rounded-xl border border-zinc-700 bg-zinc-850 px-3 py-3 space-y-2">
-            <p class="text-xs text-zinc-400">인증 코드</p>
-            <div id="oauthUserCode" class="text-base font-semibold tracking-[0.2em] text-zinc-100">-</div>
-            <p id="oauthManualHint" class="text-xs text-zinc-400">
-              브라우저에서 위 코드를 입력해 로그인하세요.
-            </p>
-            <div class="grid grid-cols-2 gap-2">
-              <button id="oauthCopyCodeBtn" class="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-zinc-100 hover:bg-zinc-700 transition-colors">
-                코드 복사
-              </button>
-              <button id="oauthOpenLinkBtn" class="rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1.5 text-xs text-zinc-100 hover:bg-zinc-700 transition-colors">
-                인증 페이지 열기
-              </button>
-            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-2">

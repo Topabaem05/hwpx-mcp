@@ -6,7 +6,7 @@ const PROVIDER_OPTIONS = {
     defaultModel: "gpt-5",
   },
   openrouter: {
-    label: "OpenRouter",
+    label: "OpenRouter / Local Qwen",
     defaultModel: "openai/gpt-oss-120b",
   },
   openai: {
@@ -135,10 +135,12 @@ const closeSettingsBtn = $("closeSettingsBtn");
 const backendBaseUrlInput = $("backendBaseUrlInput");
 const providerSelect = $("providerSelect");
 const modelInput = $("modelInput");
+const modelModeHint = $("modelModeHint");
 const codexProxySection = $("codexProxySection");
 const codexProxyUrlInput = $("codexProxyUrlInput");
 const codexProxyAccessTokenInput = $("codexProxyAccessTokenInput");
 const openrouterApiKeyInput = $("openrouterApiKeyInput");
+const localModelStatusBadge = $("localModelStatusBadge");
 const openrouterKeyRow = $("openrouterKeyRow");
 const openaiAuthSection = $("openaiAuthSection");
 const openaiApiKeyInput = $("openaiApiKeyInput");
@@ -162,6 +164,7 @@ let sessions = [];
 let activeSessionId = "";
 let currentAbort = null;
 let oauthVerificationUrl = "";
+let latestAgentHealth = null;
 
 const status = (msg) => {
   if (statusText) {
@@ -186,9 +189,47 @@ const visibleAuthModeLabel = () => {
     return "Codex Proxy Access Token";
   }
   if (currentProvider() === "openrouter") {
-    return "OpenRouter API Key";
+    return "OpenRouter API Key or local Qwen3.5-4B";
   }
   return "OpenAI OAuth / API Key";
+};
+
+const openRouterKeyPresent = () => Boolean((config.openrouterApiKey || "").trim());
+
+const describeLocalModelBadge = (health) => {
+  const localModel = localModelStateFromHealth(health);
+  if (currentProvider() !== "openrouter") {
+    return {
+      text: "OpenRouter provider를 선택하면 로컬 Qwen fallback 상태가 여기에 표시됩니다.",
+      className: "rounded-xl border border-zinc-700 bg-zinc-850 px-3 py-2 text-[11px] text-zinc-400",
+    };
+  }
+
+  if (openRouterKeyPresent()) {
+    return {
+      text: `OpenRouter API Key configured - remote model ${currentModel()} will be used.`,
+      className: "rounded-xl border border-sky-400/20 bg-sky-500/8 px-3 py-2 text-[11px] text-sky-100",
+    };
+  }
+
+  if (localModel?.ready) {
+    return {
+      text: `OpenRouter key empty - local ${localModel.model_id || "Qwen/Qwen3.5-4B"} is ready.`,
+      className: "rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100",
+    };
+  }
+
+  if (localModel?.downloading) {
+    return {
+      text: `OpenRouter key empty - downloading local ${localModel.model_id || "Qwen/Qwen3.5-4B"} now.`,
+      className: "rounded-xl border border-amber-400/20 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-100",
+    };
+  }
+
+  return {
+    text: "OpenRouter key empty - local Qwen/Qwen3.5-4B will be downloaded and used automatically.",
+    className: "rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100",
+  };
 };
 
 const runtimeConfigFromHealth = (health) => {
@@ -207,12 +248,25 @@ const updateProviderUi = () => {
   const provider = currentProvider();
   const isCodexProxy = provider === "codex-proxy";
   const isOpenRouter = provider === "openrouter";
+  const usesLocalFallback = isOpenRouter && !openRouterKeyPresent();
 
   codexProxySection?.classList.toggle("hidden", !isCodexProxy);
   openrouterKeyRow?.classList.toggle("hidden", !isOpenRouter);
   openaiAuthSection?.classList.toggle("hidden", isCodexProxy || isOpenRouter);
   if (modelInput) {
-    modelInput.placeholder = defaultModelForProvider(provider);
+    modelInput.placeholder = usesLocalFallback
+      ? `${defaultModelForProvider(provider)} (saved for remote use)`
+      : defaultModelForProvider(provider);
+  }
+  if (modelModeHint) {
+    modelModeHint.textContent = usesLocalFallback
+      ? "현재는 로컬 Qwen/Qwen3.5-4B로 실행됩니다. 여기 입력한 모델 값은 나중에 OpenRouter API Key를 넣었을 때 사용됩니다."
+      : "OpenRouter API Key가 있으면 이 모델을 사용하고, 비어 있으면 로컬 Qwen3.5-4B로 실행합니다.";
+  }
+  if (localModelStatusBadge) {
+    const badge = describeLocalModelBadge(latestAgentHealth);
+    localModelStatusBadge.textContent = badge.text;
+    localModelStatusBadge.className = badge.className;
   }
 
   if (chatTitle) {
@@ -258,6 +312,9 @@ const describeAgentHealth = (health, prefix = "Agent connected") => {
 
   if (auth.configured === true) {
     const mode = auth.mode || "configured";
+    if (mode === "local-transformers") {
+      return `${base}, local fallback Qwen/Qwen3.5-4B active`;
+    }
     const source = auth.source ? ` via ${auth.source}` : "";
     return `${base}, auth ${mode}${source}`;
   }
@@ -348,6 +405,9 @@ const authStatusLabel = (auth) => {
   }
 
   if (auth.configured) {
+    if (auth.mode === "local-transformers") {
+      return "auth:local-qwen3.5-4b";
+    }
     return `auth:${auth.mode || "configured"}`;
   }
 
@@ -467,7 +527,78 @@ const shouldRetryWithAuthSyncForError = (message) => {
   );
 };
 
+const localModelStateFromHealth = (health) => {
+  if (health?.local_model && typeof health.local_model === "object") {
+    return health.local_model;
+  }
+  if (health?.auth?.local_fallback && typeof health.auth.local_fallback === "object") {
+    return health.auth.local_fallback;
+  }
+  return null;
+};
+
+const shouldDownloadLocalFallback = (health) => {
+  const runtime = runtimeConfigFromHealth(health);
+  const localModel = localModelStateFromHealth(health);
+  if (!localModel || typeof localModel !== "object") {
+    return false;
+  }
+  if (hasStoredAuth(runtime.provider)) {
+    return false;
+  }
+  if (health?.auth?.configured) {
+    return false;
+  }
+  if (localModel.ready || localModel.downloading) {
+    return false;
+  }
+  return localModel.dependency_installed !== false;
+};
+
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
+
+const downloadLocalModel = async (force = false) => {
+  await syncBaseUrlWithBackendStatus();
+  const response = await fetch(endpointUrl("/agent/local-model/download"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({ force }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail;
+    const reason =
+      payload?.error ||
+      payload?.message ||
+      (typeof detail === "string" ? detail : Array.isArray(detail) ? JSON.stringify(detail) : "") ||
+      `HTTP ${response.status}`;
+    throw new Error(String(reason));
+  }
+  return payload;
+};
+
+const ensureLocalFallbackReady = async (health) => {
+  if (!shouldDownloadLocalFallback(health)) {
+    return health;
+  }
+
+  const localModel = localModelStateFromHealth(health);
+  const modelId = typeof localModel?.model_id === "string" ? localModel.model_id : "local model";
+  status(`No API credentials found. Downloading ${modelId} for local fallback...`);
+  try {
+    await downloadLocalModel();
+  } catch (error) {
+    status(`Local fallback setup failed: ${error?.message || String(error)}`);
+    return health;
+  }
+  const nextHealth = await checkAgentEndpoint();
+  status(describeAgentHealth(nextHealth, "Local model ready"));
+  return nextHealth;
+};
 
 const closeSidebar = () => {
   sidebar?.classList.add("-translate-x-full");
@@ -566,11 +697,18 @@ const makeTitle = (text) => {
   return cleaned.length > 24 ? `${cleaned.slice(0, 21)}...` : cleaned;
 };
 
-const addMsg = (role, text, streaming = false) => {
+const addMsg = (role, text, streaming = false, options = {}) => {
   const session = activeSession();
   if (!session) return null;
 
-  const message = { role, text, ts: Date.now(), streaming };
+  const message = {
+    role,
+    text,
+    ts: Date.now(),
+    streaming,
+    variant: typeof options.variant === "string" ? options.variant : "",
+    title: typeof options.title === "string" ? options.title : "",
+  };
   session.messages.push(message);
   renderMessages();
   return message;
@@ -582,6 +720,71 @@ const escapeHtml = (text) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br>");
+
+const formatAgentPlan = (plan) => {
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)) {
+    return "";
+  }
+
+  const sections = ["Plan"];
+  if (typeof plan.summary === "string" && plan.summary.trim()) {
+    sections.push(plan.summary.trim());
+  }
+
+  if (Array.isArray(plan.steps) && plan.steps.length) {
+    const lines = plan.steps
+      .map((step, index) => {
+        if (!step || typeof step !== "object") {
+          return "";
+        }
+
+        const title = typeof step.title === "string" ? step.title.trim() : "";
+        const objective = typeof step.objective === "string" ? step.objective.trim() : "";
+        const toolHint = typeof step.tool_hint === "string" ? step.tool_hint.trim() : "";
+        const detail = [objective, toolHint ? `tool: ${toolHint}` : ""].filter(Boolean).join(" | ");
+        const prefix = `${index + 1}. ${title || `Step ${index + 1}`}`;
+        return detail ? `${prefix} - ${detail}` : prefix;
+      })
+      .filter(Boolean);
+
+    if (lines.length) {
+      sections.push(lines.join("\n"));
+    }
+  }
+
+  return sections.join("\n\n").trim();
+};
+
+const messageVariantMeta = (message) => {
+  if (message.variant === "plan") {
+    return {
+      badge: message.title || "Plan",
+      wrapperClass:
+        "rounded-2xl border border-amber-400/25 bg-amber-500/8 px-4 py-3 shadow-[0_0_0_1px_rgba(251,191,36,0.04)]",
+      badgeClass:
+        "inline-flex items-center rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200",
+      textClass: "text-amber-50",
+    };
+  }
+
+  if (message.variant === "execution") {
+    return {
+      badge: message.title || "Execution",
+      wrapperClass:
+        "rounded-2xl border border-emerald-400/20 bg-emerald-500/8 px-4 py-3 shadow-[0_0_0_1px_rgba(52,211,153,0.04)]",
+      badgeClass:
+        "inline-flex items-center rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200",
+      textClass: "text-zinc-100",
+    };
+  }
+
+  return {
+    badge: "",
+    wrapperClass: "",
+    badgeClass: "",
+    textClass: "text-zinc-200",
+  };
+};
 
 const renderSessionList = () => {
   if (!sessionList) {
@@ -628,12 +831,21 @@ const renderMessages = () => {
       message.role === "user"
         ? '<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">U</div>'
         : '<div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center border border-zinc-700"><i data-lucide="bot" class="w-5 h-5"></i></div>';
+    const variantMeta = messageVariantMeta(message);
 
     const body = message.streaming
       ? '<div class="flex items-center gap-1 h-6"><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div></div>'
-      : `<div class="prose prose-invert max-w-none text-zinc-200 text-[15px] leading-relaxed break-words">${escapeHtml(
-          message.text
-        )}</div>`;
+      : `
+        <div class="${variantMeta.wrapperClass || ""}">
+          ${
+            variantMeta.badge
+              ? `<div class="mb-3 ${variantMeta.badgeClass}">${escapeHtml(variantMeta.badge)}</div>`
+              : ""
+          }
+          <div class="prose prose-invert max-w-none ${variantMeta.textClass} text-[15px] leading-relaxed break-words">${escapeHtml(
+            message.text
+          )}</div>
+        </div>`;
 
     const html = `
       <div class="flex gap-4 px-2 py-4 group">
@@ -728,7 +940,10 @@ const checkAgentEndpoint = async () => {
     throw new Error(`Agent ${response.status}: ${body.slice(0, 160)}`);
   }
 
-  return response.json();
+  const payload = await response.json();
+  latestAgentHealth = payload;
+  updateProviderUi();
+  return payload;
 };
 
 const callAgentChat = async (message, signal) => {
@@ -885,8 +1100,10 @@ const runToolOnlyAgent = async (userText, botMsg, signal) => {
   }
 
   let reply = "";
+  let planText = "";
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-    reply = payload.reply || payload.message || JSON.stringify(payload, null, 2);
+    planText = formatAgentPlan(payload.plan);
+    reply = payload.reply || payload.message || (planText ? "" : JSON.stringify(payload, null, 2));
     if (payload.case && payload.subagent) {
       status(`Case: ${payload.case} | Subagent: ${payload.subagent}`);
     }
@@ -896,8 +1113,14 @@ const runToolOnlyAgent = async (userText, botMsg, signal) => {
     reply = JSON.stringify(payload, null, 2);
   }
 
-  botMsg.text = reply;
+  botMsg.text = planText || reply;
   botMsg.streaming = false;
+  botMsg.variant = planText ? "plan" : "";
+  botMsg.title = planText ? "Plan" : "";
+
+  if (planText && reply) {
+    addMsg("bot", reply, false, { variant: "execution", title: "Execution" });
+  }
 };
 
 const handleUserMessage = async (text) => {
@@ -963,6 +1186,8 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
         } catch {
         }
       }
+
+      health = await ensureLocalFallbackReady(health);
 
       status(
         `Agent connected (${runtimeConfigFromHealth(health).provider} / ${runtimeConfigFromHealth(health).model}, ${authStatusLabel(
@@ -1069,9 +1294,11 @@ saveSettingsBtn?.addEventListener("click", async () => {
 
   try {
     await syncAgentConfig();
-    const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
-    const mode = authSync?.auth?.mode || "unknown";
-    status(`${restartText} Auth synced (${mode}).`);
+    if (hasStoredAuth()) {
+      await syncAgentAuth();
+    }
+    const health = await checkAgentEndpoint();
+    status(`${restartText} ${describeAgentHealth(health, "Agent ready")}`);
   } catch (error) {
     status(`${restartText} Auth sync failed: ${error?.message || String(error)}`);
   }
@@ -1095,6 +1322,11 @@ providerSelect?.addEventListener("change", () => {
     config.model = normalizeModelValue(nextProvider, modelInput.value);
   }
   renderConfig();
+});
+
+openrouterApiKeyInput?.addEventListener("input", () => {
+  config.openrouterApiKey = (openrouterApiKeyInput.value || "").trim();
+  updateProviderUi();
 });
 
 oauthCopyCodeBtn?.addEventListener("click", async () => {

@@ -11,9 +11,11 @@ from hwpx_mcp.agentic.gateway import BackendServer
 from hwpx_mcp.agentic.http_api import DEFAULT_MODEL
 from hwpx_mcp.agentic.http_api import DEFAULT_PROVIDER
 from hwpx_mcp.agentic.http_api import build_agent_http_router
+from hwpx_mcp.agentic.local_model import LocalModelSnapshot
 from hwpx_mcp.agentic.openrouter_agent import AgentAuthError
 from hwpx_mcp.agentic.openrouter_agent import JsonValue
 from hwpx_mcp.agentic.openrouter_agent import LlmRequestError
+from hwpx_mcp.agentic.openrouter_agent import LOCAL_DEFAULT_MODEL
 from hwpx_mcp.agentic.openrouter_agent import OpenRouterClient
 from hwpx_mcp.agentic.openrouter_agent import OpenRouterToolAgent
 
@@ -57,6 +59,110 @@ class DummyBackend:
         return _Manager(tool_map)
 
 
+class FakeLocalModelManager:
+    def __init__(
+        self,
+        *,
+        ready: bool,
+        downloaded: bool | None = None,
+        dependency_installed: bool = True,
+    ):
+        self.ready = ready
+        self.downloaded = ready if downloaded is None else downloaded
+        self.dependency_installed = dependency_installed
+        self.model_id = LOCAL_DEFAULT_MODEL
+        self.download_calls: list[bool] = []
+        self.chat_step = 0
+
+    def status(self) -> LocalModelSnapshot:
+        return LocalModelSnapshot(
+            configured=self.ready,
+            ready=self.ready,
+            downloaded=self.downloaded,
+            downloading=False,
+            model_id=self.model_id,
+            provider="local",
+            model_home="/tmp/local-models",
+            download_path="/tmp/local-models/Qwen__Qwen3.5-4B",
+            detail="local_model_ready" if self.ready else "local_model_not_downloaded",
+            dependency_installed=self.dependency_installed,
+        )
+
+    async def ensure_downloaded(self, *, force: bool = False) -> dict[str, object]:
+        self.download_calls.append(force)
+        self.ready = True
+        self.downloaded = True
+        return self.status().to_payload()
+
+    async def chat_completions(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, object]],
+        tools: list[dict[str, object]] | None,
+        tool_choice: str | None,
+    ) -> dict[str, object]:
+        _ = (model, messages, tools, tool_choice)
+        self.chat_step += 1
+        if self.chat_step == 1:
+            return {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": json.dumps(
+                                {
+                                    "summary": "로컬 계획",
+                                    "steps": [
+                                        {
+                                            "id": "step-1",
+                                            "title": "상태 확인",
+                                            "objective": "로컬 모델로 상태를 확인합니다.",
+                                            "tool_hint": "hwp_ping",
+                                        }
+                                    ],
+                                },
+                                ensure_ascii=False,
+                            ),
+                        },
+                    }
+                ]
+            }
+        if self.chat_step == 2:
+            return {
+                "choices": [
+                    {
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "local_call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "hwp_ping",
+                                        "arguments": "{}",
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ]
+            }
+        return {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "local pong",
+                    },
+                }
+            ]
+        }
+
+
 def _create_client():
     calls: list[tuple[str, dict[str, object]]] = []
 
@@ -79,6 +185,32 @@ def _create_client():
             self._step += 1
 
             if self._step == 1:
+                return {
+                    "choices": [
+                        {
+                            "finish_reason": "stop",
+                            "message": {
+                                "role": "assistant",
+                                "content": json.dumps(
+                                    {
+                                        "summary": "상태 확인 계획",
+                                        "steps": [
+                                            {
+                                                "id": "step-1",
+                                                "title": "상태 도구 호출",
+                                                "objective": "백엔드 응답 상태를 확인합니다.",
+                                                "tool_hint": "hwp_ping",
+                                            }
+                                        ],
+                                    },
+                                    ensure_ascii=False,
+                                ),
+                            },
+                        }
+                    ]
+                }
+
+            if self._step == 2:
                 return {
                     "choices": [
                         {
@@ -447,6 +579,17 @@ def test_agent_chat_endpoint_runs_tool_only_agent_directly():
     payload = response.json()
     assert payload["success"] is True
     assert payload["selected_tool"] == "hwp_ping"
+    assert payload["plan"] == {
+        "summary": "상태 확인 계획",
+        "steps": [
+            {
+                "id": "step-1",
+                "title": "상태 도구 호출",
+                "objective": "백엔드 응답 상태를 확인합니다.",
+                "tool_hint": "hwp_ping",
+            }
+        ],
+    }
     assert payload["runtime"] == {
         "provider": DEFAULT_PROVIDER,
         "model": DEFAULT_MODEL,
@@ -454,6 +597,99 @@ def test_agent_chat_endpoint_runs_tool_only_agent_directly():
     assert payload["reply"] == "pong"
     assert calls == []
     assert backend.call_tool_calls == [("hwp_ping", {})]
+
+
+def test_agent_health_includes_local_model_status(monkeypatch):
+    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    local_manager = FakeLocalModelManager(ready=False, downloaded=False)
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return OpenRouterToolAgent(server, local_model_manager=local_manager)
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        response = client.get("/agent/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["local_model"] == {
+        "configured": False,
+        "ready": False,
+        "downloaded": False,
+        "downloading": False,
+        "model_id": LOCAL_DEFAULT_MODEL,
+        "provider": "local",
+        "model_home": "/tmp/local-models",
+        "download_path": "/tmp/local-models/Qwen__Qwen3.5-4B",
+        "detail": "local_model_not_downloaded",
+        "dependency_installed": True,
+    }
+
+
+def test_agent_local_model_download_endpoint_calls_manager():
+    backend = DummyBackend([])
+    app = FastAPI()
+    local_manager = FakeLocalModelManager(ready=False, downloaded=False)
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return OpenRouterToolAgent(server, local_model_manager=local_manager)
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        response = client.post("/agent/local-model/download", json={"force": True})
+
+    assert response.status_code == 200
+    assert local_manager.download_calls == [True]
+    assert response.json()["ready"] is True
+
+
+def test_agent_chat_uses_local_fallback_when_remote_auth_missing(monkeypatch):
+    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    backend = DummyBackend(
+        [
+            DummyTool(
+                name="hwp_ping",
+                description="Check backend status",
+                fn=lambda **kwargs: {
+                    "success": True,
+                    "message": "pong",
+                    "arguments": kwargs,
+                },
+            )
+        ]
+    )
+    app = FastAPI()
+    local_manager = FakeLocalModelManager(ready=True)
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return OpenRouterToolAgent(
+            server, local_model_manager=local_manager, max_rounds=2
+        )
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        response = client.post("/agent/chat", json={"message": "상태 확인해줘"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["used_local_fallback"] is True
+    assert payload["selected_tool"] == "hwp_ping"
+    assert payload["reply"] == "local pong"
 
 
 def test_agent_chat_endpoint_requires_non_empty_message():

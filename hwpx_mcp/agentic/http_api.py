@@ -21,8 +21,6 @@ class ChatRequest(BaseModel):
 
 class AuthRequest(BaseModel):
     openai_api_key: str | None = None
-    openai_oauth_token: str | None = None
-    codex_oauth_token: str | None = None
 
 
 class AgentHttpSurface:
@@ -52,8 +50,6 @@ class AgentHttpSurface:
     async def set_auth(self, payload: AuthRequest) -> dict[str, object]:
         self._agent.set_runtime_auth(
             openai_api_key=payload.openai_api_key,
-            openai_oauth_token=payload.openai_oauth_token,
-            codex_oauth_token=payload.codex_oauth_token,
         )
         return {
             "success": True,

@@ -19,8 +19,6 @@ from .tool_only_agent import SubagentName
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
-OPENAI_OAUTH_TOKEN_ENV = "OPENAI_OAUTH_TOKEN"
-CODEX_OAUTH_TOKEN_ENV = "CODEX_OAUTH_TOKEN"
 OPENAI_DEFAULT_MODEL = "gpt-5.2"
 
 DEFAULT_MODEL = OPENAI_DEFAULT_MODEL
@@ -164,107 +162,31 @@ class OpenRouterClient:
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key
         self._runtime_openai_api_key = ""
-        self._runtime_openai_oauth_token = ""
-        self._runtime_codex_oauth_token = ""
 
     @staticmethod
-    def _normalize_token(value: str | None, *, trim_bearer: bool = False) -> str:
-        normalized = value.strip() if isinstance(value, str) else ""
-        if trim_bearer and normalized.lower().startswith("bearer "):
-            return normalized[7:].strip()
-        return normalized
+    def _normalize_token(value: str | None) -> str:
+        return value.strip() if isinstance(value, str) else ""
 
     def set_runtime_auth(
         self,
         *,
         openai_api_key: str | None = None,
-        openai_oauth_token: str | None = None,
-        codex_oauth_token: str | None = None,
     ) -> None:
         if openai_api_key is not None:
             self._runtime_openai_api_key = self._normalize_token(openai_api_key)
 
-        if openai_oauth_token is not None:
-            self._runtime_openai_oauth_token = self._normalize_token(
-                openai_oauth_token,
-                trim_bearer=True,
-            )
-
-        if codex_oauth_token is not None:
-            self._runtime_codex_oauth_token = self._normalize_token(
-                codex_oauth_token,
-                trim_bearer=True,
-            )
-
     def _auth_candidates(self) -> list[tuple[str, str]]:
-        candidates: list[tuple[str, str]] = []
-
-        oauth_token = (
-            self._runtime_openai_oauth_token
-            or os.getenv(OPENAI_OAUTH_TOKEN_ENV, "").strip()
-        )
-        if oauth_token.lower().startswith("bearer "):
-            oauth_token = oauth_token[7:].strip()
-        if oauth_token:
-            candidates.append(("openai-oauth", oauth_token))
-
-        codex_oauth_token = (
-            self._runtime_codex_oauth_token
-            or os.getenv(CODEX_OAUTH_TOKEN_ENV, "").strip()
-        )
-        if codex_oauth_token.lower().startswith("bearer "):
-            codex_oauth_token = codex_oauth_token[7:].strip()
-        if codex_oauth_token:
-            candidates.append(("codex-oauth", codex_oauth_token))
-
         openai_api_key = (
             self._runtime_openai_api_key
             or (self._api_key or os.getenv(OPENAI_API_KEY_ENV, "")).strip()
         )
         if openai_api_key:
-            candidates.append(("openai-api-key", openai_api_key))
+            return [("openai-api-key", openai_api_key)]
 
-        unique_candidates: list[tuple[str, str]] = []
-        seen_tokens: set[str] = set()
-        for mode, token in candidates:
-            if token in seen_tokens:
-                continue
-            seen_tokens.add(token)
-            unique_candidates.append((mode, token))
-
-        if unique_candidates:
-            return unique_candidates
-
-        raise AgentAuthError(
-            f"{OPENAI_OAUTH_TOKEN_ENV} or {CODEX_OAUTH_TOKEN_ENV} or {OPENAI_API_KEY_ENV} is not set"
-        )
+        raise AgentAuthError(f"{OPENAI_API_KEY_ENV} is not set")
 
     def _resolve_auth(self) -> tuple[str, str]:
         return self._auth_candidates()[0]
-
-    @staticmethod
-    def _is_insufficient_quota(status_code: int, response_text: str) -> bool:
-        if status_code != 429:
-            return False
-
-        lowered = response_text.lower()
-        if "insufficient_quota" in lowered:
-            return True
-
-        try:
-            payload = json.loads(response_text)
-        except (TypeError, ValueError):
-            return False
-
-        if not isinstance(payload, dict):
-            return False
-
-        error = payload.get("error")
-        if not isinstance(error, dict):
-            return False
-
-        error_type = error.get("type")
-        return isinstance(error_type, str) and error_type == "insufficient_quota"
 
     @staticmethod
     def _parse_error_fields(response_text: str) -> tuple[str, str]:
@@ -303,30 +225,7 @@ class OpenRouterClient:
             }
             return error_type in auth_like_markers or error_code in auth_like_markers
 
-        if status_code == 429 and cls._is_insufficient_quota(
-            status_code, response_text
-        ):
-            return True
-
         return False
-
-    @classmethod
-    def _append_quota_hint(
-        cls,
-        *,
-        message: str,
-        auth_mode: str,
-        status_code: int,
-        response_text: str,
-    ) -> str:
-        if auth_mode not in ("openai-oauth", "codex-oauth"):
-            return message
-        if not cls._is_insufficient_quota(status_code, response_text):
-            return message
-        return (
-            f"{message} | quota_hint: OAuth token has no API quota. "
-            f"Configure {OPENAI_API_KEY_ENV} with API billing or use another token."
-        )
 
     async def _post_chat_completion(
         self,
@@ -414,12 +313,6 @@ class OpenRouterClient:
 
             if response.status_code >= 400:
                 message = f"llm_error[{auth_mode}]: {response.status_code}: {response.text[:300]}"
-                message = self._append_quota_hint(
-                    message=message,
-                    auth_mode=auth_mode,
-                    status_code=response.status_code,
-                    response_text=response.text,
-                )
 
                 if index + 1 < total_candidates and self._can_try_next_auth(
                     status_code=response.status_code,
@@ -577,13 +470,9 @@ class OpenRouterToolAgent:
         self,
         *,
         openai_api_key: str | None = None,
-        openai_oauth_token: str | None = None,
-        codex_oauth_token: str | None = None,
     ) -> None:
         self.client.set_runtime_auth(
             openai_api_key=openai_api_key,
-            openai_oauth_token=openai_oauth_token,
-            codex_oauth_token=codex_oauth_token,
         )
 
     async def _call_tool_by_name(self, name: str, arguments: JsonObject) -> object:

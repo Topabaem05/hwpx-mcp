@@ -143,9 +143,16 @@ const setBackendCredentials = (opts) => {
 
   const provider = typeof opts.provider === "string" && opts.provider.trim() ? opts.provider.trim() : DEFAULT_AGENT_PROVIDER;
   const model = typeof opts.model === "string" && opts.model.trim() ? opts.model.trim() : DEFAULT_AGENT_MODEL;
+  const localModelId =
+    typeof opts.localModelId === "string" && opts.localModelId.trim()
+      ? opts.localModelId.trim()
+      : provider === "local"
+      ? model
+      : effectiveEnv("HWPX_LOCAL_MODEL_ID", DEFAULT_LOCAL_MODEL_ID);
 
   setOptionalEnv("HWPX_AGENT_PROVIDER", provider);
   setOptionalEnv("HWPX_AGENT_MODEL", model);
+  setOptionalEnv("HWPX_LOCAL_MODEL_ID", localModelId);
   setOptionalEnv(
     "HWPX_CODEX_PROXY_URL",
     provider === "codex-proxy" ? opts.codexProxyUrl || DEFAULT_CODEX_PROXY_URL : ""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -75,6 +76,7 @@ class FakeLocalModelManager:
         self.chat_step = 0
 
     def status(self) -> LocalModelSnapshot:
+        download_name = self.model_id.replace("/", "__")
         return LocalModelSnapshot(
             configured=self.ready,
             ready=self.ready,
@@ -83,7 +85,7 @@ class FakeLocalModelManager:
             model_id=self.model_id,
             provider="local",
             model_home="/tmp/local-models",
-            download_path="/tmp/local-models/Qwen__Qwen3.5-4B",
+            download_path=str(Path("/tmp/local-models") / download_name),
             detail="local_model_ready" if self.ready else "local_model_not_downloaded",
             dependency_installed=self.dependency_installed,
         )
@@ -446,6 +448,100 @@ def test_agent_auth_endpoint_sets_runtime_openrouter_api_key(monkeypatch):
         }
 
 
+def test_agent_config_endpoint_switches_runtime_to_local_provider():
+    backend = DummyBackend([])
+    app = FastAPI()
+    local_manager = FakeLocalModelManager(ready=False, downloaded=False)
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return OpenRouterToolAgent(server, local_model_manager=local_manager)
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        config_set = client.post(
+            "/agent/config",
+            json={
+                "provider": "local",
+                "model": "Qwen/Qwen3.5-4B-Instruct",
+            },
+        )
+        assert config_set.status_code == 200
+        config_payload = config_set.json()
+        assert config_payload["runtime"] == {
+            "provider": "local",
+            "model": "Qwen/Qwen3.5-4B-Instruct",
+        }
+        assert config_payload["auth"] == {
+            "configured": False,
+            "mode": "none",
+            "available_modes": [],
+            "accepted_env": [],
+            "local_fallback": {
+                "configured": False,
+                "ready": False,
+                "downloaded": False,
+                "downloading": False,
+                "model_id": "Qwen/Qwen3.5-4B-Instruct",
+                "provider": "local",
+                "model_home": "/tmp/local-models",
+                "download_path": "/tmp/local-models/Qwen__Qwen3.5-4B-Instruct",
+                "detail": "local_model_not_downloaded",
+                "dependency_installed": True,
+            },
+            "detail": "local_model_not_downloaded",
+        }
+
+        health_after = client.get("/agent/health")
+        assert health_after.status_code == 200
+        health_payload = health_after.json()
+        assert health_payload["runtime"] == {
+            "provider": "local",
+            "model": "Qwen/Qwen3.5-4B-Instruct",
+        }
+        assert health_payload["local_model"]["model_id"] == "Qwen/Qwen3.5-4B-Instruct"
+
+
+def test_openrouter_provider_does_not_silently_fallback_to_local(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    backend = DummyBackend([])
+    app = FastAPI()
+    local_manager = FakeLocalModelManager(ready=True)
+
+    def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
+        return OpenRouterToolAgent(server, local_model_manager=local_manager)
+
+    app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
+    client = TestClient(app)
+
+    with client:
+        config_set = client.post(
+            "/agent/config",
+            json={
+                "provider": "openrouter",
+                "model": "openai/gpt-oss-120b",
+            },
+        )
+        assert config_set.status_code == 200
+
+        health_after = client.get("/agent/health")
+        assert health_after.status_code == 200
+        health_payload = health_after.json()
+        assert health_payload["runtime"] == {
+            "provider": "openrouter",
+            "model": "openai/gpt-oss-120b",
+        }
+        assert health_payload["auth"] == {
+            "configured": False,
+            "mode": "none",
+            "detail": "OPENROUTER_API_KEY is not set",
+            "available_modes": [],
+            "accepted_env": ["OPENROUTER_API_KEY"],
+        }
+
+
 def test_agent_config_endpoint_switches_runtime_to_codex_proxy(monkeypatch):
     monkeypatch.delenv("HWPX_CODEX_PROXY_ACCESS_TOKEN", raising=False)
 
@@ -652,10 +748,8 @@ def test_agent_local_model_download_endpoint_calls_manager():
     assert response.json()["ready"] is True
 
 
-def test_agent_chat_uses_local_fallback_when_remote_auth_missing(monkeypatch):
-    monkeypatch.delenv("OPENAI_OAUTH_TOKEN", raising=False)
-    monkeypatch.delenv("CODEX_OAUTH_TOKEN", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+def test_agent_chat_uses_explicit_local_provider(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     backend = DummyBackend(
         [
@@ -675,7 +769,11 @@ def test_agent_chat_uses_local_fallback_when_remote_auth_missing(monkeypatch):
 
     def agent_factory(server: BackendServer) -> OpenRouterToolAgent:
         return OpenRouterToolAgent(
-            server, local_model_manager=local_manager, max_rounds=2
+            server,
+            local_model_manager=local_manager,
+            provider="local",
+            model=LOCAL_DEFAULT_MODEL,
+            max_rounds=2,
         )
 
     app.include_router(build_agent_http_router(backend, agent_factory=agent_factory))
@@ -687,7 +785,7 @@ def test_agent_chat_uses_local_fallback_when_remote_auth_missing(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
-    assert payload["used_local_fallback"] is True
+    assert payload["used_local_fallback"] is False
     assert payload["selected_tool"] == "hwp_ping"
     assert payload["reply"] == "local pong"
 

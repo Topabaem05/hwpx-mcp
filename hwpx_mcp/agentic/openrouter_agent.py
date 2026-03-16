@@ -1084,6 +1084,8 @@ class OpenRouterToolAgent:
             self.provider,
             configured_model,
         )
+        if self.provider == LOCAL_PROVIDER:
+            self.local_model_manager.model_id = self.model
         self.codex_proxy_url = self._normalize_codex_proxy_url(
             self.provider,
             configured_codex_proxy_url,
@@ -1126,14 +1128,6 @@ class OpenRouterToolAgent:
         if self.provider == LOCAL_PROVIDER:
             return LOCAL_PROVIDER, self.model or LOCAL_DEFAULT_MODEL, False
 
-        remote_auth = self.client.auth_status(self.provider)
-        if remote_auth.get("configured") is True:
-            return self.provider, self.model, False
-
-        local_status = self.local_model_manager.status().to_payload()
-        if local_status.get("ready") is True:
-            return LOCAL_PROVIDER, self.local_model_manager.model_id, True
-
         return self.provider, self.model, False
 
     def set_runtime_config(
@@ -1150,6 +1144,8 @@ class OpenRouterToolAgent:
         next_model = self.model
         if model is not None or provider is not None:
             next_model = self._normalize_model_for_provider(next_provider, model)
+        if next_provider == LOCAL_PROVIDER:
+            self.local_model_manager.model_id = next_model
 
         next_codex_proxy_url = self.codex_proxy_url
         if next_provider == CODEX_PROXY_PROVIDER:
@@ -1401,15 +1397,6 @@ class OpenRouterToolAgent:
 
         if remote_auth.get("configured") is True:
             return remote_auth
-
-        if local_status.get("ready") is True:
-            return {
-                "configured": True,
-                "mode": "local-transformers",
-                "available_modes": ["local-transformers"],
-                "accepted_env": remote_auth.get("accepted_env", []),
-                "detail": remote_auth.get("detail", ""),
-            }
 
         return remote_auth
 

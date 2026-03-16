@@ -32,6 +32,9 @@ IntentName = Literal[
     "status",
     "capabilities",
     "template",
+    "open_document",
+    "table",
+    "field_form",
     "create",
     "insert_text",
     "save",
@@ -75,6 +78,101 @@ def _extract_quoted_text(message: str) -> str | None:
     return None
 
 
+def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _has_table_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("table", "표", "테이블", "셀", "cell", "행"),
+    )
+
+
+def _has_field_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("field", "필드", "누름틀", "입력란"),
+    )
+
+
+def _has_template_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("template", "템플릿", "목록", "list", "search", "검색"),
+    )
+
+
+def _has_edit_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("open", "열", "불러", "수정", "편집", "변경", "update", "edit"),
+    )
+
+
+def _looks_like_document_target(message: str) -> bool:
+    quoted = _extract_quoted_text(message)
+    if isinstance(quoted, str) and quoted.lower().endswith((".hwp", ".hwpx")):
+        return True
+    lowered = message.lower()
+    return _contains_any(
+        lowered, (".hwp", ".hwpx", "기존 문서", "문서 수정", "공식문서")
+    )
+
+
+def _looks_like_search_request(lowered: str) -> bool:
+    return _contains_any(lowered, ("find", "search", "찾기", "검색"))
+
+
+def _extract_document_path(message: str) -> str | None:
+    quoted = _extract_quoted_text(message)
+    if isinstance(quoted, str) and quoted.lower().endswith((".hwp", ".hwpx")):
+        return quoted
+    match = re.search(r"([^\s]+\.(?:hwp|hwpx))", message, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _extract_table_dimensions(message: str) -> tuple[int, int] | None:
+    patterns = [
+        r"(\d+)\s*행\s*(\d+)\s*열",
+        r"(\d+)\s*열\s*(\d+)\s*행",
+        r"(\d+)\s*[xX]\s*(\d+)",
+        r"(\d+)\s*by\s*(\d+)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, message, re.IGNORECASE)
+        if match:
+            first = int(match.group(1))
+            second = int(match.group(2))
+            if pattern == r"(\d+)\s*열\s*(\d+)\s*행":
+                return second, first
+            return first, second
+    return None
+
+
+def _extract_field_name(message: str) -> str | None:
+    match = re.search(r"필드\s+([\w가-힣]+)", message)
+    if match:
+        return match.group(1).rstrip("에")
+    match = re.search(r"([\w가-힣]+?)에\s*[\"']", message)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _extract_insert_text(message: str) -> str | None:
+    quoted_values = re.findall(r'"([^"]+)"', message)
+    if len(quoted_values) >= 2:
+        return quoted_values[-1].strip()
+    if len(quoted_values) == 1 and not quoted_values[0].lower().endswith(
+        (".hwp", ".hwpx")
+    ):
+        return quoted_values[0].strip()
+    return None
+
+
 def _parse_intent(message: str) -> IntentName:
     lowered = message.lower()
     if any(token in lowered for token in ("status", "ping", "상태", "헬스")):
@@ -83,13 +181,29 @@ def _parse_intent(message: str) -> IntentName:
         token in lowered for token in ("capability", "capabilities", "지원", "가능")
     ):
         return "capabilities"
-    if any(token in lowered for token in ("template", "템플릿", "양식")):
+    if _looks_like_search_request(lowered):
+        return "search"
+    if _has_field_keywords(lowered):
+        return "field_form"
+    if _has_table_keywords(lowered):
+        return "table"
+    if "양식" in lowered and (
+        _has_table_keywords(lowered) or _has_field_keywords(lowered)
+    ):
+        return "table" if _has_table_keywords(lowered) else "field_form"
+    if _looks_like_document_target(message) and (
+        _has_edit_keywords(lowered) or _extract_quoted_text(message) is not None
+    ):
+        return "open_document"
+    if any(token in lowered for token in ("template", "템플릿")):
+        return "template"
+    if "양식" in lowered and _has_template_keywords(lowered):
         return "template"
     if any(token in lowered for token in ("export pdf", "pdf", "내보내기")):
         return "export_pdf"
     if any(token in lowered for token in ("save", "저장")):
         return "save"
-    if any(token in lowered for token in ("find", "search", "찾기", "검색")):
+    if _looks_like_search_request(lowered):
         return "search"
     if any(token in lowered for token in ("insert", "write", "작성", "추가", "입력")):
         return "insert_text"
@@ -114,7 +228,12 @@ def _detect_case(message: str, tool_names: set[str]) -> CaseName:
     )
 
     if (
-        any(token in lowered for token in ("template", "템플릿", "양식"))
+        (
+            any(token in lowered for token in ("template", "템플릿"))
+            or ("양식" in lowered and _has_template_keywords(lowered))
+        )
+        and not _has_table_keywords(lowered)
+        and not _has_field_keywords(lowered)
         and has_templates
     ):
         return "template_workflow"
@@ -229,7 +348,14 @@ class ToolOnlyAgent:
             return {"subagent": "export_agent"}
         if intent == "search":
             return {"subagent": "search_agent"}
-        if intent in ("create", "insert_text", "save"):
+        if intent in (
+            "create",
+            "insert_text",
+            "save",
+            "open_document",
+            "table",
+            "field_form",
+        ):
             return {"subagent": "document_agent"}
         return {"subagent": "recovery_agent"}
 
@@ -257,6 +383,15 @@ class ToolOnlyAgent:
         message = state.get("message", "")
         text_payload = _extract_quoted_text(message)
 
+        if intent == "open_document":
+            return await self._handle_existing_document_edit(state, message)
+
+        if intent == "table":
+            return await self._handle_table_request(state, message)
+
+        if intent == "field_form":
+            return await self._handle_field_request(state, message)
+
         if intent == "create":
             if text_payload:
                 args: dict[str, JsonValue] = {
@@ -281,6 +416,103 @@ class ToolOnlyAgent:
             ["hwp_insert_text", "hwp_windows_insert_text"],
             {"text": insert_text},
         )
+
+    async def _handle_existing_document_edit(
+        self,
+        state: AgentState,
+        message: str,
+    ) -> AgentState:
+        platform_state = await self._call_first_available(
+            state, ["hwp_platform_info"], {}
+        )
+        platform_result = platform_state.get("tool_result")
+        has_document = False
+        if isinstance(platform_result, dict):
+            has_document = platform_result.get("has_document") is True
+
+        path = _extract_document_path(message)
+        if not has_document and not path:
+            return {
+                "intent": "open_document",
+                "reply": "기존 문서를 수정하려면 열 문서 경로를 알려주세요.",
+                "error": "document_path_required",
+                "selected_tool_name": platform_state.get(
+                    "selected_tool_name", "hwp_platform_info"
+                ),
+                "selected_tool_id": platform_state.get("selected_tool_id", ""),
+                "arguments": platform_state.get("arguments", {}),
+                "tool_result": platform_result,
+            }
+
+        final_state = platform_state
+        if path:
+            open_state = await self._call_first_available(
+                state, ["hwp_open"], {"path": path}
+            )
+            if open_state.get("error"):
+                return open_state
+            final_state = open_state
+
+        insert_text = _extract_insert_text(message)
+        if not insert_text:
+            return final_state
+
+        insert_state = await self._call_first_available(
+            state,
+            ["hwp_insert_text", "hwp_windows_insert_text"],
+            {"text": insert_text},
+        )
+        insert_state["intent"] = "open_document"
+        return insert_state
+
+    async def _handle_table_request(
+        self,
+        state: AgentState,
+        message: str,
+    ) -> AgentState:
+        dims = _extract_table_dimensions(message)
+        if dims is None:
+            return {
+                "reply": "표를 만들려면 행과 열 수를 함께 알려주세요. 예: 2행 3열 표",
+                "error": "missing_table_dimensions",
+            }
+
+        rows, cols = dims
+        table_state = await self._call_first_available(
+            state,
+            ["hwp_create_table"],
+            {"rows": rows, "cols": cols},
+        )
+        table_state["intent"] = "table"
+        return table_state
+
+    async def _handle_field_request(
+        self,
+        state: AgentState,
+        message: str,
+    ) -> AgentState:
+        field_name = _extract_field_name(message)
+        if not field_name:
+            return {
+                "reply": "양식 필드 이름을 알려주세요.",
+                "error": "missing_field_name",
+            }
+
+        text = _extract_insert_text(message)
+        if text:
+            field_state = await self._call_first_available(
+                state,
+                ["hwp_put_field_text"],
+                {"name": field_name, "text": text},
+            )
+        else:
+            field_state = await self._call_first_available(
+                state,
+                ["hwp_create_field"],
+                {"name": field_name},
+            )
+        field_state["intent"] = "field_form"
+        return field_state
 
     async def _export_agent(self, state: AgentState) -> AgentState:
         output_path = str(Path.cwd() / "agent_output.pdf")
@@ -508,6 +740,29 @@ class ToolOnlyAgent:
                 return {"text": text} if isinstance(text, str) else {}
             query = args.get("query")
             return {"query": query} if isinstance(query, str) else {}
+
+        if name == "hwp_open":
+            path = args.get("path")
+            return {"path": path} if isinstance(path, str) else {}
+
+        if name == "hwp_create_table":
+            rows = args.get("rows")
+            cols = args.get("cols")
+            if isinstance(rows, int) and isinstance(cols, int):
+                return {"rows": rows, "cols": cols}
+            return {}
+
+        if name in ("hwp_create_field", "hwp_put_field_text"):
+            field_name = args.get("name")
+            if not isinstance(field_name, str):
+                return {}
+            payload = {"name": field_name}
+            text = args.get("text")
+            if name == "hwp_put_field_text":
+                if not isinstance(text, str):
+                    return {}
+                payload["text"] = text
+            return payload
 
         return {
             key: value

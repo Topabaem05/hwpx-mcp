@@ -6,8 +6,12 @@ const PROVIDER_OPTIONS = {
     defaultModel: "gpt-5",
   },
   openrouter: {
-    label: "OpenRouter / Local Qwen",
+    label: "OpenRouter",
     defaultModel: "openai/gpt-oss-120b",
+  },
+  local: {
+    label: "Local Qwen",
+    defaultModel: "Qwen/Qwen3.5-4B",
   },
   openai: {
     label: "OpenAI",
@@ -24,6 +28,17 @@ const defaultModelForProvider = (provider) =>
   PROVIDER_OPTIONS[normalizeProviderValue(provider)].defaultModel;
 
 const providerLabel = (provider) => PROVIDER_OPTIONS[normalizeProviderValue(provider)].label;
+
+const modelStorageKeyForProvider = (provider) => {
+  const normalizedProvider = normalizeProviderValue(provider);
+  if (normalizedProvider === "openrouter") {
+    return "openrouterModel";
+  }
+  if (normalizedProvider === "local") {
+    return "localModelId";
+  }
+  return "model";
+};
 
 const normalizeModelValue = (provider, value) => {
   const trimmed = typeof value === "string" ? value.trim() : "";
@@ -51,8 +66,23 @@ const defaultConfig = {
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
   provider: normalizeProviderValue(window.hwpxUi?.getConfig?.()?.provider),
   model: normalizeModelValue(
-    window.hwpxUi?.getConfig?.()?.provider,
+    window.hwpxUi?.getConfig?.()?.provider === "openai" ||
+      window.hwpxUi?.getConfig?.()?.provider === "codex-proxy"
+      ? window.hwpxUi?.getConfig?.()?.provider
+      : "openai",
     window.hwpxUi?.getConfig?.()?.model
+  ),
+  openrouterModel: normalizeModelValue(
+    "openrouter",
+    window.hwpxUi?.getConfig?.()?.provider === "openrouter"
+      ? window.hwpxUi?.getConfig?.()?.model
+      : window.hwpxUi?.getConfig?.()?.openrouterModel
+  ),
+  localModelId: normalizeModelValue(
+    "local",
+    window.hwpxUi?.getConfig?.()?.provider === "local"
+      ? window.hwpxUi?.getConfig?.()?.model
+      : window.hwpxUi?.getConfig?.()?.localModelId
   ),
   codexProxyUrl: normalizeCodexProxyUrl(window.hwpxUi?.getConfig?.()?.codexProxyUrl),
   codexProxyAccessToken: "",
@@ -96,7 +126,28 @@ const loadConfig = () => {
           }
         }
         migrated.provider = normalizeProviderValue(migrated.provider);
-        migrated.model = normalizeModelValue(migrated.provider, migrated.model);
+        migrated.openrouterModel = normalizeModelValue(
+          "openrouter",
+          typeof migrated.openrouterModel === "string"
+            ? migrated.openrouterModel
+            : migrated.provider === "openrouter"
+            ? migrated.model
+            : ""
+        );
+        migrated.localModelId = normalizeModelValue(
+          "local",
+          typeof migrated.localModelId === "string"
+            ? migrated.localModelId
+            : migrated.provider === "local"
+            ? migrated.model
+            : window.hwpxUi?.getConfig?.()?.localModelId
+        );
+        migrated.model = normalizeModelValue(
+          migrated.provider === "openai" || migrated.provider === "codex-proxy"
+            ? migrated.provider
+            : "openai",
+          migrated.model
+        );
         migrated.codexProxyUrl = normalizeCodexProxyUrl(migrated.codexProxyUrl);
         return { ...defaultConfig, ...migrated };
       }
@@ -141,6 +192,7 @@ const codexProxyUrlInput = $("codexProxyUrlInput");
 const codexProxyAccessTokenInput = $("codexProxyAccessTokenInput");
 const openrouterApiKeyInput = $("openrouterApiKeyInput");
 const localModelStatusBadge = $("localModelStatusBadge");
+const localModelSection = $("localModelSection");
 const openrouterKeyRow = $("openrouterKeyRow");
 const openaiAuthSection = $("openaiAuthSection");
 const openaiApiKeyInput = $("openaiApiKeyInput");
@@ -180,7 +232,19 @@ const setAppUpdateText = (msg) => {
 
 const currentProvider = () => normalizeProviderValue(config.provider);
 
-const currentModel = () => normalizeModelValue(currentProvider(), config.model);
+const modelValueForProvider = (provider) => {
+  const storageKey = modelStorageKeyForProvider(provider);
+  return config[storageKey];
+};
+
+const currentModel = (provider = currentProvider()) =>
+  normalizeModelValue(provider, modelValueForProvider(provider));
+
+const setModelForProvider = (provider, value) => {
+  const normalizedProvider = normalizeProviderValue(provider);
+  const storageKey = modelStorageKeyForProvider(normalizedProvider);
+  config[storageKey] = normalizeModelValue(normalizedProvider, value);
+};
 
 const currentCodexProxyUrl = () => normalizeCodexProxyUrl(config.codexProxyUrl);
 
@@ -189,45 +253,39 @@ const visibleAuthModeLabel = () => {
     return "Codex Proxy Access Token";
   }
   if (currentProvider() === "openrouter") {
-    return "OpenRouter API Key or local Qwen3.5-4B";
+    return "OpenRouter API Key";
+  }
+  if (currentProvider() === "local") {
+    return "Local Qwen model";
   }
   return "OpenAI OAuth / API Key";
 };
 
-const openRouterKeyPresent = () => Boolean((config.openrouterApiKey || "").trim());
-
 const describeLocalModelBadge = (health) => {
   const localModel = localModelStateFromHealth(health);
-  if (currentProvider() !== "openrouter") {
+  if (currentProvider() !== "local") {
     return {
-      text: "OpenRouter provider를 선택하면 로컬 Qwen fallback 상태가 여기에 표시됩니다.",
+      text: "Local Qwen provider를 선택하면 로컬 모델 상태가 여기에 표시됩니다.",
       className: "rounded-xl border border-zinc-700 bg-zinc-850 px-3 py-2 text-[11px] text-zinc-400",
-    };
-  }
-
-  if (openRouterKeyPresent()) {
-    return {
-      text: `OpenRouter API Key configured - remote model ${currentModel()} will be used.`,
-      className: "rounded-xl border border-sky-400/20 bg-sky-500/8 px-3 py-2 text-[11px] text-sky-100",
     };
   }
 
   if (localModel?.ready) {
     return {
-      text: `OpenRouter key empty - local ${localModel.model_id || "Qwen/Qwen3.5-4B"} is ready.`,
+      text: `Local ${localModel.model_id || currentModel()} is ready.`,
       className: "rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100",
     };
   }
 
   if (localModel?.downloading) {
     return {
-      text: `OpenRouter key empty - downloading local ${localModel.model_id || "Qwen/Qwen3.5-4B"} now.`,
+      text: `Downloading local ${localModel.model_id || currentModel()} now.`,
       className: "rounded-xl border border-amber-400/20 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-100",
     };
   }
 
   return {
-    text: "OpenRouter key empty - local Qwen/Qwen3.5-4B will be downloaded and used automatically.",
+    text: `Local ${currentModel()} will be downloaded and used automatically.`,
     className: "rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100",
   };
 };
@@ -236,7 +294,10 @@ const runtimeConfigFromHealth = (health) => {
   const runtime = health?.runtime && typeof health.runtime === "object" ? health.runtime : null;
   const defaults = health?.defaults && typeof health.defaults === "object" ? health.defaults : null;
   const provider = normalizeProviderValue(runtime?.provider || defaults?.provider || config.provider);
-  const model = normalizeModelValue(provider, runtime?.model || defaults?.model || config.model);
+  const model = normalizeModelValue(
+    provider,
+    runtime?.model || defaults?.model || modelValueForProvider(provider)
+  );
   const proxyUrl =
     provider === "codex-proxy"
       ? normalizeCodexProxyUrl(runtime?.proxy_url || config.codexProxyUrl)
@@ -248,20 +309,25 @@ const updateProviderUi = () => {
   const provider = currentProvider();
   const isCodexProxy = provider === "codex-proxy";
   const isOpenRouter = provider === "openrouter";
-  const usesLocalFallback = isOpenRouter && !openRouterKeyPresent();
+  const isLocal = provider === "local";
 
   codexProxySection?.classList.toggle("hidden", !isCodexProxy);
   openrouterKeyRow?.classList.toggle("hidden", !isOpenRouter);
-  openaiAuthSection?.classList.toggle("hidden", isCodexProxy || isOpenRouter);
+  localModelSection?.classList.toggle("hidden", !isLocal);
+  openaiAuthSection?.classList.toggle("hidden", isCodexProxy || isOpenRouter || isLocal);
   if (modelInput) {
-    modelInput.placeholder = usesLocalFallback
-      ? `${defaultModelForProvider(provider)} (saved for remote use)`
-      : defaultModelForProvider(provider);
+    modelInput.placeholder = defaultModelForProvider(provider);
   }
   if (modelModeHint) {
-    modelModeHint.textContent = usesLocalFallback
-      ? "현재는 로컬 Qwen/Qwen3.5-4B로 실행됩니다. 여기 입력한 모델 값은 나중에 OpenRouter API Key를 넣었을 때 사용됩니다."
-      : "OpenRouter API Key가 있으면 이 모델을 사용하고, 비어 있으면 로컬 Qwen3.5-4B로 실행합니다.";
+    if (isOpenRouter) {
+      modelModeHint.textContent = "OpenRouter에서 사용할 원격 model ID입니다.";
+    } else if (isLocal) {
+      modelModeHint.textContent = "Local Qwen provider에서 사용할 Hugging Face model ID입니다.";
+    } else if (isCodexProxy) {
+      modelModeHint.textContent = "Codex Proxy에 전달할 model ID입니다.";
+    } else {
+      modelModeHint.textContent = "OpenAI provider에서 사용할 model ID입니다.";
+    }
   }
   if (localModelStatusBadge) {
     const badge = describeLocalModelBadge(latestAgentHealth);
@@ -313,7 +379,7 @@ const describeAgentHealth = (health, prefix = "Agent connected") => {
   if (auth.configured === true) {
     const mode = auth.mode || "configured";
     if (mode === "local-transformers") {
-      return `${base}, local fallback Qwen/Qwen3.5-4B active`;
+      return `${base}, local Qwen active`;
     }
     const source = auth.source ? ` via ${auth.source}` : "";
     return `${base}, auth ${mode}${source}`;
@@ -406,7 +472,7 @@ const authStatusLabel = (auth) => {
 
   if (auth.configured) {
     if (auth.mode === "local-transformers") {
-      return "auth:local-qwen3.5-4b";
+      return "auth:local-qwen";
     }
     return `auth:${auth.mode || "configured"}`;
   }
@@ -415,12 +481,17 @@ const authStatusLabel = (auth) => {
 };
 
 const hasStoredAuth = (provider = currentProvider()) => {
-  if (normalizeProviderValue(provider) === "codex-proxy") {
+  const normalizedProvider = normalizeProviderValue(provider);
+  if (normalizedProvider === "codex-proxy") {
     return Boolean((config.codexProxyAccessToken || "").trim());
   }
 
-  if (normalizeProviderValue(provider) === "openrouter") {
+  if (normalizedProvider === "openrouter") {
     return Boolean((config.openrouterApiKey || "").trim());
+  }
+
+  if (normalizedProvider === "local") {
+    return false;
   }
 
   return Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
@@ -543,6 +614,9 @@ const shouldDownloadLocalFallback = (health) => {
   if (!localModel || typeof localModel !== "object") {
     return false;
   }
+  if (currentProvider() !== "local" || runtime.provider !== "local") {
+    return false;
+  }
   if (hasStoredAuth(runtime.provider)) {
     return false;
   }
@@ -588,7 +662,7 @@ const ensureLocalFallbackReady = async (health) => {
 
   const localModel = localModelStateFromHealth(health);
   const modelId = typeof localModel?.model_id === "string" ? localModel.model_id : "local model";
-  status(`No API credentials found. Downloading ${modelId} for local fallback...`);
+  status(`Downloading local model ${modelId}...`);
   try {
     await downloadLocalModel();
   } catch (error) {
@@ -898,6 +972,7 @@ const restartBackendWithCurrentCredentials = async () => {
   const result = await window.hwpxUi.restartBackend({
     provider: currentProvider(),
     model: currentModel(),
+    localModelId: config.localModelId,
     codexProxyUrl: currentCodexProxyUrl(),
     codexProxyAccessToken: config.codexProxyAccessToken,
     openrouterApiKey: config.openrouterApiKey,
@@ -1266,7 +1341,7 @@ settingsOverlay?.addEventListener("click", closeSettings);
 saveSettingsBtn?.addEventListener("click", async () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
   config.provider = normalizeProviderValue(providerSelect?.value);
-  config.model = normalizeModelValue(config.provider, modelInput?.value);
+  setModelForProvider(config.provider, modelInput?.value);
   config.codexProxyUrl = normalizeCodexProxyUrl(codexProxyUrlInput?.value || "");
   config.codexProxyAccessToken = (codexProxyAccessTokenInput?.value || "").trim();
   config.openrouterApiKey = (openrouterApiKeyInput?.value || "").trim();
@@ -1313,15 +1388,15 @@ resetSettingsBtn?.addEventListener("click", () => {
 });
 
 providerSelect?.addEventListener("change", () => {
-  const nextProvider = normalizeProviderValue(providerSelect.value);
   const previousProvider = currentProvider();
+  setModelForProvider(previousProvider, modelInput?.value);
+  const nextProvider = normalizeProviderValue(providerSelect.value);
   config.provider = nextProvider;
-  if (!modelInput?.value || normalizeModelValue(previousProvider, modelInput.value) === defaultModelForProvider(previousProvider)) {
-    config.model = defaultModelForProvider(nextProvider);
-  } else {
-    config.model = normalizeModelValue(nextProvider, modelInput.value);
-  }
   renderConfig();
+});
+
+modelInput?.addEventListener("input", () => {
+  setModelForProvider(currentProvider(), modelInput.value);
 });
 
 openrouterApiKeyInput?.addEventListener("input", () => {
@@ -1462,7 +1537,13 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
 
     await syncAgentConfig();
     const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
-    const mode = authSync?.auth?.mode || (currentProvider() === "openrouter" ? "openrouter-ready" : "unknown");
+    const mode =
+      authSync?.auth?.mode ||
+      (currentProvider() === "local"
+        ? "local-ready"
+        : currentProvider() === "openrouter"
+        ? "openrouter-ready"
+        : "unknown");
     if (restartError) {
       status(
         `OAuth token synced (${mode}). Backend restart failed: ${restartError?.message || String(

@@ -245,7 +245,8 @@
             <label class="text-xs text-zinc-400" for="providerSelect">LLM Provider</label>
             <select id="providerSelect" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500">
               <option value="codex-proxy">Codex Proxy</option>
-              <option value="openrouter">OpenRouter / Local Qwen</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="local">Local Qwen</option>
               <option value="openai">OpenAI</option>
             </select>
           </div>
@@ -253,7 +254,7 @@
           <div class="space-y-2">
             <label class="text-xs text-zinc-400" for="modelInput">Model</label>
             <input id="modelInput" type="text" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="openai/gpt-oss-120b" />
-            <p id="modelModeHint" class="text-[11px] text-zinc-500">OpenRouter API Key가 있으면 이 모델을 사용하고, 비어 있으면 로컬 Qwen3.5-4B로 실행합니다.</p>
+            <p id="modelModeHint" class="text-[11px] text-zinc-500">선택한 provider에 맞는 model ID를 입력합니다.</p>
           </div>
 
           <div id="codexProxySection" class="space-y-4">
@@ -272,7 +273,12 @@
           <div id="openrouterKeyRow" class="space-y-2">
             <label class="text-xs text-zinc-400" for="openrouterApiKeyInput">OpenRouter API Key</label>
             <input id="openrouterApiKeyInput" type="password" class="w-full rounded-xl bg-zinc-850 border border-zinc-700 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500" placeholder="sk-or-..." />
-            <p class="text-[11px] text-zinc-500">비워두면 로컬 `Qwen/Qwen3.5-4B`를 자동 다운로드해서 사용합니다.</p>
+            <p class="text-[11px] text-zinc-500">OpenRouter provider를 사용할 때만 필요합니다.</p>
+          </div>
+
+          <div id="localModelSection" class="space-y-2 hidden">
+            <label class="text-xs text-zinc-400" for="localModelStatusBadge">Local Qwen Status</label>
+            <p class="text-[11px] text-zinc-500">Local Qwen provider를 선택하면 필요 시 지정한 모델을 자동 다운로드해서 사용합니다.</p>
             <div id="localModelStatusBadge" class="rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100">로컬 모델 상태를 확인하는 중입니다.</div>
           </div>
 

@@ -31,6 +31,9 @@ IntentName = Literal[
     "status",
     "capabilities",
     "template",
+    "open_document",
+    "table",
+    "field_form",
     "create",
     "insert_text",
     "save",
@@ -149,6 +152,50 @@ def _extract_quoted_text(message: str) -> str | None:
     return None
 
 
+def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _has_table_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("table", "표", "테이블", "셀", "cell", "행"),
+    )
+
+
+def _has_field_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("field", "필드", "누름틀", "입력란"),
+    )
+
+
+def _has_template_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("template", "템플릿", "목록", "list", "search", "검색"),
+    )
+
+
+def _has_edit_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("open", "열", "불러", "수정", "편집", "변경", "update", "edit"),
+    )
+
+
+def _looks_like_document_target(message: str) -> bool:
+    quoted = _extract_quoted_text(message)
+    if isinstance(quoted, str) and quoted.lower().endswith((".hwp", ".hwpx")):
+        return True
+    lowered = message.lower()
+    return _contains_any(lowered, (".hwp", ".hwpx", "기존 문서", "문서 수정"))
+
+
+def _looks_like_search_request(lowered: str) -> bool:
+    return _contains_any(lowered, ("find", "search", "찾기", "검색"))
+
+
 def _parse_intent(message: str) -> IntentName:
     lowered = message.lower()
     if any(token in lowered for token in ("status", "ping", "상태", "헬스")):
@@ -157,13 +204,34 @@ def _parse_intent(message: str) -> IntentName:
         token in lowered for token in ("capability", "capabilities", "지원", "가능")
     ):
         return "capabilities"
-    if any(token in lowered for token in ("template", "템플릿", "양식")):
+    if _looks_like_search_request(lowered):
+        return "search"
+    if _has_field_keywords(lowered):
+        return "field_form"
+    if _has_table_keywords(lowered):
+        return "table"
+    if "양식" in lowered and (
+        _has_table_keywords(lowered) or _has_field_keywords(lowered)
+    ):
+        return "table" if _has_table_keywords(lowered) else "field_form"
+    if "양식" in lowered and _has_edit_keywords(lowered):
+        if _has_table_keywords(lowered):
+            return "table"
+        if _has_field_keywords(lowered):
+            return "field_form"
+    if _looks_like_document_target(message) and (
+        _has_edit_keywords(lowered) or _extract_quoted_text(message) is not None
+    ):
+        return "open_document"
+    if any(token in lowered for token in ("template", "템플릿")):
+        return "template"
+    if "양식" in lowered and _has_template_keywords(lowered):
         return "template"
     if any(token in lowered for token in ("export pdf", "pdf", "내보내기")):
         return "export_pdf"
     if any(token in lowered for token in ("save", "저장")):
         return "save"
-    if any(token in lowered for token in ("find", "search", "찾기", "검색")):
+    if _looks_like_search_request(lowered):
         return "search"
     if any(token in lowered for token in ("insert", "write", "작성", "추가", "입력")):
         return "insert_text"
@@ -188,7 +256,12 @@ def _detect_case(message: str, tool_names: set[str]) -> CaseName:
     )
 
     if (
-        any(token in lowered for token in ("template", "템플릿", "양식"))
+        (
+            any(token in lowered for token in ("template", "템플릿"))
+            or ("양식" in lowered and _has_template_keywords(lowered))
+        )
+        and not _has_table_keywords(lowered)
+        and not _has_field_keywords(lowered)
         and has_templates
     ):
         return "template_workflow"
@@ -212,7 +285,14 @@ def _route_subagent(intent: IntentName, case: CaseName) -> SubagentName:
         return "export_agent"
     if intent == "search":
         return "search_agent"
-    if intent in ("create", "insert_text", "save"):
+    if intent in (
+        "create",
+        "insert_text",
+        "save",
+        "open_document",
+        "table",
+        "field_form",
+    ):
         return "document_agent"
     return "recovery_agent"
 
@@ -227,9 +307,39 @@ def _subagent_tool_allowlist(subagent: SubagentName, intent: IntentName) -> list
             ]
         return ["hwp_ping", "hwp_platform_info", "hwp_capabilities"]
     if subagent == "template_agent":
-        return ["hwp_list_templates", "hwp_search_template"]
-    if subagent == "document_agent":
         return [
+            "hwp_list_templates",
+            "hwp_search_template",
+            "hwp_create_from_template",
+        ]
+    if subagent == "document_agent":
+        if intent == "open_document":
+            return [
+                "hwp_platform_info",
+                "hwp_open",
+                "hwp_insert_text",
+                "hwp_windows_insert_text",
+                "hwp_save",
+                "hwp_save_document",
+            ]
+        if intent == "table":
+            return [
+                "hwp_platform_info",
+                "hwp_create_table",
+                "hwp_set_cell_text",
+                "hwp_save",
+                "hwp_save_document",
+            ]
+        if intent == "field_form":
+            return [
+                "hwp_platform_info",
+                "hwp_create_field",
+                "hwp_put_field_text",
+                "hwp_save",
+                "hwp_save_document",
+            ]
+        return [
+            "hwp_platform_info",
             "hwp_create_hwpx",
             "hwp_create",
             "hwp_insert_text",
@@ -281,7 +391,10 @@ def _subagent_system_prompt(subagent: SubagentName) -> str:
         )
     if subagent == "document_agent":
         return (
-            "Focus: creating or editing documents. Use create/insert/save tools as needed.\n"
+            "Focus: creating or editing documents. Use open/create/table/field/insert/save tools as needed.\n"
+            "If the user wants to edit an existing file, check document state first and open the target document before writing.\n"
+            "If opening the target fails, ask for a valid document path instead of creating a new document automatically.\n"
+            "For tables, prefer table tools over plain text insertion. For form fields, prefer field tools over plain text insertion.\n"
             "If the user provides text in quotes, treat it as the exact content to insert or use.\n"
             "When multiple tool calls are needed, do them step-by-step.\n"
         )

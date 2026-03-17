@@ -8,8 +8,29 @@ $distDir = Join-Path $repoRoot "dist"
 $winProxyDir = Join-Path $distDir "codex-proxy-win"
 $wheelDir = Join-Path $distDir "_win_codex_proxy_wheels"
 $pipBootstrapDir = Join-Path $distDir "_win_codex_proxy_pip"
+$pythonVersionFile = Join-Path $repoRoot "scripts/runtime/python-version.txt"
+$codexPythonVersionFile = Join-Path $repoRoot "scripts/runtime/codex-proxy-python-version.txt"
 
-$pythonVersion = "3.13.1"
+if (-not (Test-Path $pythonVersionFile)) {
+    Write-Error "Missing backend Python version pin: $pythonVersionFile"
+    exit 1
+}
+$backendPythonVersion = (Get-Content -Path $pythonVersionFile -Raw).Trim()
+if (-not $backendPythonVersion) {
+    Write-Error "Backend Python version pin is empty: $pythonVersionFile"
+    exit 1
+}
+
+if (-not (Test-Path $codexPythonVersionFile)) {
+    Write-Error "Missing codex proxy Python version pin: $codexPythonVersionFile"
+    exit 1
+}
+$pythonVersion = (Get-Content -Path $codexPythonVersionFile -Raw).Trim()
+if (-not $pythonVersion) {
+    Write-Error "Codex proxy Python version pin is empty: $codexPythonVersionFile"
+    exit 1
+}
+
 $pythonEmbedUrl = "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip"
 $pythonEmbedZip = Join-Path $distDir "python-$pythonVersion-embed-amd64.zip"
 $codexLbVersion = "1.1.1"
@@ -42,7 +63,8 @@ $deps = @(
 Write-Host "=============================================="
 Write-Host " Windows Codex Proxy Bundle Builder"
 Write-Host "=============================================="
-Write-Host "Python version:   $pythonVersion"
+Write-Host "Python version:   $pythonVersion (explicit codex-proxy exception from $codexPythonVersionFile)"
+Write-Host "Backend pin:      $backendPythonVersion (from $pythonVersionFile)"
 Write-Host "codex-lb version: $codexLbVersion"
 Write-Host "Output:           $winProxyDir"
 Write-Host ""

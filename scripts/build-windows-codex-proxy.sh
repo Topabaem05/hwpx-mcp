@@ -7,8 +7,29 @@ DIST_DIR="$REPO_ROOT/dist"
 WIN_PROXY_DIR="$DIST_DIR/codex-proxy-win"
 WHEEL_DIR="$DIST_DIR/_win_codex_proxy_wheels"
 PIP_BOOTSTRAP_DIR="$DIST_DIR/_win_codex_proxy_pip"
+BACKEND_PYTHON_VERSION_FILE="$REPO_ROOT/scripts/runtime/python-version.txt"
+CODEX_PYTHON_VERSION_FILE="$REPO_ROOT/scripts/runtime/codex-proxy-python-version.txt"
 
-PYTHON_VERSION="3.13.1"
+if [ ! -f "$BACKEND_PYTHON_VERSION_FILE" ]; then
+  echo "ERROR: Missing backend Python version pin: $BACKEND_PYTHON_VERSION_FILE"
+  exit 1
+fi
+BACKEND_PYTHON_VERSION="$(tr -d '\r\n' < "$BACKEND_PYTHON_VERSION_FILE")"
+if [ -z "$BACKEND_PYTHON_VERSION" ]; then
+  echo "ERROR: Empty backend Python version pin: $BACKEND_PYTHON_VERSION_FILE"
+  exit 1
+fi
+
+if [ ! -f "$CODEX_PYTHON_VERSION_FILE" ]; then
+  echo "ERROR: Missing codex proxy Python version pin: $CODEX_PYTHON_VERSION_FILE"
+  exit 1
+fi
+PYTHON_VERSION="$(tr -d '\r\n' < "$CODEX_PYTHON_VERSION_FILE")"
+if [ -z "$PYTHON_VERSION" ]; then
+  echo "ERROR: Empty codex proxy Python version pin: $CODEX_PYTHON_VERSION_FILE"
+  exit 1
+fi
+
 PYTHON_EMBED_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip"
 PYTHON_EMBED_ZIP="$DIST_DIR/python-${PYTHON_VERSION}-embed-amd64.zip"
 CODEX_LB_VERSION="1.1.1"
@@ -41,7 +62,8 @@ DEPS=(
 echo "=============================================="
 echo " Windows Codex Proxy Bundle Builder"
 echo "=============================================="
-echo "Python version:    $PYTHON_VERSION"
+echo "Python version:    $PYTHON_VERSION (explicit codex-proxy exception from $CODEX_PYTHON_VERSION_FILE)"
+echo "Backend pin:       $BACKEND_PYTHON_VERSION (from $BACKEND_PYTHON_VERSION_FILE)"
 echo "codex-lb version:  $CODEX_LB_VERSION"
 echo "Output:            $WIN_PROXY_DIR"
 echo ""
@@ -69,13 +91,13 @@ import pathlib
 import sys
 
 pth = pathlib.Path(sys.argv[1])
-text = pth.read_text(encoding="utf-8")
+text = pth.read_text(encoding="ascii")
 text = text.replace("#import site", "import site")
 lines = text.splitlines()
 for extra in (r"..\\Lib\\site-packages", ".."):
     if extra not in lines:
         lines.append(extra)
-pth.write_text("\n".join(lines) + "\n", encoding="utf-8")
+pth.write_text("\n".join(lines) + "\n", encoding="ascii")
 PY
 fi
 echo ""

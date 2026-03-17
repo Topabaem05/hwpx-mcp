@@ -156,7 +156,7 @@
             id="chatTitle"
             class="flex items-center gap-2 text-lg font-semibold text-zinc-200 hover:text-white px-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors"
           >
-            OpenRouter (or local Qwen3.5-4B)
+            HWPX MCP
             <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>
           </button>
         </div>
@@ -174,7 +174,22 @@
               <i data-lucide="bot" class="w-10 h-10"></i>
             </div>
             <h1 class="text-3xl font-bold text-white mb-2">무엇을 도와드릴까요?</h1>
-            <p class="text-zinc-400 text-sm mb-8">OpenRouter API 키가 없으면 로컬 Qwen3.5-4B로 바로 문서 작업을 시작할 수 있습니다.</p>
+            <p class="text-zinc-400 text-sm mb-8">설치 후 첫 실행에서는 OpenRouter 사용 또는 Local Qwen 설치를 선택할 수 있습니다.</p>
+
+            <div id="localModelSetupCard" class="hidden w-full max-w-2xl mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-500/8 p-5 text-left shadow-xl">
+              <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div class="space-y-2">
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">First-Run Setup</p>
+                  <h2 class="text-xl font-semibold text-white">Local Qwen 설치</h2>
+                  <p id="localModelSetupDescription" class="text-sm text-zinc-300">로컬 Qwen 모델을 설치하면 Windows 설치 직후 인터넷이 가능한 환경에서 문서 작업용 로컬 AI를 준비할 수 있습니다.</p>
+                  <p id="localModelSetupStatus" class="text-xs text-zinc-400">Local Qwen 설치를 시작할 수 있습니다.</p>
+                </div>
+                <div class="flex flex-col gap-2 md:min-w-[180px]">
+                  <button id="startLocalModelSetupBtn" class="rounded-xl bg-white text-black px-3 py-2 text-sm font-medium hover:bg-zinc-200 transition-colors">Local Qwen 설치</button>
+                  <button id="skipLocalModelSetupBtn" class="rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-100 px-3 py-2 text-sm hover:bg-zinc-700 transition-colors">나중에 설치</button>
+                </div>
+              </div>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
               <button class="suggestion-prompt text-left p-4 rounded-2xl border border-zinc-800 bg-zinc-850/50 hover:bg-zinc-800 transition-colors group" data-prompt="전자상거래 쇼핑몰 초기 기획서를 작성해줘">

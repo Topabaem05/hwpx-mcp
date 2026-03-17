@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+from importlib.util import find_spec
 import json
 import os
 import re
@@ -138,12 +139,18 @@ class LocalTransformersModelManager:
         os.environ.setdefault(LOCAL_MODEL_ENV, self.model_id)
 
     def _dependency_error(self) -> str:
-        try:
-            importlib.import_module("huggingface_hub")
-            importlib.import_module("torch")
-            importlib.import_module("transformers")
-        except Exception as error:
-            return str(error)
+        required_modules = (
+            "huggingface_hub",
+            "torch",
+            "transformers",
+        )
+        for module_name in required_modules:
+            try:
+                spec = find_spec(module_name)
+            except (ImportError, AttributeError, ValueError) as error:
+                return str(error)
+            if spec is None:
+                return f"No module named '{module_name}'"
         return ""
 
     def _is_downloaded(self) -> bool:

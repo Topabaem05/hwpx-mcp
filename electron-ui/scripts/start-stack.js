@@ -4,6 +4,7 @@ const { existsSync } = require("node:fs");
 
 const ELECTRON_UI_DIR = resolve(__dirname, "..");
 const REPO_ROOT = resolve(ELECTRON_UI_DIR, "..");
+const RUNTIME_MANAGER_SCRIPT = join(__dirname, "runtime-manager.js");
 
 const MCP_HOST = process.env.MCP_HOST || "127.0.0.1";
 const MCP_PORT = process.env.MCP_PORT || "8000";
@@ -12,11 +13,27 @@ const requestedTransport = (process.env.MCP_TRANSPORT || "streamable-http").trim
 const MCP_TRANSPORT = "streamable-http";
 const disableSandbox = process.env.HWPX_ELECTRON_NO_SANDBOX === "1";
 const autoInstallUiDeps = process.env.HWPX_ELECTRON_AUTO_INSTALL !== "0";
+const argv = process.argv.slice(2);
+const hasFlag = (name) => argv.includes(name);
+const isEnvToggleEnabled = (value) => typeof value === "string" && value.trim() === "1";
+const dryRunMode = hasFlag("--dry-run") || isEnvToggleEnabled(process.env.HWPX_RUNTIME_DRY_RUN);
+const jsonOutput = hasFlag("--json") || isEnvToggleEnabled(process.env.HWPX_RUNTIME_JSON);
+const printInfo = (message) => {
+  if (!jsonOutput) {
+    console.log(message);
+  }
+};
 const backendUrl =
   process.env.HWPX_MCP_HTTP_URL || `http://${MCP_HOST}:${MCP_PORT}${MCP_PATH}`;
 
 const explicitBackendExecutable = (process.env.HWPX_MCP_BACKEND_EXE || "").trim();
-const requestedBackendCommand = process.env.HWPX_MCP_BACKEND_COMMAND || "uv run hwpx-mcp";
+const hasExplicitBackendCommand = Object.prototype.hasOwnProperty.call(
+  process.env,
+  "HWPX_MCP_BACKEND_COMMAND"
+);
+const requestedBackendCommand = hasExplicitBackendCommand
+  ? process.env.HWPX_MCP_BACKEND_COMMAND
+  : "";
 const openWebUiUrl = process.env.OPEN_WEBUI_URL || "http://localhost:3000";
 const runWithBackend = process.env.HWPX_MCP_START_BACKEND !== "0";
 const uiPackageManager = (process.env.HWPX_ELECTRON_PKG_MANAGER || "").trim().toLowerCase();
@@ -154,57 +171,96 @@ const resolveBackendExecutable = (executablePath) => {
   return "";
 };
 
-const resolveBackendCommand = (command, backendExe) => {
-  const normalizedCommand = command.trim();
-
-  if (backendExe) {
-    const resolvedBackendExe = resolveBackendExecutable(backendExe);
+const resolveBackendSelection = () => {
+  if (explicitBackendExecutable) {
+    const resolvedBackendExe = resolveBackendExecutable(explicitBackendExecutable);
 
     if (!resolvedBackendExe) {
       throw new Error(
-        `Could not find backend executable from HWPX_MCP_BACKEND_EXE=${backendExe}. ` +
+        `Could not find backend executable from HWPX_MCP_BACKEND_EXE=${explicitBackendExecutable}. ` +
           "Set HWPX_MCP_BACKEND_EXE to an existing binary path."
       );
     }
 
-    if (resolvedBackendExe.includes(" ")) {
-      return `"${resolvedBackendExe}"`;
-    }
-
-    return resolvedBackendExe;
+    return {
+      backendCommand: resolvedBackendExe.includes(" ") ? `"${resolvedBackendExe}"` : resolvedBackendExe,
+      source: "explicit-executable",
+      overrideUsed: true,
+    };
   }
 
-  if (!normalizedCommand) {
-    return "uv run hwpx-mcp";
+  if (hasExplicitBackendCommand) {
+    const normalizedCommand = String(requestedBackendCommand || "").trim();
+
+    if (normalizedCommand && !isExecutableAvailable(normalizedCommand)) {
+      throw new Error(
+        `Backend command is not runnable: ${normalizedCommand}. ` +
+          "Set HWPX_MCP_BACKEND_COMMAND to a valid executable on PATH or a full path command."
+      );
+    }
+
+    return {
+      backendCommand: normalizedCommand,
+      source: "explicit-command",
+      overrideUsed: true,
+    };
   }
 
-  if (/^uv\s+run\s+/i.test(normalizedCommand)) {
-    if (isCommandAvailable("uv")) {
-      return normalizedCommand;
+  const bundled = findBundledBackend();
+  if (bundled) {
+    printInfo(`Found bundled backend binary: ${bundled}`);
+    return {
+      backendCommand: bundled.includes(" ") ? `"${bundled}"` : bundled,
+      source: "bundled-backend",
+      overrideUsed: false,
+    };
+  }
+
+  const runtimeEnsureResult = spawnSync(
+    process.execPath,
+    [RUNTIME_MANAGER_SCRIPT, "ensure", "--json"],
+    {
+      cwd: REPO_ROOT,
+      env: process.env,
+      encoding: "utf8",
+    }
+  );
+
+  if (runtimeEnsureResult.status !== 0) {
+    const raw = (runtimeEnsureResult.stdout || runtimeEnsureResult.stderr || "").trim();
+    let message = "Managed runtime ensure failed.";
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        message = parsed.message || parsed.error || raw;
+      } catch {
+        message = raw;
+      }
     }
 
-    if (isCommandAvailable("python3")) {
-      return "python3 -m hwpx_mcp.server";
-    }
+    throw new Error(message);
+  }
 
-    if (isCommandAvailable("python")) {
-      return "python -m hwpx_mcp.server";
-    }
+  let managed;
+  try {
+    managed = JSON.parse(runtimeEnsureResult.stdout || "{}");
+  } catch {
+    throw new Error("Managed runtime ensure returned invalid JSON output.");
+  }
 
+  const managedExecutable = getPrimaryCommandToken(managed.backendCommand || "");
+  if (!managedExecutable || !existsSync(managedExecutable)) {
     throw new Error(
-      "Backend command requires uv, but neither uv nor python are available in PATH. " +
-        "Install uv or set HWPX_MCP_BACKEND_COMMAND to a runnable command."
+      `Managed runtime backend executable does not exist: ${managedExecutable || "<empty>"}`
     );
   }
 
-  if (!isExecutableAvailable(normalizedCommand)) {
-    throw new Error(
-      `Backend command is not runnable: ${normalizedCommand}. ` +
-        "Set HWPX_MCP_BACKEND_COMMAND to a valid executable on PATH or a full path command."
-    );
-  }
-
-  return normalizedCommand;
+  return {
+    backendCommand: managed.backendCommand,
+    source: "managed-runtime",
+    overrideUsed: Boolean(managed.overrideUsed),
+  };
 };
 
 const sharedEnv = {
@@ -218,19 +274,8 @@ const sharedEnv = {
   OPEN_WEBUI_URL: openWebUiUrl,
 };
 
-let backendCommand;
-
-if (!explicitBackendExecutable && requestedBackendCommand === "uv run hwpx-mcp") {
-  const bundled = findBundledBackend();
-  if (bundled) {
-    console.log(`Found bundled backend binary: ${bundled}`);
-    backendCommand = bundled.includes(" ") ? `"${bundled}"` : bundled;
-  } else {
-    backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
-  }
-} else {
-  backendCommand = resolveBackendCommand(requestedBackendCommand, explicitBackendExecutable);
-}
+const backendSelection = resolveBackendSelection();
+const backendCommand = backendSelection.backendCommand;
 sharedEnv.HWPX_MCP_BACKEND_COMMAND = backendCommand;
 
 const stopProcess = (child) => {
@@ -249,7 +294,7 @@ const stopProcess = (child) => {
 };
 
 if (requestedTransport !== MCP_TRANSPORT) {
-  console.log(
+  printInfo(
     `Overriding MCP_TRANSPORT=${requestedTransport} for Electron bootstrap; using ${MCP_TRANSPORT} instead.`
   );
 }
@@ -284,7 +329,7 @@ const waitForEndpoint = async () => {
         });
 
       if (response.status < 500) {
-        console.log(`Backend is ready after ${attempt} polling attempt(s).`);
+        printInfo(`Backend is ready after ${attempt} polling attempt(s).`);
         return;
       }
 
@@ -307,7 +352,7 @@ const installUiDependencies = () => {
 
   const { command, args } = resolveUiPackageManager();
 
-  console.log(`Electron binary not found. Running ${command} ${args.join(" ")} in electron-ui...`);
+  printInfo(`Electron binary not found. Running ${command} ${args.join(" ")} in electron-ui...`);
 
   const result = spawnSync(command, args, {
     cwd: ELECTRON_UI_DIR,
@@ -326,11 +371,11 @@ const installUiDependencies = () => {
 
 const launchBackend = () => {
   if (!runWithBackend) {
-    console.log("Skipping backend startup because HWPX_MCP_START_BACKEND=0.");
+    printInfo("Skipping backend startup because HWPX_MCP_START_BACKEND=0.");
     return null;
   }
 
-  console.log(`Starting backend with: ${backendCommand}`);
+  printInfo(`Starting backend with: ${backendCommand}`);
 
   const child = spawn(backendCommand, [], {
     cwd: REPO_ROOT,
@@ -402,14 +447,51 @@ const launchElectron = () => {
 };
 
 const printBootstrapSummary = () => {
-  console.log("Starting HWPX MCP Electron stack");
-  console.log(`MCP_HOST: ${MCP_HOST}`);
-  console.log(`MCP_PORT: ${MCP_PORT}`);
-  console.log(`MCP_PATH: ${MCP_PATH}`);
-  console.log(`MCP transport: ${requestedTransport} -> ${MCP_TRANSPORT}`);
-  console.log(`Backend URL: ${backendUrl}`);
-  console.log(`Backend start command: ${backendCommand}`);
-  console.log(`Let Electron manage backend start: ${runWithBackend}`);
+  printInfo("Starting HWPX MCP Electron stack");
+  printInfo(`MCP_HOST: ${MCP_HOST}`);
+  printInfo(`MCP_PORT: ${MCP_PORT}`);
+  printInfo(`MCP_PATH: ${MCP_PATH}`);
+  printInfo(`MCP transport: ${requestedTransport} -> ${MCP_TRANSPORT}`);
+  printInfo(`Backend URL: ${backendUrl}`);
+  printInfo(`Backend start command: ${backendCommand}`);
+  printInfo(`Let Electron manage backend start: ${runWithBackend}`);
+};
+
+const dryRunPayload = () => ({
+  mode: "dry-run",
+  source: backendSelection.source,
+  overrideUsed: backendSelection.overrideUsed,
+  backendCommand,
+  backendUrl,
+  mcpTransport: MCP_TRANSPORT,
+  requestedTransport,
+  runWithBackend,
+});
+
+const printDryRun = () => {
+  const payload = dryRunPayload();
+  if (jsonOutput) {
+    process.stdout.write(`${JSON.stringify(payload)}\n`);
+    return;
+  }
+
+  printInfo("Dry-run mode enabled; skipping Electron launch.");
+  printInfo(`Backend source: ${payload.source}`);
+  printInfo(`Backend command: ${payload.backendCommand}`);
+};
+
+const printFatal = (error) => {
+  if (jsonOutput) {
+    process.stderr.write(
+      `${JSON.stringify({
+        mode: dryRunMode ? "dry-run" : "launch",
+        error: error.message,
+      })}\n`
+    );
+    return;
+  }
+
+  console.error(error.message);
 };
 
 let electronProcess = null;
@@ -420,11 +502,16 @@ const stopAll = () => {
 
 (async () => {
   try {
+    if (dryRunMode) {
+      printDryRun();
+      process.exit(0);
+    }
+
     printBootstrapSummary();
     electronProcess = launchElectron();
   } catch (error) {
     stopAll();
-    console.error(error.message);
+    printFatal(error);
     process.exit(1);
   }
 

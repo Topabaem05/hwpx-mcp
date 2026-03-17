@@ -93,6 +93,7 @@ collected_packages = [
     "starlette",
     "uvicorn",
     "httpx",
+    "huggingface_hub",
     "langgraph",
     "pydantic",
     "pydantic_xml",
@@ -104,6 +105,10 @@ collected_packages = [
     "pandas",
     "matplotlib",
     "hwpx",
+    "accelerate",
+    "safetensors",
+    "transformers",
+    "torch",
 ]
 
 collected_submodule_packages = [

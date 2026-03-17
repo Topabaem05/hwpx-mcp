@@ -50,11 +50,11 @@ function Install-PyInstaller {
 function Install-Dependencies {
     Write-Host "Ensuring backend Python dependencies are installed..."
     if (Get-Command uv -ErrorAction SilentlyContinue) {
-        uv pip install -e $repoRoot
+        uv pip install -e "$repoRoot[local_llm]"
     } elseif (Get-Command pip3 -ErrorAction SilentlyContinue) {
-        pip3 install -e $repoRoot
+        pip3 install -e "$repoRoot[local_llm]"
     } elseif (Get-Command pip -ErrorAction SilentlyContinue) {
-        pip install -e $repoRoot
+        pip install -e "$repoRoot[local_llm]"
     } else {
         Write-Error "No pip/uv found to install dependencies."
         exit 1

@@ -50,11 +50,11 @@ install_pyinstaller() {
 install_deps() {
   echo "Ensuring backend Python dependencies are installed..."
   if command -v uv >/dev/null 2>&1; then
-    uv pip install -e "$REPO_ROOT"
+    uv pip install -e "$REPO_ROOT[local_llm]"
   elif command -v pip3 >/dev/null 2>&1; then
-    pip3 install -e "$REPO_ROOT"
+    pip3 install -e "$REPO_ROOT[local_llm]"
   elif command -v pip >/dev/null 2>&1; then
-    pip install -e "$REPO_ROOT"
+    pip install -e "$REPO_ROOT[local_llm]"
   else
     echo "ERROR: No pip/uv found to install dependencies."
     exit 1

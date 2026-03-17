@@ -65,7 +65,7 @@ function Invoke-PipDownload {
     $stdoutFile = [System.IO.Path]::GetTempFileName()
     $stderrFile = [System.IO.Path]::GetTempFileName()
     try {
-        $process = Start-Process -FilePath "python" -ArgumentList @("-m", "pip") + $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+        $process = Start-Process -FilePath "python" -ArgumentList (@("-m", "pip") + $Arguments) -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
         return $process.ExitCode -eq 0
     }
     finally {

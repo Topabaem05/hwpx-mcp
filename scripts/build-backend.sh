@@ -12,6 +12,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SPEC_FILE="$REPO_ROOT/hwpx-mcp-backend.spec"
 DIST_DIR="$REPO_ROOT/dist"
+PYTHON_VERSION_FILE="$REPO_ROOT/scripts/runtime/python-version.txt"
+
+if [ ! -f "$PYTHON_VERSION_FILE" ]; then
+  echo "ERROR: Missing Python version pin: $PYTHON_VERSION_FILE"
+  exit 1
+fi
+PYTHON_VERSION="$(tr -d '\r\n' < "$PYTHON_VERSION_FILE")"
+if [ -z "$PYTHON_VERSION" ]; then
+  echo "ERROR: Empty Python version pin: $PYTHON_VERSION_FILE"
+  exit 1
+fi
 
 if [ ! -f "$SPEC_FILE" ]; then
   echo "ERROR: Spec file not found at $SPEC_FILE"
@@ -52,6 +63,7 @@ install_deps() {
 
 echo "=== HWPX-MCP Backend Build ==="
 echo "Repository root: $REPO_ROOT"
+echo "Backend runtime pin: $PYTHON_VERSION (from $PYTHON_VERSION_FILE)"
 
 install_deps
 install_pyinstaller

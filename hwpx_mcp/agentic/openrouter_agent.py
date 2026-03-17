@@ -4,18 +4,52 @@ import json
 import os
 from dataclasses import dataclass
 from dataclasses import field
+import re
 from typing import Literal
 
 import httpx
 
 from .gateway import AgenticGateway
 from .gateway import BackendServer
+from .local_model import LOCAL_DEFAULT_MODEL
+from .local_model import LOCAL_PROVIDER
+from .local_model import LocalModelError
+from .local_model import LocalModelManagerProtocol
+from .local_model import LocalTransformersModelManager
 from .models import JsonValue
-from .tool_only_agent import _detect_case
-from .tool_only_agent import _parse_intent
-from .tool_only_agent import CaseName
-from .tool_only_agent import IntentName
-from .tool_only_agent import SubagentName
+
+CaseName = Literal[
+    "windows_com_full",
+    "cross_platform_hwpx",
+    "template_workflow",
+    "query_analyze_only",
+    "no_document_context",
+    "degraded_recovery",
+]
+
+IntentName = Literal[
+    "status",
+    "capabilities",
+    "template",
+    "open_document",
+    "table",
+    "field_form",
+    "create",
+    "insert_text",
+    "save",
+    "export_pdf",
+    "search",
+    "unknown",
+]
+
+SubagentName = Literal[
+    "status_agent",
+    "template_agent",
+    "document_agent",
+    "export_agent",
+    "search_agent",
+    "recovery_agent",
+]
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -35,7 +69,12 @@ CODEX_PROXY_DEFAULT_URL = "http://127.0.0.1:2455/v1/chat/completions"
 OPENAI_PROVIDER = "openai"
 OPENROUTER_PROVIDER = "openrouter"
 CODEX_PROXY_PROVIDER = "codex-proxy"
-SUPPORTED_PROVIDERS = {OPENAI_PROVIDER, OPENROUTER_PROVIDER, CODEX_PROXY_PROVIDER}
+SUPPORTED_PROVIDERS = {
+    OPENAI_PROVIDER,
+    OPENROUTER_PROVIDER,
+    CODEX_PROXY_PROVIDER,
+    LOCAL_PROVIDER,
+}
 
 DEFAULT_MODEL = OPENAI_DEFAULT_MODEL
 DEFAULT_PROVIDER = OPENAI_PROVIDER
@@ -55,6 +94,10 @@ class LlmRequestError(RuntimeError):
         self.status_code = status_code
 
 
+class LocalModelNotReadyError(RuntimeError):
+    pass
+
+
 @dataclass(slots=True)
 class ToolCall:
     tool_call_id: str
@@ -70,6 +113,169 @@ class ToolCallResult:
     result: object
 
 
+@dataclass(slots=True)
+class PlanStep:
+    id: str
+    title: str
+    objective: str
+    tool_hint: str | None = None
+
+
+@dataclass(slots=True)
+class ExecutionPlan:
+    summary: str
+    steps: list[PlanStep]
+    raw_text: str = ""
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "summary": self.summary,
+            "steps": [
+                {
+                    "id": step.id,
+                    "title": step.title,
+                    "objective": step.objective,
+                    "tool_hint": step.tool_hint,
+                }
+                for step in self.steps
+            ],
+        }
+
+
+def _extract_quoted_text(message: str) -> str | None:
+    match = re.search(r'"([^"]+)"', message)
+    if match:
+        return match.group(1).strip()
+    match = re.search(r"'([^']+)'", message)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _has_table_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("table", "표", "테이블", "셀", "cell", "행"),
+    )
+
+
+def _has_field_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("field", "필드", "누름틀", "입력란"),
+    )
+
+
+def _has_template_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("template", "템플릿", "목록", "list", "search", "검색"),
+    )
+
+
+def _has_edit_keywords(lowered: str) -> bool:
+    return _contains_any(
+        lowered,
+        ("open", "열", "불러", "수정", "편집", "변경", "update", "edit"),
+    )
+
+
+def _looks_like_document_target(message: str) -> bool:
+    quoted = _extract_quoted_text(message)
+    if isinstance(quoted, str) and quoted.lower().endswith((".hwp", ".hwpx")):
+        return True
+    lowered = message.lower()
+    return _contains_any(lowered, (".hwp", ".hwpx", "기존 문서", "문서 수정"))
+
+
+def _looks_like_search_request(lowered: str) -> bool:
+    return _contains_any(lowered, ("find", "search", "찾기", "검색"))
+
+
+def _parse_intent(message: str) -> IntentName:
+    lowered = message.lower()
+    if any(token in lowered for token in ("status", "ping", "상태", "헬스")):
+        return "status"
+    if any(
+        token in lowered for token in ("capability", "capabilities", "지원", "가능")
+    ):
+        return "capabilities"
+    if _looks_like_search_request(lowered):
+        return "search"
+    if _has_field_keywords(lowered):
+        return "field_form"
+    if _has_table_keywords(lowered):
+        return "table"
+    if "양식" in lowered and (
+        _has_table_keywords(lowered) or _has_field_keywords(lowered)
+    ):
+        return "table" if _has_table_keywords(lowered) else "field_form"
+    if "양식" in lowered and _has_edit_keywords(lowered):
+        if _has_table_keywords(lowered):
+            return "table"
+        if _has_field_keywords(lowered):
+            return "field_form"
+    if _looks_like_document_target(message) and (
+        _has_edit_keywords(lowered) or _extract_quoted_text(message) is not None
+    ):
+        return "open_document"
+    if any(token in lowered for token in ("template", "템플릿")):
+        return "template"
+    if "양식" in lowered and _has_template_keywords(lowered):
+        return "template"
+    if any(token in lowered for token in ("export pdf", "pdf", "내보내기")):
+        return "export_pdf"
+    if any(token in lowered for token in ("save", "저장")):
+        return "save"
+    if _looks_like_search_request(lowered):
+        return "search"
+    if any(token in lowered for token in ("insert", "write", "작성", "추가", "입력")):
+        return "insert_text"
+    if any(
+        token in lowered for token in ("create", "new", "문서 생성", "새 문서", "만들")
+    ):
+        return "create"
+    return "unknown"
+
+
+def _detect_case(message: str, tool_names: set[str]) -> CaseName:
+    lowered = message.lower()
+    has_windows = any(name.startswith("hwp_windows_") for name in tool_names)
+    has_templates = "hwp_list_templates" in tool_names
+    has_hwpx = "hwp_create_hwpx" in tool_names
+    has_doc_ops = any(
+        name in tool_names for name in ("hwp_create", "hwp_insert_text", "hwp_save")
+    )
+    has_xml_only = bool(tool_names) and all(
+        ("xml" in name) or ("xpath" in name) or ("smart_patch" in name)
+        for name in tool_names
+    )
+
+    if (
+        (
+            any(token in lowered for token in ("template", "템플릿"))
+            or ("양식" in lowered and _has_template_keywords(lowered))
+        )
+        and not _has_table_keywords(lowered)
+        and not _has_field_keywords(lowered)
+        and has_templates
+    ):
+        return "template_workflow"
+    if has_windows:
+        return "windows_com_full"
+    if has_xml_only:
+        return "query_analyze_only"
+    if has_hwpx:
+        return "cross_platform_hwpx"
+    if has_doc_ops:
+        return "no_document_context"
+    return "degraded_recovery"
+
+
 def _route_subagent(intent: IntentName, case: CaseName) -> SubagentName:
     if intent in ("status", "capabilities"):
         return "status_agent"
@@ -79,7 +285,14 @@ def _route_subagent(intent: IntentName, case: CaseName) -> SubagentName:
         return "export_agent"
     if intent == "search":
         return "search_agent"
-    if intent in ("create", "insert_text", "save"):
+    if intent in (
+        "create",
+        "insert_text",
+        "save",
+        "open_document",
+        "table",
+        "field_form",
+    ):
         return "document_agent"
     return "recovery_agent"
 
@@ -94,9 +307,39 @@ def _subagent_tool_allowlist(subagent: SubagentName, intent: IntentName) -> list
             ]
         return ["hwp_ping", "hwp_platform_info", "hwp_capabilities"]
     if subagent == "template_agent":
-        return ["hwp_list_templates", "hwp_search_template"]
-    if subagent == "document_agent":
         return [
+            "hwp_list_templates",
+            "hwp_search_template",
+            "hwp_create_from_template",
+        ]
+    if subagent == "document_agent":
+        if intent == "open_document":
+            return [
+                "hwp_platform_info",
+                "hwp_open",
+                "hwp_insert_text",
+                "hwp_windows_insert_text",
+                "hwp_save",
+                "hwp_save_document",
+            ]
+        if intent == "table":
+            return [
+                "hwp_platform_info",
+                "hwp_create_table",
+                "hwp_set_cell_text",
+                "hwp_save",
+                "hwp_save_document",
+            ]
+        if intent == "field_form":
+            return [
+                "hwp_platform_info",
+                "hwp_create_field",
+                "hwp_put_field_text",
+                "hwp_save",
+                "hwp_save_document",
+            ]
+        return [
+            "hwp_platform_info",
             "hwp_create_hwpx",
             "hwp_create",
             "hwp_insert_text",
@@ -121,6 +364,20 @@ def _base_system_prompt() -> str:
     )
 
 
+def _planner_system_prompt() -> str:
+    return (
+        "You are the planning phase of HWPX MCP Assistant.\n"
+        "Create a short execution plan before any tool can be used.\n"
+        "Do not call tools. Do not mention tool call syntax.\n"
+        "Return JSON only with this shape:\n"
+        '{"summary": "...", "steps": ['
+        '{"id": "step-1", "title": "...", "objective": "...", "tool_hint": "optional_tool_name_or_null"}'
+        "]}.\n"
+        "Keep steps concrete, ordered, and minimal.\n"
+        "Use the same language as the user.\n"
+    )
+
+
 def _subagent_system_prompt(subagent: SubagentName) -> str:
     if subagent == "status_agent":
         return (
@@ -134,7 +391,10 @@ def _subagent_system_prompt(subagent: SubagentName) -> str:
         )
     if subagent == "document_agent":
         return (
-            "Focus: creating or editing documents. Use create/insert/save tools as needed.\n"
+            "Focus: creating or editing documents. Use open/create/table/field/insert/save tools as needed.\n"
+            "If the user wants to edit an existing file, check document state first and open the target document before writing.\n"
+            "If opening the target fails, ask for a valid document path instead of creating a new document automatically.\n"
+            "For tables, prefer table tools over plain text insertion. For form fields, prefer field tools over plain text insertion.\n"
             "If the user provides text in quotes, treat it as the exact content to insert or use.\n"
             "When multiple tool calls are needed, do them step-by-step.\n"
         )
@@ -172,6 +432,209 @@ def _tool_record_to_openai_tool(record: object) -> dict[str, object]:
             "parameters": parameters,
         },
     }
+
+
+def _format_allowlist(allowlist: list[str]) -> str:
+    if not allowlist:
+        return "none"
+    return ", ".join(allowlist)
+
+
+def _strip_json_fence(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", stripped)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    return stripped.strip()
+
+
+def _extract_json_object(text: str) -> str:
+    stripped = _strip_json_fence(text)
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start >= 0 and end > start:
+        return stripped[start : end + 1]
+    return stripped
+
+
+def _coerce_plan_step(raw: object, index: int) -> PlanStep | None:
+    if not isinstance(raw, dict):
+        return None
+
+    title_value = raw.get("title")
+    objective_value = raw.get("objective")
+    if not isinstance(title_value, str) or not title_value.strip():
+        return None
+
+    title = title_value.strip()
+    objective = (
+        objective_value.strip()
+        if isinstance(objective_value, str) and objective_value.strip()
+        else title
+    )
+    tool_hint = raw.get("tool_hint")
+    normalized_tool_hint = (
+        tool_hint.strip() if isinstance(tool_hint, str) and tool_hint.strip() else None
+    )
+    step_id = raw.get("id")
+    normalized_id = (
+        step_id.strip()
+        if isinstance(step_id, str) and step_id.strip()
+        else f"step-{index}"
+    )
+    return PlanStep(
+        id=normalized_id,
+        title=title,
+        objective=objective,
+        tool_hint=normalized_tool_hint,
+    )
+
+
+def _fallback_plan(
+    *,
+    message: str,
+    intent: IntentName,
+    subagent: SubagentName,
+    allowlist: list[str],
+) -> ExecutionPlan:
+    summary = f"요청을 처리하기 위한 실행 계획을 준비합니다: {message.strip()}"
+    steps: list[PlanStep]
+
+    if subagent == "status_agent":
+        steps = [
+            PlanStep(
+                id="step-1",
+                title="상태 확인",
+                objective="백엔드 상태 또는 지원 기능을 확인합니다.",
+                tool_hint=allowlist[0] if allowlist else None,
+            )
+        ]
+    elif subagent == "template_agent":
+        steps = [
+            PlanStep(
+                id="step-1",
+                title="템플릿 확인",
+                objective="요청에 맞는 템플릿 목록이나 검색 결과를 확인합니다.",
+                tool_hint=allowlist[0] if allowlist else None,
+            )
+        ]
+    elif subagent == "document_agent":
+        steps = [
+            PlanStep(
+                id="step-1",
+                title="문서 작업 준비",
+                objective="요청된 문서 작업에 필요한 생성 또는 편집 단계를 정리합니다.",
+                tool_hint=allowlist[0] if allowlist else None,
+            ),
+            PlanStep(
+                id="step-2",
+                title="문서 반영",
+                objective="정리한 계획에 따라 실제 문서 내용을 반영합니다.",
+                tool_hint=allowlist[1]
+                if len(allowlist) > 1
+                else allowlist[0]
+                if allowlist
+                else None,
+            ),
+        ]
+        if intent == "save":
+            steps.append(
+                PlanStep(
+                    id="step-3",
+                    title="문서 저장",
+                    objective="변경된 문서를 지정된 형식으로 저장합니다.",
+                    tool_hint=allowlist[-1] if allowlist else None,
+                )
+            )
+    elif subagent == "export_agent":
+        steps = [
+            PlanStep(
+                id="step-1",
+                title="내보내기 준비",
+                objective="요청된 형식으로 문서를 내보낼 수 있도록 출력 경로와 방식을 정합니다.",
+                tool_hint=allowlist[0] if allowlist else None,
+            )
+        ]
+    elif subagent == "search_agent":
+        steps = [
+            PlanStep(
+                id="step-1",
+                title="검색 실행",
+                objective="문서에서 필요한 키워드나 텍스트를 찾습니다.",
+                tool_hint=allowlist[0] if allowlist else None,
+            )
+        ]
+    else:
+        steps = [
+            PlanStep(
+                id="step-1",
+                title="요청 해석",
+                objective="현재 요청을 처리할 수 있는 방법을 확인합니다.",
+                tool_hint=allowlist[0] if allowlist else None,
+            )
+        ]
+
+    return ExecutionPlan(summary=summary, steps=steps, raw_text="")
+
+
+def _parse_plan_response(
+    *,
+    raw_text: str,
+    message: str,
+    intent: IntentName,
+    subagent: SubagentName,
+    allowlist: list[str],
+) -> ExecutionPlan:
+    fallback = _fallback_plan(
+        message=message,
+        intent=intent,
+        subagent=subagent,
+        allowlist=allowlist,
+    )
+    if not raw_text.strip():
+        return fallback
+
+    candidate = _extract_json_object(raw_text)
+    try:
+        payload = json.loads(candidate)
+    except ValueError:
+        fallback.raw_text = raw_text
+        return fallback
+
+    if not isinstance(payload, dict):
+        fallback.raw_text = raw_text
+        return fallback
+
+    summary_value = payload.get("summary")
+    raw_steps = payload.get("steps")
+    steps: list[PlanStep] = []
+    if isinstance(raw_steps, list):
+        for index, item in enumerate(raw_steps, start=1):
+            step = _coerce_plan_step(item, index)
+            if step is not None:
+                steps.append(step)
+
+    if not steps:
+        fallback.raw_text = raw_text
+        return fallback
+
+    summary = (
+        summary_value.strip()
+        if isinstance(summary_value, str) and summary_value.strip()
+        else fallback.summary
+    )
+    return ExecutionPlan(summary=summary, steps=steps, raw_text=raw_text)
+
+
+def _render_plan_for_execution(plan: ExecutionPlan) -> str:
+    rendered_steps = []
+    for step in plan.steps:
+        line = f"- {step.id}: {step.title} | objective={step.objective}"
+        if step.tool_hint:
+            line += f" | tool_hint={step.tool_hint}"
+        rendered_steps.append(line)
+    body = "\n".join(rendered_steps) if rendered_steps else "- no steps"
+    return f"Execution plan summary: {plan.summary}\n{body}"
 
 
 class OpenRouterClient:
@@ -232,6 +695,9 @@ class OpenRouterClient:
 
     def _auth_candidates(self, provider: str) -> list[tuple[str, str]]:
         normalized_provider = self.normalize_provider(provider)
+
+        if normalized_provider == LOCAL_PROVIDER:
+            return [("local-transformers", "")]
 
         if normalized_provider == CODEX_PROXY_PROVIDER:
             codex_proxy_access_token = (
@@ -299,7 +765,9 @@ class OpenRouterClient:
 
     def auth_status(self, provider: str) -> dict[str, object]:
         normalized_provider = self.normalize_provider(provider)
-        if normalized_provider == CODEX_PROXY_PROVIDER:
+        if normalized_provider == LOCAL_PROVIDER:
+            accepted_env: list[str] = []
+        elif normalized_provider == CODEX_PROXY_PROVIDER:
             accepted_env = [CODEX_PROXY_ACCESS_TOKEN_ENV]
         elif normalized_provider == OPENROUTER_PROVIDER:
             accepted_env = [OPENROUTER_API_KEY_ENV]
@@ -478,6 +946,9 @@ class OpenRouterClient:
     @classmethod
     def _resolve_model(cls, provider: str, model: str) -> str:
         normalized_provider = cls.normalize_provider(provider)
+        if normalized_provider == LOCAL_PROVIDER:
+            candidate = model.strip()
+            return candidate or LOCAL_DEFAULT_MODEL
         if normalized_provider == CODEX_PROXY_PROVIDER:
             return cls._resolve_codex_proxy_model(model)
         if normalized_provider == OPENROUTER_PROVIDER:
@@ -489,6 +960,8 @@ class OpenRouterClient:
         cls, provider: str, proxy_url: str | None = None
     ) -> str:
         normalized_provider = cls.normalize_provider(provider)
+        if normalized_provider == LOCAL_PROVIDER:
+            return "local://transformers"
         if normalized_provider == CODEX_PROXY_PROVIDER:
             return cls._resolve_codex_proxy_url(proxy_url)
         if normalized_provider == OPENROUTER_PROVIDER:
@@ -581,6 +1054,9 @@ class OpenRouterClient:
 class OpenRouterToolAgent:
     backend_server: BackendServer
     client: OpenRouterClient = field(default_factory=OpenRouterClient)
+    local_model_manager: LocalModelManagerProtocol = field(
+        default_factory=LocalTransformersModelManager
+    )
     model: str = ""
     provider: str = DEFAULT_PROVIDER
     codex_proxy_url: str = ""
@@ -608,6 +1084,8 @@ class OpenRouterToolAgent:
             self.provider,
             configured_model,
         )
+        if self.provider == LOCAL_PROVIDER:
+            self.local_model_manager.model_id = self.model
         self.codex_proxy_url = self._normalize_codex_proxy_url(
             self.provider,
             configured_codex_proxy_url,
@@ -617,6 +1095,8 @@ class OpenRouterToolAgent:
     @classmethod
     def _normalize_model_for_provider(cls, provider: str, model: str | None) -> str:
         candidate = model.strip() if isinstance(model, str) else ""
+        if provider == LOCAL_PROVIDER:
+            return candidate or LOCAL_DEFAULT_MODEL
         if provider == CODEX_PROXY_PROVIDER:
             return OpenRouterClient._resolve_codex_proxy_model(candidate)
         if provider == OPENROUTER_PROVIDER:
@@ -638,6 +1118,18 @@ class OpenRouterToolAgent:
             runtime["proxy_url"] = self.codex_proxy_url
         return runtime
 
+    def local_model_status(self) -> dict[str, object]:
+        return self.local_model_manager.status().to_payload()
+
+    async def download_local_model(self, *, force: bool = False) -> dict[str, object]:
+        return await self.local_model_manager.ensure_downloaded(force=force)
+
+    def _effective_provider_and_model(self) -> tuple[str, str, bool]:
+        if self.provider == LOCAL_PROVIDER:
+            return LOCAL_PROVIDER, self.model or LOCAL_DEFAULT_MODEL, False
+
+        return self.provider, self.model, False
+
     def set_runtime_config(
         self,
         *,
@@ -652,6 +1144,8 @@ class OpenRouterToolAgent:
         next_model = self.model
         if model is not None or provider is not None:
             next_model = self._normalize_model_for_provider(next_provider, model)
+        if next_provider == LOCAL_PROVIDER:
+            self.local_model_manager.model_id = next_model
 
         next_codex_proxy_url = self.codex_proxy_url
         if next_provider == CODEX_PROXY_PROVIDER:
@@ -667,6 +1161,86 @@ class OpenRouterToolAgent:
         self.model = next_model
         self.codex_proxy_url = next_codex_proxy_url
         return self.runtime_config()
+
+    async def _build_plan(
+        self,
+        *,
+        message: str,
+        intent: IntentName,
+        case: CaseName,
+        subagent: SubagentName,
+        allowlist: list[str],
+        provider: str,
+        model: str,
+    ) -> ExecutionPlan:
+        planner_messages: list[dict[str, object]] = [
+            {"role": "system", "content": _planner_system_prompt()},
+            {
+                "role": "user",
+                "content": (
+                    f"User request: {message}\n"
+                    f"Detected intent: {intent}\n"
+                    f"Detected case: {case}\n"
+                    f"Selected subagent: {subagent}\n"
+                    f"Available tools for later execution: {_format_allowlist(allowlist)}"
+                ),
+            },
+        ]
+        response = await self._chat_completions(
+            model=model,
+            provider=provider,
+            messages=planner_messages,
+            tools=None,
+            tool_choice=None,
+        )
+        choice = _first_choice(response)
+        assistant_message = choice.get("message")
+        if not isinstance(assistant_message, dict):
+            return _fallback_plan(
+                message=message,
+                intent=intent,
+                subagent=subagent,
+                allowlist=allowlist,
+            )
+
+        content = assistant_message.get("content")
+        raw_text = content if isinstance(content, str) else ""
+        return _parse_plan_response(
+            raw_text=raw_text,
+            message=message,
+            intent=intent,
+            subagent=subagent,
+            allowlist=allowlist,
+        )
+
+    async def _chat_completions(
+        self,
+        *,
+        model: str,
+        provider: str,
+        messages: list[dict[str, object]],
+        tools: list[dict[str, object]] | None,
+        tool_choice: str | None,
+    ) -> dict[str, object]:
+        if provider == LOCAL_PROVIDER:
+            try:
+                return await self.local_model_manager.chat_completions(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                )
+            except LocalModelError as error:
+                raise LocalModelNotReadyError(str(error)) from error
+
+        return await self.client.chat_completions(
+            model=model,
+            provider=provider,
+            proxy_url=self.codex_proxy_url,
+            messages=messages,
+            tools=tools,
+            tool_choice=tool_choice,
+        )
 
     async def run(self, *, message: str, session_id: str = "") -> dict[str, object]:
         await self._gateway.refresh_registry()
@@ -685,12 +1259,30 @@ class OpenRouterToolAgent:
                 continue
             tool_defs.append(_tool_record_to_openai_tool(record))
 
+        request_provider, request_model, used_local_fallback = (
+            self._effective_provider_and_model()
+        )
+
+        plan = await self._build_plan(
+            message=message,
+            intent=intent,
+            case=case,
+            subagent=subagent,
+            allowlist=allowlist,
+            provider=request_provider,
+            model=request_model,
+        )
+
         messages: list[dict[str, object]] = [
             {
                 "role": "system",
                 "content": _base_system_prompt()
                 + "\n"
                 + _subagent_system_prompt(subagent),
+            },
+            {
+                "role": "assistant",
+                "content": _render_plan_for_execution(plan),
             },
             {"role": "user", "content": message},
         ]
@@ -700,10 +1292,9 @@ class OpenRouterToolAgent:
         last_arguments: JsonObject = {}
 
         for _round in range(self.max_rounds):
-            response = await self.client.chat_completions(
-                model=self.model,
-                provider=self.provider,
-                proxy_url=self.codex_proxy_url,
+            response = await self._chat_completions(
+                model=request_model,
+                provider=request_provider,
                 messages=messages,
                 tools=tool_defs if tool_defs else None,
                 tool_choice="auto" if tool_defs else None,
@@ -716,6 +1307,7 @@ class OpenRouterToolAgent:
                     "case": case,
                     "intent": intent,
                     "subagent": subagent,
+                    "plan": plan.to_payload(),
                     "reply": "모델 응답을 파싱하지 못했습니다.",
                     "error": "invalid_model_response",
                 }
@@ -756,6 +1348,8 @@ class OpenRouterToolAgent:
                 "case": case,
                 "intent": intent,
                 "subagent": subagent,
+                "plan": plan.to_payload(),
+                "used_local_fallback": used_local_fallback,
                 "selected_tool": last_tool_name,
                 "arguments": last_arguments,
                 "reply": reply,
@@ -777,12 +1371,34 @@ class OpenRouterToolAgent:
             "case": case,
             "intent": intent,
             "subagent": subagent,
+            "plan": plan.to_payload(),
+            "used_local_fallback": used_local_fallback,
             "reply": "도구 호출 루프가 너무 오래 지속되었습니다.",
             "error": "max_rounds_exceeded",
         }
 
     def auth_status(self) -> dict[str, object]:
-        return self.client.auth_status(self.provider)
+        remote_auth = self.client.auth_status(self.provider)
+        local_status = self.local_model_status()
+
+        if self.provider == LOCAL_PROVIDER:
+            return {
+                "configured": local_status.get("ready") is True,
+                "mode": "local-transformers"
+                if local_status.get("ready") is True
+                else "none",
+                "available_modes": ["local-transformers"]
+                if local_status.get("ready") is True
+                else [],
+                "accepted_env": [],
+                "local_fallback": local_status,
+                "detail": local_status.get("detail", ""),
+            }
+
+        if remote_auth.get("configured") is True:
+            return remote_auth
+
+        return remote_auth
 
     def set_runtime_auth(
         self,

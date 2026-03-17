@@ -11,6 +11,18 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $specFile = Join-Path $repoRoot "hwpx-mcp-backend.spec"
 $distDir = Join-Path $repoRoot "dist"
+$pythonVersionFile = Join-Path $repoRoot "scripts/runtime/python-version.txt"
+
+if (-not (Test-Path $pythonVersionFile)) {
+    Write-Error "Missing Python version pin: $pythonVersionFile"
+    exit 1
+}
+
+$pythonVersion = (Get-Content -Path $pythonVersionFile -Raw).Trim()
+if (-not $pythonVersion) {
+    Write-Error "Python version pin is empty: $pythonVersionFile"
+    exit 1
+}
 
 if (-not (Test-Path $specFile)) {
     Write-Error "Spec file not found at $specFile"
@@ -38,11 +50,11 @@ function Install-PyInstaller {
 function Install-Dependencies {
     Write-Host "Ensuring backend Python dependencies are installed..."
     if (Get-Command uv -ErrorAction SilentlyContinue) {
-        uv pip install -e $repoRoot
+        uv pip install -e "$repoRoot[local_llm]"
     } elseif (Get-Command pip3 -ErrorAction SilentlyContinue) {
-        pip3 install -e $repoRoot
+        pip3 install -e "$repoRoot[local_llm]"
     } elseif (Get-Command pip -ErrorAction SilentlyContinue) {
-        pip install -e $repoRoot
+        pip install -e "$repoRoot[local_llm]"
     } else {
         Write-Error "No pip/uv found to install dependencies."
         exit 1
@@ -51,6 +63,7 @@ function Install-Dependencies {
 
 Write-Host "=== HWPX-MCP Backend Build ==="
 Write-Host "Repository root: $repoRoot"
+Write-Host "Backend runtime pin: $pythonVersion (from $pythonVersionFile)"
 
 Install-Dependencies
 Install-PyInstaller

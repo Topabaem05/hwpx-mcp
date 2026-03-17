@@ -30,7 +30,16 @@ DIST_DIR="$REPO_ROOT/dist"
 WIN_BACKEND_DIR="$DIST_DIR/hwpx-mcp-backend-win"
 WHEEL_DIR="$DIST_DIR/_win_wheels"
 
-PYTHON_VERSION="3.11.9"
+PYTHON_VERSION_FILE="$REPO_ROOT/scripts/runtime/python-version.txt"
+if [ ! -f "$PYTHON_VERSION_FILE" ]; then
+  echo "ERROR: Missing Python version pin: $PYTHON_VERSION_FILE"
+  exit 1
+fi
+PYTHON_VERSION="$(tr -d '\r\n' < "$PYTHON_VERSION_FILE")"
+if [ -z "$PYTHON_VERSION" ]; then
+  echo "ERROR: Empty Python version pin: $PYTHON_VERSION_FILE"
+  exit 1
+fi
 PYTHON_EMBED_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip"
 PYTHON_EMBED_ZIP="$DIST_DIR/python-${PYTHON_VERSION}-embed-amd64.zip"
 
@@ -38,6 +47,7 @@ echo "=============================================="
 echo " Windows Self-Contained Backend Builder"
 echo "=============================================="
 echo "Python version:  $PYTHON_VERSION"
+echo "Version source:  $PYTHON_VERSION_FILE"
 echo "Output:          $WIN_BACKEND_DIR"
 echo ""
 
@@ -67,14 +77,14 @@ import pathlib
 import sys
 
 pth = pathlib.Path(sys.argv[1])
-text = pth.read_text(encoding="utf-8")
+text = pth.read_text(encoding="ascii")
 text = text.replace("#import site", "import site")
 lines = text.splitlines()
 if "../Lib/site-packages" not in lines:
     lines.append("../Lib/site-packages")
 if ".." not in lines:
     lines.append("..")
-pth.write_text("\n".join(lines) + "\n", encoding="utf-8")
+pth.write_text("\n".join(lines) + "\n", encoding="ascii")
 PY
   echo "Enabled site-packages in $PTH_FILE"
 fi
@@ -85,6 +95,8 @@ echo "--- Step 2: Downloading Windows wheels ---"
 PY_MINOR="${PYTHON_VERSION%.*}"
 
 DEPS=(
+  "pyhwpx"
+  "pywin32>=305"
   "mcp>=1.0.0"
   "fastmcp>=0.2.0"
   "pyhwp>=0.1a"
@@ -103,6 +115,11 @@ DEPS=(
   "starlette>=0.38.0"
   "httpx>=0.28.0"
   "langgraph>=0.2.0"
+  "torch>=2.5.0"
+  "transformers>=4.49.0"
+  "accelerate>=1.2.0"
+  "safetensors>=0.5.0"
+  "huggingface_hub>=0.28.0"
 )
 
 for dep in "${DEPS[@]}"; do
@@ -170,8 +187,8 @@ cat > "$WIN_BACKEND_DIR/hwpx-mcp-backend.bat" << 'BATCH_EOF'
 setlocal
 
 set "SCRIPT_DIR=%~dp0"
-set "PYTHONHOME=%SCRIPT_DIR%python"
-set "PYTHONPATH=%SCRIPT_DIR%;%SCRIPT_DIR%Lib\site-packages"
+set "PYTHONHOME="
+set "PYTHONPATH="
 set "PATH=%SCRIPT_DIR%python;%PATH%"
 
 if not defined MCP_TRANSPORT set "MCP_TRANSPORT=streamable-http"
@@ -188,8 +205,8 @@ BATCH_EOF
 
 cat > "$WIN_BACKEND_DIR/hwpx-mcp-backend.ps1" << 'PS_EOF'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$env:PYTHONHOME = Join-Path $scriptDir "python"
-$env:PYTHONPATH = "$scriptDir;$(Join-Path $scriptDir 'Lib\site-packages')"
+$env:PYTHONHOME = $null
+$env:PYTHONPATH = $null
 $env:PATH = "$(Join-Path $scriptDir 'python');$env:PATH"
 
 if (-not $env:MCP_TRANSPORT) { $env:MCP_TRANSPORT = "streamable-http" }

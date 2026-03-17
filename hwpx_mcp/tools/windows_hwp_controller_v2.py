@@ -6,7 +6,10 @@ Provides full access to ~219 pyhwpx methods through the unified interface.
 import sys
 import os
 import logging
+import importlib
 from typing import Optional, List, Dict, Any, Set
+
+from hwpx_mcp.runtime_paths import get_security_module_path
 
 from .hwp_controller_base import (
     HwpControllerBase,
@@ -67,7 +70,7 @@ class WindowsHwpControllerV2(HwpControllerBase):
             return True
 
         try:
-            from pyhwpx import Hwp
+            Hwp = importlib.import_module("pyhwpx").Hwp
 
             self._hwp = Hwp(visible=visible)
             self._visible = visible
@@ -89,13 +92,7 @@ class WindowsHwpControllerV2(HwpControllerBase):
     def _try_register_security_module(self) -> None:
         try:
             module_paths = [
-                os.path.join(
-                    os.path.dirname(__file__),
-                    "..",
-                    "..",
-                    "security_module",
-                    "FilePathCheckerModuleExample.dll",
-                ),
+                str(get_security_module_path()),
                 "D:/hwp-mcp/security_module/FilePathCheckerModuleExample.dll",
             ]
             for path in module_paths:

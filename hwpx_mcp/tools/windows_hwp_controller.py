@@ -11,6 +11,8 @@ import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
+from hwpx_mcp.runtime_paths import get_security_module_path
+
 logger = logging.getLogger("hwp-mcp-extended.windows_controller")
 
 # Check if running on Windows
@@ -91,13 +93,7 @@ class WindowsHwpController:
             if register_security_module:
                 try:
                     # Try to find security module in project directory
-                    module_path = os.path.join(
-                        os.path.dirname(__file__),
-                        "..",
-                        "..",
-                        "security_module",
-                        "FilePathCheckerModuleExample.dll",
-                    )
+                    module_path = str(get_security_module_path())
                     if not os.path.exists(module_path):
                         # Fall back to common installation paths
                         module_path = "D:/hwp-mcp/security_module/FilePathCheckerModuleExample.dll"

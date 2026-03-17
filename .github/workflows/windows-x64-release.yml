@@ -56,7 +56,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e . pyinstaller
+          python -m pip install -e .[local_llm] pyinstaller
 
       - name: Install Electron dependencies
         working-directory: electron-ui
@@ -74,37 +74,30 @@ jobs:
       - name: Verify bundled backend executable exists
         shell: pwsh
         run: |
-          $backendBuildExe = Join-Path $env:GITHUB_WORKSPACE "dist/hwpx-mcp-backend/hwpx-mcp-backend.exe"
-          if (-not (Test-Path $backendBuildExe)) {
-            throw "Backend build executable missing: $backendBuildExe"
+          $backendBuildDir = Join-Path $env:GITHUB_WORKSPACE "dist/hwpx-mcp-backend-win"
+          $backendBuildLauncher = Join-Path $backendBuildDir "hwpx-mcp-backend.bat"
+          if (-not (Test-Path $backendBuildLauncher)) {
+            throw "Backend build launcher missing: $backendBuildLauncher"
           }
 
-          $archiveListing = & pyi-archive_viewer --list --brief $backendBuildExe | Out-String
-          if ($archiveListing -notmatch "(?i)pythoncom") {
-            throw "pywin32 verification failed: pythoncom missing in backend archive"
-          }
-          if ($archiveListing -notmatch "(?i)pywintypes") {
-            throw "pywin32 verification failed: pywintypes missing in backend archive"
-          }
-          if ($archiveListing -notmatch "(?i)win32com") {
-            throw "pywin32 verification failed: win32com missing in backend archive"
+          $backendPython = Join-Path $backendBuildDir "python/python.exe"
+          if (-not (Test-Path $backendPython)) {
+            throw "Backend Python runtime missing: $backendPython"
           }
 
-          $candidates = @(
-            (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend.exe"),
-            (Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend/hwpx-mcp-backend")
-          )
-
-          $found = $false
-          foreach ($candidate in $candidates) {
-            if (Test-Path $candidate) {
-              $found = $true
-              break
-            }
+          $bundledBackendDir = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend-win"
+          if (-not (Test-Path $bundledBackendDir)) {
+            throw "Bundled backend directory missing: $bundledBackendDir"
           }
 
-          if (-not $found) {
-            throw "Bundled backend executable missing in expected resources/backend paths."
+          $bundledBackendLauncher = Join-Path $bundledBackendDir "hwpx-mcp-backend.bat"
+          if (-not (Test-Path $bundledBackendLauncher)) {
+            throw "Bundled backend launcher missing in resources/backend-win."
+          }
+
+          $bundledBackendPython = Join-Path $bundledBackendDir "python/python.exe"
+          if (-not (Test-Path $bundledBackendPython)) {
+            throw "Bundled backend Python runtime missing in resources/backend-win."
           }
 
           $proxyLauncher = Join-Path $env:GITHUB_WORKSPACE "dist/codex-proxy-win/codex-proxy.bat"
@@ -120,6 +113,61 @@ jobs:
           $bundledProxyPython = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/codex-proxy-win/python/python.exe"
           if (-not (Test-Path $bundledProxyPython)) {
             throw "Bundled codex proxy Python runtime missing: $bundledProxyPython"
+          }
+
+      - name: Smoke test bundled backend executable
+        shell: pwsh
+        run: |
+          $backendLauncher = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/backend-win/hwpx-mcp-backend.bat"
+          if (-not (Test-Path $backendLauncher)) {
+            throw "Bundled backend launcher missing: $backendLauncher"
+          }
+
+          $backendLogPath = Join-Path $env:RUNNER_TEMP "backend-win.log"
+          if (Test-Path $backendLogPath) {
+            Remove-Item $backendLogPath -Force
+          }
+
+          $env:MCP_TRANSPORT = "streamable-http"
+          $env:MCP_HOST = "127.0.0.1"
+          $env:MCP_PORT = "18000"
+          $env:MCP_PATH = "/mcp"
+          $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$backendLauncher`" > `"$backendLogPath`" 2>&1" -WindowStyle Hidden -PassThru
+          try {
+            $healthy = $false
+            for ($i = 0; $i -lt 180; $i++) {
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18000/agent/health" -TimeoutSec 2
+                if ($health.status -eq "ok") {
+                  $healthy = $true
+                  break
+                }
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+
+             if (-not $healthy) {
+               if (Test-Path $backendLogPath) {
+                 Write-Host "Bundled backend log:"
+                 Get-Content $backendLogPath -Tail 200 | ForEach-Object { Write-Host $_ }
+               }
+                throw "Bundled backend executable did not become healthy on http://127.0.0.1:18000/agent/health"
+              }
+
+             if ($health.local_model.dependency_installed -ne $true) {
+               throw "Bundled backend is missing local Qwen dependencies."
+             }
+           }
+           finally {
+             Remove-Item Env:BACKEND_LOG_PATH -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_TRANSPORT -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_HOST -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_PORT -ErrorAction SilentlyContinue
+            Remove-Item Env:MCP_PATH -ErrorAction SilentlyContinue
+            if ($process -and -not $process.HasExited) {
+              taskkill /PID $process.Id /F /T | Out-Null
+            }
           }
 
       - name: Smoke test bundled codex proxy launcher
@@ -184,6 +232,11 @@ jobs:
           $latestYml = Join-Path $outputDir "latest.yml"
           if (-not (Test-Path $latestYml)) {
             throw "Updater metadata missing: $latestYml"
+          }
+
+          $latestYmlContent = Get-Content $latestYml -Raw
+          if ($latestYmlContent -notmatch [regex]::Escape($installer.Name)) {
+            throw "Updater metadata does not reference installer: $($installer.Name)"
           }
 
           $blockmaps = Get-ChildItem $outputDir -File -Filter *.blockmap

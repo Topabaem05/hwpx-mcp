@@ -19,6 +19,8 @@ packages the installer.
 import os
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
@@ -28,6 +30,7 @@ templates_source = os.path.join(repo_root, "templates")
 security_source = os.path.join(repo_root, "security_module")
 
 datas = []
+binaries = []
 if os.path.isdir(templates_source):
     datas.append((templates_source, "templates"))
 if os.path.isdir(security_source):
@@ -85,20 +88,76 @@ hidden_imports = [
     "xmldiff",
 ]
 
+collected_packages = [
+    "fastapi",
+    "starlette",
+    "uvicorn",
+    "httpx",
+    "huggingface_hub",
+    "langgraph",
+    "pydantic",
+    "pydantic_xml",
+    "lxml",
+    "defusedxml",
+    "xmlschema",
+    "xmldiff",
+    "pyhwp",
+    "pandas",
+    "matplotlib",
+    "hwpx",
+    "accelerate",
+    "safetensors",
+    "transformers",
+    "torch",
+]
+
+collected_submodule_packages = [
+    "mcp.server",
+]
+
+def collect_required_package(package_name: str) -> None:
+    try:
+        pkg_datas, pkg_binaries, pkg_hidden = collect_all(package_name)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to collect required package '{package_name}': {exc}") from exc
+
+    datas.extend(pkg_datas)
+    binaries.extend(pkg_binaries)
+    hidden_imports.extend(pkg_hidden)
+
+
+def collect_required_submodule_package(package_name: str) -> None:
+    try:
+        hidden_imports.extend(collect_submodules(package_name))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to collect required submodules for '{package_name}': {exc}"
+        ) from exc
+
+
+for package_name in collected_packages:
+    collect_required_package(package_name)
+
+for package_name in collected_submodule_packages:
+    collect_required_submodule_package(package_name)
+
 if sys.platform == "win32":
     hidden_imports.extend([
         "hwpx_mcp.tools.windows_hwp_controller",
         "hwpx_mcp.tools.windows_hwp_controller_v2",
         "hwpx_mcp.tools.hwp_table_tools",
+        "pywintypes",
         "win32com",
         "win32com.client",
         "pythoncom",
     ])
+    for package_name in ("pyhwpx",):
+        collect_required_package(package_name)
 
 a = Analysis(
     [os.path.join(repo_root, "hwpx_mcp", "__main__.py")],
     pathex=[repo_root],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hidden_imports,
     hookspath=[],

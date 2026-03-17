@@ -9,6 +9,10 @@ const PROVIDER_OPTIONS = {
     label: "OpenRouter",
     defaultModel: "openai/gpt-oss-120b",
   },
+  local: {
+    label: "Local Qwen",
+    defaultModel: "Qwen/Qwen3.5-4B",
+  },
   openai: {
     label: "OpenAI",
     defaultModel: "gpt-4o-mini",
@@ -24,6 +28,25 @@ const defaultModelForProvider = (provider) =>
   PROVIDER_OPTIONS[normalizeProviderValue(provider)].defaultModel;
 
 const providerLabel = (provider) => PROVIDER_OPTIONS[normalizeProviderValue(provider)].label;
+
+const modelStorageKeyForProvider = (provider) => {
+  const normalizedProvider = normalizeProviderValue(provider);
+  if (normalizedProvider === "openrouter") {
+    return "openrouterModel";
+  }
+  if (normalizedProvider === "local") {
+    return "localModelId";
+  }
+  return "model";
+};
+
+const normalizeLocalModelSetupState = (value) => {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (["pending", "installing", "failed", "dismissed", "completed"].includes(normalized)) {
+    return normalized;
+  }
+  return "pending";
+};
 
 const normalizeModelValue = (provider, value) => {
   const trimmed = typeof value === "string" ? value.trim() : "";
@@ -51,14 +74,30 @@ const defaultConfig = {
     window.hwpxUi?.getConfig?.()?.backendBaseUrl ?? "http://127.0.0.1:8000",
   provider: normalizeProviderValue(window.hwpxUi?.getConfig?.()?.provider),
   model: normalizeModelValue(
-    window.hwpxUi?.getConfig?.()?.provider,
+    window.hwpxUi?.getConfig?.()?.provider === "openai" ||
+      window.hwpxUi?.getConfig?.()?.provider === "codex-proxy"
+      ? window.hwpxUi?.getConfig?.()?.provider
+      : "openai",
     window.hwpxUi?.getConfig?.()?.model
+  ),
+  openrouterModel: normalizeModelValue(
+    "openrouter",
+    window.hwpxUi?.getConfig?.()?.provider === "openrouter"
+      ? window.hwpxUi?.getConfig?.()?.model
+      : window.hwpxUi?.getConfig?.()?.openrouterModel
+  ),
+  localModelId: normalizeModelValue(
+    "local",
+    window.hwpxUi?.getConfig?.()?.provider === "local"
+      ? window.hwpxUi?.getConfig?.()?.model
+      : window.hwpxUi?.getConfig?.()?.localModelId
   ),
   codexProxyUrl: normalizeCodexProxyUrl(window.hwpxUi?.getConfig?.()?.codexProxyUrl),
   codexProxyAccessToken: "",
   openrouterApiKey: "",
   openaiApiKey: "",
   gptOauthToken: "",
+  localModelSetupState: "pending",
 };
 
 const loadConfig = () => {
@@ -96,8 +135,33 @@ const loadConfig = () => {
           }
         }
         migrated.provider = normalizeProviderValue(migrated.provider);
-        migrated.model = normalizeModelValue(migrated.provider, migrated.model);
+        migrated.openrouterModel = normalizeModelValue(
+          "openrouter",
+          typeof migrated.openrouterModel === "string"
+            ? migrated.openrouterModel
+            : migrated.provider === "openrouter"
+            ? migrated.model
+            : ""
+        );
+        migrated.localModelId = normalizeModelValue(
+          "local",
+          typeof migrated.localModelId === "string"
+            ? migrated.localModelId
+            : migrated.provider === "local"
+            ? migrated.model
+            : window.hwpxUi?.getConfig?.()?.localModelId
+        );
+        migrated.model = normalizeModelValue(
+          migrated.provider === "openai" || migrated.provider === "codex-proxy"
+            ? migrated.provider
+            : "openai",
+          migrated.model
+        );
         migrated.codexProxyUrl = normalizeCodexProxyUrl(migrated.codexProxyUrl);
+        migrated.localModelSetupState =
+          typeof migrated.localModelSetupState === "string"
+            ? normalizeLocalModelSetupState(migrated.localModelSetupState)
+            : "dismissed";
         return { ...defaultConfig, ...migrated };
       }
     }
@@ -135,10 +199,18 @@ const closeSettingsBtn = $("closeSettingsBtn");
 const backendBaseUrlInput = $("backendBaseUrlInput");
 const providerSelect = $("providerSelect");
 const modelInput = $("modelInput");
+const modelModeHint = $("modelModeHint");
 const codexProxySection = $("codexProxySection");
 const codexProxyUrlInput = $("codexProxyUrlInput");
 const codexProxyAccessTokenInput = $("codexProxyAccessTokenInput");
 const openrouterApiKeyInput = $("openrouterApiKeyInput");
+const localModelStatusBadge = $("localModelStatusBadge");
+const localModelSection = $("localModelSection");
+const localModelSetupCard = $("localModelSetupCard");
+const localModelSetupDescription = $("localModelSetupDescription");
+const localModelSetupStatus = $("localModelSetupStatus");
+const startLocalModelSetupBtn = $("startLocalModelSetupBtn");
+const skipLocalModelSetupBtn = $("skipLocalModelSetupBtn");
 const openrouterKeyRow = $("openrouterKeyRow");
 const openaiAuthSection = $("openaiAuthSection");
 const openaiApiKeyInput = $("openaiApiKeyInput");
@@ -162,6 +234,7 @@ let sessions = [];
 let activeSessionId = "";
 let currentAbort = null;
 let oauthVerificationUrl = "";
+let latestAgentHealth = null;
 
 const status = (msg) => {
   if (statusText) {
@@ -177,7 +250,19 @@ const setAppUpdateText = (msg) => {
 
 const currentProvider = () => normalizeProviderValue(config.provider);
 
-const currentModel = () => normalizeModelValue(currentProvider(), config.model);
+const modelValueForProvider = (provider) => {
+  const storageKey = modelStorageKeyForProvider(provider);
+  return config[storageKey];
+};
+
+const currentModel = (provider = currentProvider()) =>
+  normalizeModelValue(provider, modelValueForProvider(provider));
+
+const setModelForProvider = (provider, value) => {
+  const normalizedProvider = normalizeProviderValue(provider);
+  const storageKey = modelStorageKeyForProvider(normalizedProvider);
+  config[storageKey] = normalizeModelValue(normalizedProvider, value);
+};
 
 const currentCodexProxyUrl = () => normalizeCodexProxyUrl(config.codexProxyUrl);
 
@@ -188,14 +273,66 @@ const visibleAuthModeLabel = () => {
   if (currentProvider() === "openrouter") {
     return "OpenRouter API Key";
   }
+  if (currentProvider() === "local") {
+    return "Local Qwen model";
+  }
   return "OpenAI OAuth / API Key";
+};
+
+const localModelReady = (health = latestAgentHealth) => {
+  const localModel = localModelStateFromHealth(health);
+  return Boolean(localModel?.ready);
+};
+
+const setLocalModelSetupState = (nextState) => {
+  config.localModelSetupState = normalizeLocalModelSetupState(nextState);
+  persistConfig();
+};
+
+const describeLocalModelBadge = (health) => {
+  const localModel = localModelStateFromHealth(health);
+  if (currentProvider() !== "local") {
+    return {
+      text: "Local Qwen provider를 선택하면 로컬 모델 상태가 여기에 표시됩니다.",
+      className: "rounded-xl border border-zinc-700 bg-zinc-850 px-3 py-2 text-[11px] text-zinc-400",
+    };
+  }
+
+  if (localModel?.dependency_installed === false) {
+    return {
+      text: `Local dependencies missing: ${localModel.detail || "check packaged backend runtime"}`,
+      className: "rounded-xl border border-rose-400/20 bg-rose-500/8 px-3 py-2 text-[11px] text-rose-100",
+    };
+  }
+
+  if (localModel?.ready) {
+    return {
+      text: `Local ${localModel.model_id || currentModel()} is ready.`,
+      className: "rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100",
+    };
+  }
+
+  if (localModel?.downloading) {
+    return {
+      text: `Downloading local ${localModel.model_id || currentModel()} now.`,
+      className: "rounded-xl border border-amber-400/20 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-100",
+    };
+  }
+
+  return {
+    text: `Local ${currentModel()} will be downloaded and used automatically.`,
+    className: "rounded-xl border border-emerald-400/20 bg-emerald-500/8 px-3 py-2 text-[11px] text-emerald-100",
+  };
 };
 
 const runtimeConfigFromHealth = (health) => {
   const runtime = health?.runtime && typeof health.runtime === "object" ? health.runtime : null;
   const defaults = health?.defaults && typeof health.defaults === "object" ? health.defaults : null;
   const provider = normalizeProviderValue(runtime?.provider || defaults?.provider || config.provider);
-  const model = normalizeModelValue(provider, runtime?.model || defaults?.model || config.model);
+  const model = normalizeModelValue(
+    provider,
+    runtime?.model || defaults?.model || modelValueForProvider(provider)
+  );
   const proxyUrl =
     provider === "codex-proxy"
       ? normalizeCodexProxyUrl(runtime?.proxy_url || config.codexProxyUrl)
@@ -207,13 +344,32 @@ const updateProviderUi = () => {
   const provider = currentProvider();
   const isCodexProxy = provider === "codex-proxy";
   const isOpenRouter = provider === "openrouter";
+  const isLocal = provider === "local";
 
   codexProxySection?.classList.toggle("hidden", !isCodexProxy);
   openrouterKeyRow?.classList.toggle("hidden", !isOpenRouter);
-  openaiAuthSection?.classList.toggle("hidden", isCodexProxy || isOpenRouter);
+  localModelSection?.classList.toggle("hidden", !isLocal);
+  openaiAuthSection?.classList.toggle("hidden", isCodexProxy || isOpenRouter || isLocal);
   if (modelInput) {
     modelInput.placeholder = defaultModelForProvider(provider);
   }
+  if (modelModeHint) {
+    if (isOpenRouter) {
+      modelModeHint.textContent = "OpenRouter에서 사용할 원격 model ID입니다.";
+    } else if (isLocal) {
+      modelModeHint.textContent = "Local Qwen provider에서 사용할 Hugging Face model ID입니다.";
+    } else if (isCodexProxy) {
+      modelModeHint.textContent = "Codex Proxy에 전달할 model ID입니다.";
+    } else {
+      modelModeHint.textContent = "OpenAI provider에서 사용할 model ID입니다.";
+    }
+  }
+  if (localModelStatusBadge) {
+    const badge = describeLocalModelBadge(latestAgentHealth);
+    localModelStatusBadge.textContent = badge.text;
+    localModelStatusBadge.className = badge.className;
+  }
+  renderLocalModelSetupCard(latestAgentHealth);
 
   if (chatTitle) {
     chatTitle.innerHTML = `${escapeHtml(`${providerLabel(provider)} (${currentModel()})`)} <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-500"></i>`;
@@ -258,6 +414,9 @@ const describeAgentHealth = (health, prefix = "Agent connected") => {
 
   if (auth.configured === true) {
     const mode = auth.mode || "configured";
+    if (mode === "local-transformers") {
+      return `${base}, local Qwen active`;
+    }
     const source = auth.source ? ` via ${auth.source}` : "";
     return `${base}, auth ${mode}${source}`;
   }
@@ -348,6 +507,9 @@ const authStatusLabel = (auth) => {
   }
 
   if (auth.configured) {
+    if (auth.mode === "local-transformers") {
+      return "auth:local-qwen";
+    }
     return `auth:${auth.mode || "configured"}`;
   }
 
@@ -355,12 +517,17 @@ const authStatusLabel = (auth) => {
 };
 
 const hasStoredAuth = (provider = currentProvider()) => {
-  if (normalizeProviderValue(provider) === "codex-proxy") {
+  const normalizedProvider = normalizeProviderValue(provider);
+  if (normalizedProvider === "codex-proxy") {
     return Boolean((config.codexProxyAccessToken || "").trim());
   }
 
-  if (normalizeProviderValue(provider) === "openrouter") {
+  if (normalizedProvider === "openrouter") {
     return Boolean((config.openrouterApiKey || "").trim());
+  }
+
+  if (normalizedProvider === "local") {
+    return false;
   }
 
   return Boolean((config.openaiApiKey || "").trim() || (config.gptOauthToken || "").trim());
@@ -467,7 +634,177 @@ const shouldRetryWithAuthSyncForError = (message) => {
   );
 };
 
+const localModelStateFromHealth = (health) => {
+  if (health?.local_model && typeof health.local_model === "object") {
+    return health.local_model;
+  }
+  if (health?.auth?.local_fallback && typeof health.auth.local_fallback === "object") {
+    return health.auth.local_fallback;
+  }
+  return null;
+};
+
+const shouldDownloadLocalFallback = (health) => {
+  const runtime = runtimeConfigFromHealth(health);
+  const localModel = localModelStateFromHealth(health);
+  if (!localModel || typeof localModel !== "object") {
+    return false;
+  }
+  if (currentProvider() !== "local" || runtime.provider !== "local") {
+    return false;
+  }
+  if (hasStoredAuth(runtime.provider)) {
+    return false;
+  }
+  if (health?.auth?.configured) {
+    return false;
+  }
+  if (localModel.ready || localModel.downloading) {
+    return false;
+  }
+  return localModel.dependency_installed !== false;
+};
+
+const shouldShowLocalModelSetupCard = (health = latestAgentHealth) => {
+  const setupState = normalizeLocalModelSetupState(config.localModelSetupState);
+  if (setupState === "dismissed" || setupState === "completed") {
+    return false;
+  }
+
+  return !localModelReady(health);
+};
+
+const renderLocalModelSetupCard = (health = latestAgentHealth) => {
+  if (!localModelSetupCard || !localModelSetupDescription || !localModelSetupStatus) {
+    return;
+  }
+
+  if (localModelReady(health) && config.localModelSetupState !== "completed") {
+    setLocalModelSetupState("completed");
+  }
+
+  const localModel = localModelStateFromHealth(health);
+  const setupState = normalizeLocalModelSetupState(config.localModelSetupState);
+  const visible = shouldShowLocalModelSetupCard(health);
+  localModelSetupCard.classList.toggle("hidden", !visible);
+  if (!visible) {
+    return;
+  }
+
+  let description = "로컬 Qwen 모델을 설치하면 Windows 설치 직후 인터넷이 가능한 환경에서 문서 작업용 로컬 AI를 준비할 수 있습니다.";
+  let setupStatusText = "Local Qwen 설치를 시작할 수 있습니다.";
+
+  if (setupState === "installing") {
+    setupStatusText = `로컬 모델 ${localModel?.model_id || currentModel("local")} 설치를 진행 중입니다.`;
+  } else if (setupState === "failed") {
+    setupStatusText = "Local Qwen 설치가 실패했습니다. 네트워크 또는 설치 환경을 확인한 뒤 다시 시도하세요.";
+  } else if (localModel?.dependency_installed === false) {
+    description = "이 설치본에는 Local Qwen 실행에 필요한 Python 패키지가 없거나 손상되었습니다. 설치본을 다시 받아 주세요.";
+    setupStatusText = localModel.detail || "local_dependencies_missing";
+  } else if (localModel?.downloading) {
+    setupStatusText = `로컬 모델 ${localModel.model_id || currentModel("local")} 다운로드 중입니다.`;
+  }
+
+  localModelSetupDescription.textContent = description;
+  localModelSetupStatus.textContent = setupStatusText;
+
+  if (startLocalModelSetupBtn) {
+    startLocalModelSetupBtn.disabled = setupState === "installing";
+    startLocalModelSetupBtn.textContent = setupState === "failed" ? "Local Qwen 다시 설치" : "Local Qwen 설치";
+  }
+};
+
 const endpointUrl = (path) => `${normalizeBaseUrl(config.backendBaseUrl)}${path}`;
+
+const downloadLocalModel = async (force = false) => {
+  await syncBaseUrlWithBackendStatus();
+  const response = await fetch(endpointUrl("/agent/local-model/download"), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({ force }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail;
+    const reason =
+      payload?.error ||
+      payload?.message ||
+      (typeof detail === "string" ? detail : Array.isArray(detail) ? JSON.stringify(detail) : "") ||
+      `HTTP ${response.status}`;
+    throw new Error(String(reason));
+  }
+  return payload;
+};
+
+const ensureLocalFallbackReady = async (health) => {
+  if (!shouldDownloadLocalFallback(health)) {
+    return health;
+  }
+
+  const localModel = localModelStateFromHealth(health);
+  const modelId = typeof localModel?.model_id === "string" ? localModel.model_id : "local model";
+  status(`Downloading local model ${modelId}...`);
+  try {
+    await downloadLocalModel();
+  } catch (error) {
+    status(`Local model setup failed: ${error?.message || String(error)}`);
+    return health;
+  }
+  const nextHealth = await checkAgentEndpoint();
+  status(describeAgentHealth(nextHealth, "Local model ready"));
+  return nextHealth;
+};
+
+const ensureLocalModelSetup = async () => {
+  setLocalModelSetupState("installing");
+  config.provider = "local";
+  persistConfig();
+  renderConfig();
+  status("Preparing Local Qwen setup...");
+
+  try {
+    try {
+      await restartBackendWithCurrentCredentials();
+    } catch (error) {
+      status(`Backend restart failed during Local Qwen setup: ${error?.message || String(error)}`);
+    }
+
+    const ready = await waitForBackend(10, 1000);
+    if (!ready) {
+      throw new Error("backend_not_ready_for_local_qwen_setup");
+    }
+
+    await syncAgentConfig();
+    let health = await checkAgentEndpoint();
+    const localModel = localModelStateFromHealth(health);
+
+    if (localModel?.dependency_installed === false) {
+      throw new Error(localModel.detail || "local_dependencies_missing");
+    }
+
+    if (!localModel?.ready) {
+      status(`Downloading local model ${localModel?.model_id || currentModel("local")}...`);
+      await downloadLocalModel();
+      health = await checkAgentEndpoint();
+    }
+
+    if (!localModelStateFromHealth(health)?.ready) {
+      throw new Error("local_model_not_ready_after_download");
+    }
+
+    setLocalModelSetupState("completed");
+    renderLocalModelSetupCard(health);
+    status(describeAgentHealth(health, "Local Qwen ready"));
+  } catch (error) {
+    setLocalModelSetupState("failed");
+    renderLocalModelSetupCard(latestAgentHealth);
+    status(`Local Qwen setup failed: ${error?.message || String(error)}`);
+  }
+};
 
 const closeSidebar = () => {
   sidebar?.classList.add("-translate-x-full");
@@ -566,11 +903,18 @@ const makeTitle = (text) => {
   return cleaned.length > 24 ? `${cleaned.slice(0, 21)}...` : cleaned;
 };
 
-const addMsg = (role, text, streaming = false) => {
+const addMsg = (role, text, streaming = false, options = {}) => {
   const session = activeSession();
   if (!session) return null;
 
-  const message = { role, text, ts: Date.now(), streaming };
+  const message = {
+    role,
+    text,
+    ts: Date.now(),
+    streaming,
+    variant: typeof options.variant === "string" ? options.variant : "",
+    title: typeof options.title === "string" ? options.title : "",
+  };
   session.messages.push(message);
   renderMessages();
   return message;
@@ -582,6 +926,71 @@ const escapeHtml = (text) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br>");
+
+const formatAgentPlan = (plan) => {
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)) {
+    return "";
+  }
+
+  const sections = ["Plan"];
+  if (typeof plan.summary === "string" && plan.summary.trim()) {
+    sections.push(plan.summary.trim());
+  }
+
+  if (Array.isArray(plan.steps) && plan.steps.length) {
+    const lines = plan.steps
+      .map((step, index) => {
+        if (!step || typeof step !== "object") {
+          return "";
+        }
+
+        const title = typeof step.title === "string" ? step.title.trim() : "";
+        const objective = typeof step.objective === "string" ? step.objective.trim() : "";
+        const toolHint = typeof step.tool_hint === "string" ? step.tool_hint.trim() : "";
+        const detail = [objective, toolHint ? `tool: ${toolHint}` : ""].filter(Boolean).join(" | ");
+        const prefix = `${index + 1}. ${title || `Step ${index + 1}`}`;
+        return detail ? `${prefix} - ${detail}` : prefix;
+      })
+      .filter(Boolean);
+
+    if (lines.length) {
+      sections.push(lines.join("\n"));
+    }
+  }
+
+  return sections.join("\n\n").trim();
+};
+
+const messageVariantMeta = (message) => {
+  if (message.variant === "plan") {
+    return {
+      badge: message.title || "Plan",
+      wrapperClass:
+        "rounded-2xl border border-amber-400/25 bg-amber-500/8 px-4 py-3 shadow-[0_0_0_1px_rgba(251,191,36,0.04)]",
+      badgeClass:
+        "inline-flex items-center rounded-full border border-amber-300/25 bg-amber-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200",
+      textClass: "text-amber-50",
+    };
+  }
+
+  if (message.variant === "execution") {
+    return {
+      badge: message.title || "Execution",
+      wrapperClass:
+        "rounded-2xl border border-emerald-400/20 bg-emerald-500/8 px-4 py-3 shadow-[0_0_0_1px_rgba(52,211,153,0.04)]",
+      badgeClass:
+        "inline-flex items-center rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200",
+      textClass: "text-zinc-100",
+    };
+  }
+
+  return {
+    badge: "",
+    wrapperClass: "",
+    badgeClass: "",
+    textClass: "text-zinc-200",
+  };
+};
 
 const renderSessionList = () => {
   if (!sessionList) {
@@ -628,12 +1037,21 @@ const renderMessages = () => {
       message.role === "user"
         ? '<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm">U</div>'
         : '<div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center border border-zinc-700"><i data-lucide="bot" class="w-5 h-5"></i></div>';
+    const variantMeta = messageVariantMeta(message);
 
     const body = message.streaming
       ? '<div class="flex items-center gap-1 h-6"><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div><div class="w-2 h-2 bg-zinc-500 rounded-full typing-dot"></div></div>'
-      : `<div class="prose prose-invert max-w-none text-zinc-200 text-[15px] leading-relaxed break-words">${escapeHtml(
-          message.text
-        )}</div>`;
+      : `
+        <div class="${variantMeta.wrapperClass || ""}">
+          ${
+            variantMeta.badge
+              ? `<div class="mb-3 ${variantMeta.badgeClass}">${escapeHtml(variantMeta.badge)}</div>`
+              : ""
+          }
+          <div class="prose prose-invert max-w-none ${variantMeta.textClass} text-[15px] leading-relaxed break-words">${escapeHtml(
+            message.text
+          )}</div>
+        </div>`;
 
     const html = `
       <div class="flex gap-4 px-2 py-4 group">
@@ -686,6 +1104,7 @@ const restartBackendWithCurrentCredentials = async () => {
   const result = await window.hwpxUi.restartBackend({
     provider: currentProvider(),
     model: currentModel(),
+    localModelId: config.localModelId,
     codexProxyUrl: currentCodexProxyUrl(),
     codexProxyAccessToken: config.codexProxyAccessToken,
     openrouterApiKey: config.openrouterApiKey,
@@ -728,7 +1147,10 @@ const checkAgentEndpoint = async () => {
     throw new Error(`Agent ${response.status}: ${body.slice(0, 160)}`);
   }
 
-  return response.json();
+  const payload = await response.json();
+  latestAgentHealth = payload;
+  updateProviderUi();
+  return payload;
 };
 
 const callAgentChat = async (message, signal) => {
@@ -885,8 +1307,10 @@ const runToolOnlyAgent = async (userText, botMsg, signal) => {
   }
 
   let reply = "";
+  let planText = "";
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-    reply = payload.reply || payload.message || JSON.stringify(payload, null, 2);
+    planText = formatAgentPlan(payload.plan);
+    reply = payload.reply || payload.message || (planText ? "" : JSON.stringify(payload, null, 2));
     if (payload.case && payload.subagent) {
       status(`Case: ${payload.case} | Subagent: ${payload.subagent}`);
     }
@@ -896,8 +1320,14 @@ const runToolOnlyAgent = async (userText, botMsg, signal) => {
     reply = JSON.stringify(payload, null, 2);
   }
 
-  botMsg.text = reply;
+  botMsg.text = planText || reply;
   botMsg.streaming = false;
+  botMsg.variant = planText ? "plan" : "";
+  botMsg.title = planText ? "Plan" : "";
+
+  if (planText && reply) {
+    addMsg("bot", reply, false, { variant: "execution", title: "Execution" });
+  }
 };
 
 const handleUserMessage = async (text) => {
@@ -963,6 +1393,8 @@ const waitForBackend = async (maxAttempts = 15, delayMs = 2000) => {
         } catch {
         }
       }
+
+      health = await ensureLocalFallbackReady(health);
 
       status(
         `Agent connected (${runtimeConfigFromHealth(health).provider} / ${runtimeConfigFromHealth(health).model}, ${authStatusLabel(
@@ -1041,7 +1473,7 @@ settingsOverlay?.addEventListener("click", closeSettings);
 saveSettingsBtn?.addEventListener("click", async () => {
   config.backendBaseUrl = normalizeBaseUrl(backendBaseUrlInput?.value || "");
   config.provider = normalizeProviderValue(providerSelect?.value);
-  config.model = normalizeModelValue(config.provider, modelInput?.value);
+  setModelForProvider(config.provider, modelInput?.value);
   config.codexProxyUrl = normalizeCodexProxyUrl(codexProxyUrlInput?.value || "");
   config.codexProxyAccessToken = (codexProxyAccessTokenInput?.value || "").trim();
   config.openrouterApiKey = (openrouterApiKeyInput?.value || "").trim();
@@ -1069,9 +1501,11 @@ saveSettingsBtn?.addEventListener("click", async () => {
 
   try {
     await syncAgentConfig();
-    const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
-    const mode = authSync?.auth?.mode || "unknown";
-    status(`${restartText} Auth synced (${mode}).`);
+    if (hasStoredAuth()) {
+      await syncAgentAuth();
+    }
+    const health = await checkAgentEndpoint();
+    status(`${restartText} ${describeAgentHealth(health, "Agent ready")}`);
   } catch (error) {
     status(`${restartText} Auth sync failed: ${error?.message || String(error)}`);
   }
@@ -1085,16 +1519,31 @@ resetSettingsBtn?.addEventListener("click", () => {
   status("Settings reset");
 });
 
+startLocalModelSetupBtn?.addEventListener("click", async () => {
+  await ensureLocalModelSetup();
+});
+
+skipLocalModelSetupBtn?.addEventListener("click", () => {
+  setLocalModelSetupState("dismissed");
+  renderLocalModelSetupCard(latestAgentHealth);
+  status("Local Qwen setup skipped. You can install it later from settings.");
+});
+
 providerSelect?.addEventListener("change", () => {
-  const nextProvider = normalizeProviderValue(providerSelect.value);
   const previousProvider = currentProvider();
+  setModelForProvider(previousProvider, modelInput?.value);
+  const nextProvider = normalizeProviderValue(providerSelect.value);
   config.provider = nextProvider;
-  if (!modelInput?.value || normalizeModelValue(previousProvider, modelInput.value) === defaultModelForProvider(previousProvider)) {
-    config.model = defaultModelForProvider(nextProvider);
-  } else {
-    config.model = normalizeModelValue(nextProvider, modelInput.value);
-  }
   renderConfig();
+});
+
+modelInput?.addEventListener("input", () => {
+  setModelForProvider(currentProvider(), modelInput.value);
+});
+
+openrouterApiKeyInput?.addEventListener("input", () => {
+  config.openrouterApiKey = (openrouterApiKeyInput.value || "").trim();
+  updateProviderUi();
 });
 
 oauthCopyCodeBtn?.addEventListener("click", async () => {
@@ -1230,7 +1679,13 @@ openAiOauthLoginBtn?.addEventListener("click", async () => {
 
     await syncAgentConfig();
     const authSync = hasStoredAuth() ? await syncAgentAuth() : { auth: { mode: "none" } };
-    const mode = authSync?.auth?.mode || (currentProvider() === "openrouter" ? "openrouter-ready" : "unknown");
+    const mode =
+      authSync?.auth?.mode ||
+      (currentProvider() === "local"
+        ? "local-ready"
+        : currentProvider() === "openrouter"
+        ? "openrouter-ready"
+        : "unknown");
     if (restartError) {
       status(
         `OAuth token synced (${mode}). Backend restart failed: ${restartError?.message || String(
@@ -1373,6 +1828,7 @@ renderConfig();
 renderAll();
 autoResize();
 updateSendBtn();
+renderLocalModelSetupCard(latestAgentHealth);
 
 (async () => {
   await new Promise((resolve) => setTimeout(resolve, 2000));

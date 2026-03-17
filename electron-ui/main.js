@@ -3,11 +3,13 @@ const { autoUpdater } = require("electron-updater");
 const { join, resolve, dirname } = require("path");
 const { spawn, spawnSync } = require("child_process");
 const { existsSync, appendFileSync, mkdirSync } = require("fs");
+const { ensureAsync, resolveManagedBackend } = require("./scripts/runtime-manager");
 
 const MCP_HOST = process.env.MCP_HOST || "127.0.0.1";
 const MCP_PORT = process.env.MCP_PORT || "8000";
 const MCP_PATH = process.env.MCP_PATH || "/mcp";
 const BACKEND_URL = `http://${MCP_HOST}:${MCP_PORT}${MCP_PATH}`;
+const REPO_ROOT = resolve(__dirname, "..");
 
 const OPENAI_OAUTH_ISSUER = (process.env.OPENAI_OAUTH_ISSUER || "https://auth.openai.com")
   .trim()
@@ -22,13 +24,25 @@ const OPENAI_OAUTH_TIMEOUT_MS = Number.parseInt(
 );
 const OPENAI_OAUTH_API_BASE = `${OPENAI_OAUTH_ISSUER}/api/accounts`;
 const OPENAI_OAUTH_DEVICE_URL = `${OPENAI_OAUTH_ISSUER}/codex/device`;
-const DEFAULT_AGENT_PROVIDER = (process.env.HWPX_AGENT_PROVIDER || "codex-proxy").trim();
-const DEFAULT_AGENT_MODEL = (process.env.HWPX_AGENT_MODEL || "gpt-5").trim();
+const DEFAULT_AGENT_PROVIDER = (process.env.HWPX_AGENT_PROVIDER || "openrouter").trim();
+const DEFAULT_AGENT_MODEL = (process.env.HWPX_AGENT_MODEL || "openai/gpt-oss-120b").trim();
 const DEFAULT_CODEX_PROXY_URL = (
   process.env.HWPX_CODEX_PROXY_URL || "http://127.0.0.1:2455/v1/chat/completions"
 ).trim();
 const DEFAULT_CODEX_PROXY_START = process.env.HWPX_CODEX_PROXY_START !== "0";
 const DEFAULT_CODEX_PROXY_COMMAND = (process.env.HWPX_CODEX_PROXY_COMMAND || "").trim();
+const DEFAULT_LOCAL_MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B").trim();
+
+const localModelBaseDir = () => {
+  const localAppData = (process.env.LOCALAPPDATA || "").trim();
+  if (localAppData) {
+    return join(localAppData, "HWPX MCP");
+  }
+  return join(app.getPath("userData"), "local-model");
+};
+
+const defaultLocalModelHome = () => join(localModelBaseDir(), "models");
+const defaultHfHome = () => join(localModelBaseDir(), "hf");
 
 const readUrlField = (value) => {
   if (typeof value !== "string") {
@@ -129,9 +143,16 @@ const setBackendCredentials = (opts) => {
 
   const provider = typeof opts.provider === "string" && opts.provider.trim() ? opts.provider.trim() : DEFAULT_AGENT_PROVIDER;
   const model = typeof opts.model === "string" && opts.model.trim() ? opts.model.trim() : DEFAULT_AGENT_MODEL;
+  const localModelId =
+    typeof opts.localModelId === "string" && opts.localModelId.trim()
+      ? opts.localModelId.trim()
+      : provider === "local"
+      ? model
+      : effectiveEnv("HWPX_LOCAL_MODEL_ID", DEFAULT_LOCAL_MODEL_ID);
 
   setOptionalEnv("HWPX_AGENT_PROVIDER", provider);
   setOptionalEnv("HWPX_AGENT_MODEL", model);
+  setOptionalEnv("HWPX_LOCAL_MODEL_ID", localModelId);
   setOptionalEnv(
     "HWPX_CODEX_PROXY_URL",
     provider === "codex-proxy" ? opts.codexProxyUrl || DEFAULT_CODEX_PROXY_URL : ""
@@ -530,6 +551,31 @@ const isCmd = (cmd) => {
   return spawnSync(check, [cmd], { stdio: "ignore" }).status === 0;
 };
 
+const getPrimaryCommandToken = (command) => {
+  const match = String(command || "").match(/^\s*(?:"([^"]+)"|(\S+))/);
+  if (!match) {
+    return "";
+  }
+  return match[1] || match[2] || "";
+};
+
+const resolveBackendExecutable = (executablePath) => {
+  if (!executablePath) {
+    return "";
+  }
+
+  if (existsSync(executablePath)) {
+    return executablePath;
+  }
+
+  const resolvedPath = resolve(REPO_ROOT, executablePath);
+  if (existsSync(resolvedPath)) {
+    return resolvedPath;
+  }
+
+  return "";
+};
+
 const isCodexProxyReachable = async (chatUrl) => {
   const probeUrls = codexProxyProbeUrls(chatUrl);
   if (probeUrls.length === 0) {
@@ -754,46 +800,89 @@ const syncCodexProxyLifecycle = async () => {
   return startCodexProxy();
 };
 
-const findBackendCommand = () => {
+const findBackendCommand = async () => {
+  const explicitBackendExecutable = (process.env.HWPX_MCP_BACKEND_EXE || "").trim();
+  if (explicitBackendExecutable) {
+    const resolvedBackendExe = resolveBackendExecutable(explicitBackendExecutable);
+    if (!resolvedBackendExe) {
+      log(`Configured HWPX_MCP_BACKEND_EXE not found: ${explicitBackendExecutable}`);
+      return null;
+    }
+
+    return {
+      cmd: resolvedBackendExe,
+      type: "bin",
+      cwd: dirname(resolvedBackendExe),
+      source: "explicit-executable",
+    };
+  }
+
+  const hasExplicitBackendCommand = Object.prototype.hasOwnProperty.call(
+    process.env,
+    "HWPX_MCP_BACKEND_COMMAND"
+  );
+  if (hasExplicitBackendCommand) {
+    return {
+      cmd: String(process.env.HWPX_MCP_BACKEND_COMMAND || "").trim(),
+      type: "shell",
+      cwd: REPO_ROOT,
+      source: "explicit-command",
+    };
+  }
+
   const isWin = process.platform === "win32";
   const binName = isWin ? "hwpx-mcp-backend.exe" : "hwpx-mcp-backend";
   const batName = "hwpx-mcp-backend.bat";
-
   const resPath = typeof process.resourcesPath === "string" && process.resourcesPath
     ? process.resourcesPath
     : null;
-
   const appDir = __dirname;
-  const repoRoot = resolve(appDir, "..");
 
   const candidates = [];
 
   if (resPath) {
-    candidates.push({ path: join(resPath, "backend", binName), type: "bin" });
     if (isWin) candidates.push({ path: join(resPath, "backend-win", batName), type: "bat" });
+    candidates.push({ path: join(resPath, "backend", binName), type: "bin" });
   }
 
-  candidates.push({ path: join(appDir, "resources", "backend", binName), type: "bin" });
   if (isWin) candidates.push({ path: join(appDir, "resources", "backend-win", batName), type: "bat" });
+  candidates.push({ path: join(appDir, "resources", "backend", binName), type: "bin" });
 
-  candidates.push({ path: join(repoRoot, "dist", "hwpx-mcp-backend", binName), type: "bin" });
-  if (isWin) candidates.push({ path: join(repoRoot, "dist", "hwpx-mcp-backend-win", batName), type: "bat" });
+  if (isWin) candidates.push({ path: join(REPO_ROOT, "dist", "hwpx-mcp-backend-win", batName), type: "bat" });
+  candidates.push({ path: join(REPO_ROOT, "dist", "hwpx-mcp-backend", binName), type: "bin" });
 
   for (const c of candidates) {
     log(`Checking: ${c.path} → ${existsSync(c.path) ? "FOUND" : "not found"}`);
     if (existsSync(c.path)) {
-      return { cmd: c.path, type: c.type, cwd: dirname(c.path) };
+      return {
+        cmd: c.path,
+        type: c.type,
+        cwd: dirname(c.path),
+        source: "bundled-backend",
+      };
     }
   }
 
-  if (isCmd("uv")) {
-    log("Fallback: uv run hwpx-mcp");
-    return { cmd: "uv run hwpx-mcp", type: "shell", cwd: repoRoot };
-  }
-  const py = isCmd("python3") ? "python3" : isCmd("python") ? "python" : null;
-  if (py) {
-    log(`Fallback: ${py} -m hwpx_mcp.server`);
-    return { cmd: `${py} -m hwpx_mcp.server`, type: "shell", cwd: repoRoot };
+  try {
+    const runtimeEnsure = await ensureAsync({ env: process.env });
+    const managed = resolveManagedBackend(runtimeEnsure.pythonPath, process.env);
+    const managedExecutable = getPrimaryCommandToken(managed.backendCommand);
+
+    if (!managedExecutable || !existsSync(managedExecutable)) {
+      log(
+        `Managed runtime backend executable does not exist: ${managedExecutable || "<empty>"}`
+      );
+      return null;
+    }
+
+    return {
+      cmd: managed.backendCommand,
+      type: "shell",
+      cwd: REPO_ROOT,
+      source: "managed-runtime",
+    };
+  } catch (error) {
+    log(`Managed runtime resolution failed: ${error.message}`);
   }
 
   log("No backend command found.");
@@ -802,13 +891,13 @@ const findBackendCommand = () => {
 
 const isBackendManaged = () => process.env.HWPX_MCP_START_BACKEND !== "0";
 
-const startBackend = () => {
+const startBackend = async () => {
   if (!isBackendManaged()) {
     log("Backend start skipped (HWPX_MCP_START_BACKEND=0)");
     return;
   }
 
-  const found = findBackendCommand();
+  const found = await findBackendCommand();
   if (!found) {
     log("ERROR: No backend command available.");
     return;
@@ -834,19 +923,29 @@ const startBackend = () => {
   log(`  cwd: ${cwd}`);
   log(`  type: ${type}`);
 
+  const launchEnv = {
+    ...process.env,
+    ...backendEnvOverrides,
+    MCP_TRANSPORT: "streamable-http",
+    MCP_HOST,
+    MCP_PORT,
+    MCP_PATH,
+    HWPX_LOCAL_MODEL_ID: effectiveEnv("HWPX_LOCAL_MODEL_ID", DEFAULT_LOCAL_MODEL_ID),
+    HWPX_LOCAL_MODEL_HOME: effectiveEnv("HWPX_LOCAL_MODEL_HOME", defaultLocalModelHome()),
+    HF_HOME: effectiveEnv("HF_HOME", defaultHfHome()),
+  };
+
+  if (found.source === "managed-runtime" || found.source === "bundled-backend") {
+    delete launchEnv.PYTHONHOME;
+    delete launchEnv.PYTHONPATH;
+  }
+
   try {
     backendProcess = spawn(spawnCmd, spawnArgs, {
       cwd,
       shell: type !== "bin",
       windowsVerbatimArguments: isWin && type === "bat",
-      env: {
-        ...process.env,
-        ...backendEnvOverrides,
-        MCP_TRANSPORT: "streamable-http",
-        MCP_HOST,
-        MCP_PORT,
-        MCP_PATH,
-      },
+      env: launchEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -999,7 +1098,7 @@ ipcMain.handle("backend:restart", async (_, opts) => {
   if (process.platform === "win32") {
     await sleep(450);
   }
-  startBackend();
+  await startBackend();
   return {
     restarted: backendProcess !== null,
     managed: true,
@@ -1041,7 +1140,7 @@ ipcMain.handle("auth:openai-oauth-login", async () => {
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   await syncCodexProxyLifecycle();
-  startBackend();
+  await startBackend();
   createWindow();
   setupAutoUpdater();
 

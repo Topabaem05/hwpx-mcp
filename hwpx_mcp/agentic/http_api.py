@@ -11,6 +11,8 @@ from .openrouter_agent import DEFAULT_MODEL
 from .openrouter_agent import DEFAULT_PROVIDER
 from .openrouter_agent import AgentAuthError
 from .openrouter_agent import LlmRequestError
+from .openrouter_agent import LocalModelError
+from .openrouter_agent import LocalModelNotReadyError
 from .openrouter_agent import OpenRouterToolAgent
 
 
@@ -31,6 +33,10 @@ class ConfigRequest(BaseModel):
     provider: str | None = None
     model: str | None = None
     proxy_url: str | None = None
+
+
+class LocalModelDownloadRequest(BaseModel):
+    force: bool = False
 
 
 class AgentHttpSurface:
@@ -56,6 +62,7 @@ class AgentHttpSurface:
             },
             "runtime": self._agent.runtime_config(),
             "auth": auth,
+            "local_model": self._agent.local_model_status(),
         }
 
     async def set_auth(self, payload: AuthRequest) -> dict[str, object]:
@@ -99,6 +106,8 @@ class AgentHttpSurface:
             if error.status_code in (400, 401, 403, 404, 429):
                 status_code = 400
             raise HTTPException(status_code=status_code, detail=str(error)) from error
+        except LocalModelNotReadyError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
         except Exception as error:
             raise HTTPException(
                 status_code=500, detail=f"agent_runtime_error: {error}"
@@ -107,6 +116,17 @@ class AgentHttpSurface:
             **result,
             "runtime": self._agent.runtime_config(),
         }
+
+    async def local_model_status(self) -> dict[str, object]:
+        return self._agent.local_model_status()
+
+    async def download_local_model(
+        self, payload: LocalModelDownloadRequest
+    ) -> dict[str, object]:
+        try:
+            return await self._agent.download_local_model(force=payload.force)
+        except LocalModelError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 def build_agent_http_router(
@@ -132,5 +152,15 @@ def build_agent_http_router(
     @router.post("/agent/chat")
     async def agent_chat(payload: ChatRequest) -> dict[str, object]:
         return await surface.chat(payload)
+
+    @router.get("/agent/local-model/status")
+    async def agent_local_model_status() -> dict[str, object]:
+        return await surface.local_model_status()
+
+    @router.post("/agent/local-model/download")
+    async def agent_local_model_download(
+        payload: LocalModelDownloadRequest,
+    ) -> dict[str, object]:
+        return await surface.download_local_model(payload)
 
     return router

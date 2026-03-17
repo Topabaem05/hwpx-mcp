@@ -28,12 +28,25 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $electronUiDir = Join-Path $repoRoot "electron-ui"
 $distDir = Join-Path $repoRoot "dist"
+$pythonVersionFile = Join-Path $repoRoot "scripts/runtime/python-version.txt"
+
+if (-not (Test-Path $pythonVersionFile)) {
+    Write-Error "Missing Python version pin: $pythonVersionFile"
+    exit 1
+}
+
+$pythonVersion = (Get-Content -Path $pythonVersionFile -Raw).Trim()
+if (-not $pythonVersion) {
+    Write-Error "Python version pin is empty: $pythonVersionFile"
+    exit 1
+}
 
 Write-Host "=============================================="
 Write-Host " HWPX-MCP Installer Build Pipeline"
 Write-Host "=============================================="
 Write-Host "Repository:   $repoRoot"
 Write-Host "Platform:     Windows $([System.Environment]::Is64BitOperatingSystem ? 'x64' : 'x86')"
+Write-Host "Backend pin:  $pythonVersion (from $pythonVersionFile)"
 Write-Host "Skip backend: $SkipBackend"
 Write-Host ""
 

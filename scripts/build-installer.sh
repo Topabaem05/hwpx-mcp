@@ -24,8 +24,19 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ELECTRON_UI_DIR="$REPO_ROOT/electron-ui"
 DIST_DIR="$REPO_ROOT/dist"
+PYTHON_VERSION_FILE="$REPO_ROOT/scripts/runtime/python-version.txt"
 SKIP_BACKEND=false
 TARGET_PLATFORM=""
+
+if [ ! -f "$PYTHON_VERSION_FILE" ]; then
+  echo "ERROR: Missing Python version pin: $PYTHON_VERSION_FILE"
+  exit 1
+fi
+PYTHON_VERSION="$(tr -d '\r\n' < "$PYTHON_VERSION_FILE")"
+if [ -z "$PYTHON_VERSION" ]; then
+  echo "ERROR: Empty Python version pin: $PYTHON_VERSION_FILE"
+  exit 1
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -42,6 +53,7 @@ echo " HWPX-MCP Installer Build Pipeline"
 echo "=============================================="
 echo "Repository:    $REPO_ROOT"
 echo "Host platform: $(uname -s) $(uname -m)"
+echo "Backend pin:   $PYTHON_VERSION (from $PYTHON_VERSION_FILE)"
 echo "Target:        ${TARGET_PLATFORM:-auto-detect}"
 echo "Skip backend:  $SKIP_BACKEND"
 echo ""

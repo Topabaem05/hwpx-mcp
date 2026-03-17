@@ -124,15 +124,19 @@ jobs:
           }
 
           $backendLogPath = Join-Path $env:RUNNER_TEMP "backend-win.log"
+          $backendErrLogPath = Join-Path $env:RUNNER_TEMP "backend-win.err.log"
           if (Test-Path $backendLogPath) {
             Remove-Item $backendLogPath -Force
+          }
+          if (Test-Path $backendErrLogPath) {
+            Remove-Item $backendErrLogPath -Force
           }
 
           $env:MCP_TRANSPORT = "streamable-http"
           $env:MCP_HOST = "127.0.0.1"
           $env:MCP_PORT = "18000"
           $env:MCP_PATH = "/mcp"
-          $process = Start-Process -FilePath $backendLauncher -WindowStyle Hidden -RedirectStandardOutput $backendLogPath -RedirectStandardError $backendLogPath -PassThru
+          $process = Start-Process -FilePath $backendLauncher -WindowStyle Hidden -RedirectStandardOutput $backendLogPath -RedirectStandardError $backendErrLogPath -PassThru
           try {
             $healthy = $false
             $health = $null
@@ -167,10 +171,17 @@ jobs:
 
              if (-not $healthy) {
                if (Test-Path $backendLogPath) {
-                 Write-Host "Bundled backend log:"
+                 Write-Host "Bundled backend stdout log:"
                  Get-Content $backendLogPath -Tail 200 | ForEach-Object { Write-Host $_ }
                } else {
-                 Write-Host "Bundled backend log file was not created: $backendLogPath"
+                 Write-Host "Bundled backend stdout log file was not created: $backendLogPath"
+               }
+
+               if (Test-Path $backendErrLogPath) {
+                 Write-Host "Bundled backend stderr log:"
+                 Get-Content $backendErrLogPath -Tail 200 | ForEach-Object { Write-Host $_ }
+               } else {
+                 Write-Host "Bundled backend stderr log file was not created: $backendErrLogPath"
                }
 
                if ($process -and $process.HasExited) {

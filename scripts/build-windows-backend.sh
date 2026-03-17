@@ -82,6 +82,10 @@ text = text.replace("#import site", "import site")
 lines = text.splitlines()
 if "../Lib/site-packages/win32" not in lines:
     lines.append("../Lib/site-packages/win32")
+if "../Lib/site-packages/win32/lib" not in lines:
+    lines.append("../Lib/site-packages/win32/lib")
+if "../Lib/site-packages/Pythonwin" not in lines:
+    lines.append("../Lib/site-packages/Pythonwin")
 if "../Lib/site-packages/pywin32_system32" not in lines:
     lines.append("../Lib/site-packages/pywin32_system32")
 if "../Lib/site-packages" not in lines:

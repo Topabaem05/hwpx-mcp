@@ -107,6 +107,8 @@ if ($pthFile) {
         if ($_ -eq "#import site") { "import site" } else { $_ }
     }
     if ($lines -notcontains "..\Lib\site-packages\win32") { $lines += "..\Lib\site-packages\win32" }
+    if ($lines -notcontains "..\Lib\site-packages\win32\lib") { $lines += "..\Lib\site-packages\win32\lib" }
+    if ($lines -notcontains "..\Lib\site-packages\Pythonwin") { $lines += "..\Lib\site-packages\Pythonwin" }
     if ($lines -notcontains "..\Lib\site-packages\pywin32_system32") { $lines += "..\Lib\site-packages\pywin32_system32" }
     if ($lines -notcontains "..\Lib\site-packages") { $lines += "..\Lib\site-packages" }
     if ($lines -notcontains "..") { $lines += ".." }

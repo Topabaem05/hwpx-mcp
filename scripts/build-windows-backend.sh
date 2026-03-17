@@ -198,6 +198,8 @@ set "SCRIPT_DIR=%~dp0"
 set "PYTHONHOME="
 set "PYTHONPATH="
 set "PATH=%SCRIPT_DIR%python;%PATH%"
+if exist "%SCRIPT_DIR%Lib\site-packages\torch\lib" set "PATH=%SCRIPT_DIR%Lib\site-packages\torch\lib;%PATH%"
+if exist "%SCRIPT_DIR%Lib\site-packages\torch\bin" set "PATH=%SCRIPT_DIR%Lib\site-packages\torch\bin;%PATH%"
 
 if not defined MCP_TRANSPORT set "MCP_TRANSPORT=streamable-http"
 if not defined MCP_HOST set "MCP_HOST=127.0.0.1"
@@ -216,6 +218,10 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $env:PYTHONHOME = $null
 $env:PYTHONPATH = $null
 $env:PATH = "$(Join-Path $scriptDir 'python');$env:PATH"
+$torchLibDir = Join-Path $scriptDir "Lib/site-packages/torch/lib"
+if (Test-Path $torchLibDir) { $env:PATH = "$torchLibDir;$env:PATH" }
+$torchBinDir = Join-Path $scriptDir "Lib/site-packages/torch/bin"
+if (Test-Path $torchBinDir) { $env:PATH = "$torchBinDir;$env:PATH" }
 
 if (-not $env:MCP_TRANSPORT) { $env:MCP_TRANSPORT = "streamable-http" }
 if (-not $env:MCP_HOST)      { $env:MCP_HOST = "127.0.0.1" }

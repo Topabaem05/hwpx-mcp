@@ -841,15 +841,15 @@ const findBackendCommand = async () => {
   const candidates = [];
 
   if (resPath) {
-    candidates.push({ path: join(resPath, "backend", binName), type: "bin" });
     if (isWin) candidates.push({ path: join(resPath, "backend-win", batName), type: "bat" });
+    candidates.push({ path: join(resPath, "backend", binName), type: "bin" });
   }
 
-  candidates.push({ path: join(appDir, "resources", "backend", binName), type: "bin" });
   if (isWin) candidates.push({ path: join(appDir, "resources", "backend-win", batName), type: "bat" });
+  candidates.push({ path: join(appDir, "resources", "backend", binName), type: "bin" });
 
-  candidates.push({ path: join(REPO_ROOT, "dist", "hwpx-mcp-backend", binName), type: "bin" });
   if (isWin) candidates.push({ path: join(REPO_ROOT, "dist", "hwpx-mcp-backend-win", batName), type: "bat" });
+  candidates.push({ path: join(REPO_ROOT, "dist", "hwpx-mcp-backend", binName), type: "bin" });
 
   for (const c of candidates) {
     log(`Checking: ${c.path} → ${existsSync(c.path) ? "FOUND" : "not found"}`);

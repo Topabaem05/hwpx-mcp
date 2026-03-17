@@ -53,7 +53,7 @@ Write-Host ""
 # Step 1: Backend
 if (-not $SkipBackend) {
     Write-Host "--- Step 1: Building backend binary ---"
-    & (Join-Path $repoRoot "scripts" "build-backend.ps1")
+    & (Join-Path $repoRoot "scripts" "build-windows-backend.ps1")
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Backend build failed."
         exit 1
@@ -68,9 +68,9 @@ if (-not $SkipBackend) {
     Write-Host ""
 } else {
     Write-Host "--- Step 1: Skipping backend build ---"
-    $backendDir = Join-Path $distDir "hwpx-mcp-backend"
+    $backendDir = Join-Path $distDir "hwpx-mcp-backend-win"
     if (-not (Test-Path $backendDir)) {
-        Write-Warning "dist\hwpx-mcp-backend\ not found."
+        Write-Warning "dist\hwpx-mcp-backend-win\ not found."
         Write-Warning "Electron installer will be built without bundled backend."
         Write-Warning "Users will need Python runtime to run the backend."
     }
@@ -123,7 +123,7 @@ Write-Host " Build Complete"
 Write-Host "=============================================="
 Write-Host ""
 
-$backendOutputDir = Join-Path $distDir "hwpx-mcp-backend"
+$backendOutputDir = Join-Path $distDir "hwpx-mcp-backend-win"
 if (Test-Path $backendOutputDir) {
     Write-Host "Backend binary:  $backendOutputDir"
 }

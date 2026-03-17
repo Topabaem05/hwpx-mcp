@@ -67,7 +67,7 @@ if [ "$SKIP_BACKEND" = false ]; then
     bash "$REPO_ROOT/scripts/build-windows-codex-proxy.sh"
   else
     echo "--- Step 1: Building backend binary ---"
-    bash "$REPO_ROOT/scripts/build-backend.sh"
+    bash "$REPO_ROOT/scripts/build-windows-backend.sh"
   fi
   echo ""
 else
@@ -144,8 +144,8 @@ echo " Build Complete"
 echo "=============================================="
 echo ""
 
-if [ -d "$DIST_DIR/hwpx-mcp-backend" ]; then
-  echo "Backend binary:  $DIST_DIR/hwpx-mcp-backend/"
+if [ -d "$DIST_DIR/hwpx-mcp-backend-win" ]; then
+  echo "Backend binary:  $DIST_DIR/hwpx-mcp-backend-win/"
 fi
 if [ -d "$DIST_DIR/codex-proxy-win" ]; then
   echo "Codex proxy:     $DIST_DIR/codex-proxy-win/"

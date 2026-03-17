@@ -123,11 +123,16 @@ jobs:
             throw "Bundled backend launcher missing: $backendLauncher"
           }
 
+          $backendLogPath = Join-Path $env:RUNNER_TEMP "backend-win.log"
+          if (Test-Path $backendLogPath) {
+            Remove-Item $backendLogPath -Force
+          }
+
           $env:MCP_TRANSPORT = "streamable-http"
           $env:MCP_HOST = "127.0.0.1"
           $env:MCP_PORT = "18000"
           $env:MCP_PATH = "/mcp"
-          $process = Start-Process -FilePath $backendLauncher -WindowStyle Hidden -PassThru
+          $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$backendLauncher`" > `"$backendLogPath`" 2>&1" -WindowStyle Hidden -PassThru
           try {
             $healthy = $false
             for ($i = 0; $i -lt 45; $i++) {
@@ -143,17 +148,22 @@ jobs:
             }
 
              if (-not $healthy) {
-               throw "Bundled backend executable did not become healthy on http://127.0.0.1:18000/agent/health"
-             }
+               if (Test-Path $backendLogPath) {
+                 Write-Host "Bundled backend log:"
+                 Get-Content $backendLogPath -Tail 200 | ForEach-Object { Write-Host $_ }
+               }
+                throw "Bundled backend executable did not become healthy on http://127.0.0.1:18000/agent/health"
+              }
 
              if ($health.local_model.dependency_installed -ne $true) {
                throw "Bundled backend is missing local Qwen dependencies."
              }
            }
            finally {
-            Remove-Item Env:MCP_TRANSPORT -ErrorAction SilentlyContinue
-            Remove-Item Env:MCP_HOST -ErrorAction SilentlyContinue
-            Remove-Item Env:MCP_PORT -ErrorAction SilentlyContinue
+             Remove-Item Env:BACKEND_LOG_PATH -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_TRANSPORT -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_HOST -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_PORT -ErrorAction SilentlyContinue
             Remove-Item Env:MCP_PATH -ErrorAction SilentlyContinue
             if ($process -and -not $process.HasExited) {
               taskkill /PID $process.Id /F /T | Out-Null

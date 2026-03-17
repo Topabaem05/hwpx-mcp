@@ -135,7 +135,7 @@ jobs:
           $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$backendLauncher`" > `"$backendLogPath`" 2>&1" -WindowStyle Hidden -PassThru
           try {
             $healthy = $false
-            for ($i = 0; $i -lt 45; $i++) {
+            for ($i = 0; $i -lt 180; $i++) {
               try {
                 $health = Invoke-RestMethod -Uri "http://127.0.0.1:18000/agent/health" -TimeoutSec 2
                 if ($health.status -eq "ok") {

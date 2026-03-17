@@ -132,43 +132,70 @@ jobs:
           $env:MCP_HOST = "127.0.0.1"
           $env:MCP_PORT = "18000"
           $env:MCP_PATH = "/mcp"
-          $process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$backendLauncher`" > `"$backendLogPath`" 2>&1" -WindowStyle Hidden -PassThru
+          $process = Start-Process -FilePath $backendLauncher -WindowStyle Hidden -RedirectStandardOutput $backendLogPath -RedirectStandardError $backendLogPath -PassThru
           try {
             $healthy = $false
+            $health = $null
+            $healthUrl = ""
+            $healthUrls = @(
+              "http://127.0.0.1:18000/agent/health",
+              "http://127.0.0.1:18000/mcp/agent/health"
+            )
             for ($i = 0; $i -lt 180; $i++) {
-              try {
-                $health = Invoke-RestMethod -Uri "http://127.0.0.1:18000/agent/health" -TimeoutSec 2
-                if ($health.status -eq "ok") {
-                  $healthy = $true
-                  break
-                }
-              } catch {
-                Start-Sleep -Seconds 1
+              if ($process -and $process.HasExited) {
+                break
               }
+
+              foreach ($candidateUrl in $healthUrls) {
+                try {
+                  $health = Invoke-RestMethod -Uri $candidateUrl -TimeoutSec 4
+                  if ($health.status -eq "ok") {
+                    $healthy = $true
+                    $healthUrl = $candidateUrl
+                    break
+                  }
+                } catch {
+                }
+              }
+
+              if ($healthy) {
+                break
+              }
+
+              Start-Sleep -Seconds 1
             }
 
              if (-not $healthy) {
                if (Test-Path $backendLogPath) {
                  Write-Host "Bundled backend log:"
                  Get-Content $backendLogPath -Tail 200 | ForEach-Object { Write-Host $_ }
+               } else {
+                 Write-Host "Bundled backend log file was not created: $backendLogPath"
                }
-                throw "Bundled backend executable did not become healthy on http://127.0.0.1:18000/agent/health"
+
+               if ($process -and $process.HasExited) {
+                 Write-Host "Bundled backend process exited early with code: $($process.ExitCode)"
+               }
+
+                throw "Bundled backend executable did not become healthy on any expected endpoint: $($healthUrls -join ', ')"
               }
+
+             Write-Host "Bundled backend became healthy on $healthUrl"
 
              if ($health.local_model.dependency_installed -ne $true) {
                throw "Bundled backend is missing local Qwen dependencies."
              }
-           }
-           finally {
-             Remove-Item Env:BACKEND_LOG_PATH -ErrorAction SilentlyContinue
-             Remove-Item Env:MCP_TRANSPORT -ErrorAction SilentlyContinue
-             Remove-Item Env:MCP_HOST -ErrorAction SilentlyContinue
-             Remove-Item Env:MCP_PORT -ErrorAction SilentlyContinue
-            Remove-Item Env:MCP_PATH -ErrorAction SilentlyContinue
-            if ($process -and -not $process.HasExited) {
-              taskkill /PID $process.Id /F /T | Out-Null
             }
-          }
+            finally {
+              Remove-Item Env:BACKEND_LOG_PATH -ErrorAction SilentlyContinue
+              Remove-Item Env:MCP_TRANSPORT -ErrorAction SilentlyContinue
+              Remove-Item Env:MCP_HOST -ErrorAction SilentlyContinue
+              Remove-Item Env:MCP_PORT -ErrorAction SilentlyContinue
+             Remove-Item Env:MCP_PATH -ErrorAction SilentlyContinue
+             if ($process -and -not $process.HasExited) {
+               taskkill /PID $process.Id /F /T | Out-Null
+             }
+           }
 
       - name: Smoke test bundled codex proxy launcher
         shell: pwsh

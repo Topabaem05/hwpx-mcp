@@ -19,6 +19,8 @@ LOCAL_MODEL_HOME_ENV = "HWPX_LOCAL_MODEL_HOME"
 HF_HOME_ENV = "HF_HOME"
 HF_HUB_DISABLE_SYMLINKS_WARNING_ENV = "HF_HUB_DISABLE_SYMLINKS_WARNING"
 LOCAL_DEFAULT_MODEL = "Qwen/Qwen3.5-4B"
+_WINDOWS_DLL_DIRECTORY_HANDLES: list[object] = []
+_WINDOWS_DLL_DIRECTORIES: set[str] = set()
 
 
 class LocalModelError(RuntimeError):
@@ -103,6 +105,41 @@ def _default_hf_home() -> Path:
     return Path.home().resolve() / ".cache" / "hwpx-mcp" / "hf"
 
 
+def _is_windows() -> bool:
+    return os.name == "nt"
+
+
+def _torch_runtime_directories() -> list[Path]:
+    try:
+        spec = find_spec("torch")
+    except (ImportError, AttributeError, ValueError):
+        return []
+    if spec is None:
+        return []
+
+    torch_root: Path | None = None
+    search_locations = spec.submodule_search_locations
+    if search_locations:
+        torch_root = Path(next(iter(search_locations))).resolve()
+    elif spec.origin:
+        torch_root = Path(spec.origin).resolve().parent
+    if torch_root is None:
+        return []
+
+    candidates = [
+        torch_root / "lib",
+        torch_root / "bin",
+    ]
+    directories: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if not candidate.is_dir() or candidate in seen:
+            continue
+        seen.add(candidate)
+        directories.append(candidate)
+    return directories
+
+
 class LocalTransformersModelManager:
     def __init__(
         self,
@@ -127,6 +164,7 @@ class LocalTransformersModelManager:
         self._loaded_model: Any = None
         self._loaded_tokenizer: Any = None
         self._last_error = ""
+        self._dll_directories_configured = False
 
     @property
     def local_dir(self) -> Path:
@@ -152,6 +190,44 @@ class LocalTransformersModelManager:
             if spec is None:
                 return f"No module named '{module_name}'"
         return ""
+
+    def _configure_windows_torch_dll_directories(self) -> None:
+        if not _is_windows() or self._dll_directories_configured:
+            return
+
+        directories = _torch_runtime_directories()
+        if not directories:
+            self._dll_directories_configured = True
+            return
+
+        add_dll_directory = getattr(os, "add_dll_directory", None)
+        if callable(add_dll_directory):
+            for directory in directories:
+                normalized = os.path.normcase(os.path.normpath(str(directory)))
+                if normalized in _WINDOWS_DLL_DIRECTORIES:
+                    continue
+                _WINDOWS_DLL_DIRECTORY_HANDLES.append(add_dll_directory(str(directory)))
+                _WINDOWS_DLL_DIRECTORIES.add(normalized)
+
+        current_path = os.environ.get("PATH", "")
+        path_entries = [entry for entry in current_path.split(os.pathsep) if entry]
+        normalized_entries = {
+            os.path.normcase(os.path.normpath(entry)) for entry in path_entries
+        }
+
+        missing_entries: list[str] = []
+        for directory in directories:
+            directory_str = str(directory)
+            normalized = os.path.normcase(os.path.normpath(directory_str))
+            if normalized in normalized_entries:
+                continue
+            normalized_entries.add(normalized)
+            missing_entries.append(directory_str)
+
+        if missing_entries:
+            os.environ["PATH"] = os.pathsep.join([*missing_entries, *path_entries])
+
+        self._dll_directories_configured = True
 
     def _is_downloaded(self) -> bool:
         target = self.local_dir
@@ -231,6 +307,7 @@ class LocalTransformersModelManager:
             raise LocalModelError(f"local_dependencies_missing: {dependency_error}")
 
         self._set_hf_environment()
+        self._configure_windows_torch_dll_directories()
 
         def _load() -> tuple[Any, Any]:
             torch = importlib.import_module("torch")

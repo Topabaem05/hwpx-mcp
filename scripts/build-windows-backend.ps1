@@ -62,8 +62,16 @@ function Invoke-PipDownload {
         [string[]]$Arguments
     )
 
-    & python -m pip @Arguments *> $null
-    return $LASTEXITCODE -eq 0
+    $stdoutFile = [System.IO.Path]::GetTempFileName()
+    $stderrFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $process = Start-Process -FilePath "python" -ArgumentList @("-m", "pip") + $Arguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+        return $process.ExitCode -eq 0
+    }
+    finally {
+        if (Test-Path $stdoutFile) { Remove-Item $stdoutFile -Force }
+        if (Test-Path $stderrFile) { Remove-Item $stderrFile -Force }
+    }
 }
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {

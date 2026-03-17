@@ -106,6 +106,8 @@ if ($pthFile) {
     $lines = $lines | ForEach-Object {
         if ($_ -eq "#import site") { "import site" } else { $_ }
     }
+    if ($lines -notcontains "..\Lib\site-packages\win32") { $lines += "..\Lib\site-packages\win32" }
+    if ($lines -notcontains "..\Lib\site-packages\pywin32_system32") { $lines += "..\Lib\site-packages\pywin32_system32" }
     if ($lines -notcontains "..\Lib\site-packages") { $lines += "..\Lib\site-packages" }
     if ($lines -notcontains "..") { $lines += ".." }
     Set-Content -Path $pthFile.FullName -Value $lines -Encoding ASCII

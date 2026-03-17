@@ -80,6 +80,10 @@ pth = pathlib.Path(sys.argv[1])
 text = pth.read_text(encoding="ascii")
 text = text.replace("#import site", "import site")
 lines = text.splitlines()
+if "../Lib/site-packages/win32" not in lines:
+    lines.append("../Lib/site-packages/win32")
+if "../Lib/site-packages/pywin32_system32" not in lines:
+    lines.append("../Lib/site-packages/pywin32_system32")
 if "../Lib/site-packages" not in lines:
     lines.append("../Lib/site-packages")
 if ".." not in lines:

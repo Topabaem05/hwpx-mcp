@@ -50,8 +50,14 @@
     Abort
   ${EndIf}
 
+  StrCpy $3 "$INSTDIR\resources\windows-prereqs\install-local-model.py"
+  ${IfNot} ${FileExists} $3
+    MessageBox MB_ICONSTOP "Installer model helper is missing.$\r$\n$\r$\nExpected: $3"
+    Abort
+  ${EndIf}
+
   DetailPrint "Downloading local Qwen model. This can take several minutes..."
-  ExecWait '"$2" -c "import os, sys; root=r''$INSTDIR\resources\backend-win''; sys.path[:0]=[root, os.path.join(root, ''Lib'', ''site-packages'')]; from huggingface_hub import snapshot_download; target=r''$LOCALAPPDATA\HWPX MCP\models\${LOCAL_MODEL_DIR_NAME}''; os.makedirs(target, exist_ok=True); snapshot_download(repo_id=''${LOCAL_MODEL_ID}'', local_dir=target)"' $0
+  ExecWait '"$2" "$3" "$INSTDIR\resources\backend-win" "${LOCAL_MODEL_ID}" "${LOCAL_MODEL_DIR_NAME}" "$LOCALAPPDATA\HWPX MCP\models"' $0
 
   ${If} $0 == 0
     Goto LocalModelDone

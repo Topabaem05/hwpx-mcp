@@ -2,7 +2,7 @@ const { existsSync, mkdirSync, renameSync, rmSync, statSync } = require("node:fs
 const { resolve } = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B-Instruct").trim();
+const MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen2.5-1.5B-Instruct").trim();
 const OUTPUT_ROOT = resolve(__dirname, "../../dist/local-models");
 const OUTPUT_DIR = resolve(OUTPUT_ROOT, MODEL_ID.replaceAll("/", "__"));
 

@@ -1,5 +1,8 @@
 !include LogicLib.nsh
 
+!define LOCAL_MODEL_ID "Qwen/Qwen2.5-1.5B-Instruct"
+!define LOCAL_MODEL_DIR_NAME "Qwen__Qwen2.5-1.5B-Instruct"
+
 !macro InstallVCRedist
   StrCpy $1 "$INSTDIR\resources\windows-prereqs\vc_redist.x64.exe"
   ${IfNot} ${FileExists} $1
@@ -31,6 +34,36 @@
   VCRedistDone:
 !macroend
 
+!macro InstallLocalModel
+  StrCpy $1 "$LOCALAPPDATA\HWPX MCP\models\${LOCAL_MODEL_DIR_NAME}"
+
+  ${If} ${FileExists} "$1\config.json"
+  ${AndIf} ${FileExists} "$1\tokenizer_config.json"
+  ${AndIf} ${FileExists} "$1\model.safetensors"
+    DetailPrint "Local Qwen model already installed"
+    Goto LocalModelDone
+  ${EndIf}
+
+  StrCpy $2 "$INSTDIR\resources\backend-win\python\python.exe"
+  ${IfNot} ${FileExists} $2
+    MessageBox MB_ICONSTOP "Bundled backend Python runtime is missing.$\r$\n$\r$\nExpected: $2"
+    Abort
+  ${EndIf}
+
+  DetailPrint "Downloading local Qwen model. This can take several minutes..."
+  ExecWait '"$2" -c "import os, sys; root=r''$INSTDIR\resources\backend-win''; sys.path[:0]=[root, os.path.join(root, ''Lib'', ''site-packages'')]; from huggingface_hub import snapshot_download; target=r''$LOCALAPPDATA\HWPX MCP\models\${LOCAL_MODEL_DIR_NAME}''; os.makedirs(target, exist_ok=True); snapshot_download(repo_id=''${LOCAL_MODEL_ID}'', local_dir=target)"' $0
+
+  ${If} $0 == 0
+    Goto LocalModelDone
+  ${EndIf}
+
+  MessageBox MB_ICONSTOP "Local Qwen model installation failed (exit code $0). Check your internet connection and run HWPX MCP Setup again."
+  Abort
+
+  LocalModelDone:
+!macroend
+
 !macro customInstall
   !insertmacro InstallVCRedist
+  !insertmacro InstallLocalModel
 !macroend

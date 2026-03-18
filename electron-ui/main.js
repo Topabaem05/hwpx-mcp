@@ -31,7 +31,7 @@ const DEFAULT_CODEX_PROXY_URL = (
 ).trim();
 const DEFAULT_CODEX_PROXY_START = process.env.HWPX_CODEX_PROXY_START !== "0";
 const DEFAULT_CODEX_PROXY_COMMAND = (process.env.HWPX_CODEX_PROXY_COMMAND || "").trim();
-const DEFAULT_LOCAL_MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B-Instruct").trim();
+const DEFAULT_LOCAL_MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen2.5-1.5B-Instruct").trim();
 
 const sanitizeModelId = (modelId) => String(modelId || "").replaceAll("/", "__");
 

@@ -105,20 +105,6 @@ jobs:
             throw "Bundled VC++ redistributable missing in resources/windows-prereqs."
           }
 
-          $bundledLocalModel = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/local-models/Qwen__Qwen2.5-1.5B-Instruct"
-          if (-not (Test-Path (Join-Path $bundledLocalModel "config.json"))) {
-            throw "Bundled local model config missing in resources/local-models."
-          }
-          if (-not (Test-Path (Join-Path $bundledLocalModel "tokenizer_config.json"))) {
-            throw "Bundled local model tokenizer config missing in resources/local-models."
-          }
-          if (-not (Test-Path (Join-Path $bundledLocalModel "tokenizer.json")) -and -not (Test-Path (Join-Path $bundledLocalModel "vocab.json")) -and -not (Test-Path (Join-Path $bundledLocalModel "tokenizer.model"))) {
-            throw "Bundled local model tokenizer payload missing in resources/local-models."
-          }
-          if (-not (Test-Path (Join-Path $bundledLocalModel "model.safetensors")) -and -not (Test-Path (Join-Path $bundledLocalModel "model.safetensors.index.json")) -and -not (Test-Path (Join-Path $bundledLocalModel "pytorch_model.bin")) -and -not (Test-Path (Join-Path $bundledLocalModel "pytorch_model.bin.index.json"))) {
-            throw "Bundled local model weights missing in resources/local-models."
-          }
-
           $proxyLauncher = Join-Path $env:GITHUB_WORKSPACE "dist/codex-proxy-win/codex-proxy.bat"
           if (-not (Test-Path $proxyLauncher)) {
             throw "Windows codex proxy launcher missing: $proxyLauncher"

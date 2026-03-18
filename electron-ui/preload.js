@@ -4,7 +4,7 @@ const mcpHttpUrl = process.env.HWPX_MCP_HTTP_URL || "http://127.0.0.1:8000/mcp";
 const agentHttpUrl = process.env.HWPX_AGENT_HTTP_URL || mcpHttpUrl.replace(/\/mcp\/?$/i, "");
 const defaultAgentProvider = process.env.HWPX_AGENT_PROVIDER || "openrouter";
 const defaultAgentModel = process.env.HWPX_AGENT_MODEL || "openai/gpt-oss-120b";
-const defaultLocalModelId = process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B";
+const defaultLocalModelId = process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B-Instruct";
 const defaultCodexProxyUrl =
   process.env.HWPX_CODEX_PROXY_URL || "http://127.0.0.1:2455/v1/chat/completions";
 

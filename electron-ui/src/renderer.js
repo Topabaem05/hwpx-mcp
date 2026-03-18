@@ -11,7 +11,7 @@ const PROVIDER_OPTIONS = {
   },
   local: {
     label: "Local Qwen",
-    defaultModel: "Qwen/Qwen3.5-4B",
+    defaultModel: "Qwen/Qwen3.5-4B-Instruct",
   },
   openai: {
     label: "OpenAI",

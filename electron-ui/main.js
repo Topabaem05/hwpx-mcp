@@ -31,7 +31,9 @@ const DEFAULT_CODEX_PROXY_URL = (
 ).trim();
 const DEFAULT_CODEX_PROXY_START = process.env.HWPX_CODEX_PROXY_START !== "0";
 const DEFAULT_CODEX_PROXY_COMMAND = (process.env.HWPX_CODEX_PROXY_COMMAND || "").trim();
-const DEFAULT_LOCAL_MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B").trim();
+const DEFAULT_LOCAL_MODEL_ID = (process.env.HWPX_LOCAL_MODEL_ID || "Qwen/Qwen3.5-4B-Instruct").trim();
+
+const sanitizeModelId = (modelId) => String(modelId || "").replaceAll("/", "__");
 
 const localModelBaseDir = () => {
   const localAppData = (process.env.LOCALAPPDATA || "").trim();
@@ -41,7 +43,20 @@ const localModelBaseDir = () => {
   return join(app.getPath("userData"), "local-model");
 };
 
-const defaultLocalModelHome = () => join(localModelBaseDir(), "models");
+const bundledLocalModelHome = (modelId = DEFAULT_LOCAL_MODEL_ID) => {
+  const bundledRoot = join(process.resourcesPath, "local-models");
+  const bundledConfig = join(bundledRoot, sanitizeModelId(modelId), "config.json");
+  return existsSync(bundledConfig) ? bundledRoot : "";
+};
+
+const defaultLocalModelHome = (modelId = DEFAULT_LOCAL_MODEL_ID) => {
+  const bundledHome = bundledLocalModelHome(modelId);
+  if (bundledHome) {
+    return bundledHome;
+  }
+
+  return join(localModelBaseDir(), "models");
+};
 const defaultHfHome = () => join(localModelBaseDir(), "hf");
 
 const readUrlField = (value) => {
@@ -923,6 +938,7 @@ const startBackend = async () => {
   log(`  cwd: ${cwd}`);
   log(`  type: ${type}`);
 
+  const localModelId = effectiveEnv("HWPX_LOCAL_MODEL_ID", DEFAULT_LOCAL_MODEL_ID);
   const launchEnv = {
     ...process.env,
     ...backendEnvOverrides,
@@ -930,8 +946,8 @@ const startBackend = async () => {
     MCP_HOST,
     MCP_PORT,
     MCP_PATH,
-    HWPX_LOCAL_MODEL_ID: effectiveEnv("HWPX_LOCAL_MODEL_ID", DEFAULT_LOCAL_MODEL_ID),
-    HWPX_LOCAL_MODEL_HOME: effectiveEnv("HWPX_LOCAL_MODEL_HOME", defaultLocalModelHome()),
+    HWPX_LOCAL_MODEL_ID: localModelId,
+    HWPX_LOCAL_MODEL_HOME: effectiveEnv("HWPX_LOCAL_MODEL_HOME", defaultLocalModelHome(localModelId)),
     HF_HOME: effectiveEnv("HF_HOME", defaultHfHome()),
   };
 

@@ -17,11 +17,11 @@
     "dev": "electron .",
     "build:backend:win": "powershell -ExecutionPolicy Bypass -File ../scripts/build-windows-backend.ps1",
     "build:codex-proxy:win": "powershell -ExecutionPolicy Bypass -File ../scripts/build-windows-codex-proxy.ps1",
-    "build:win": "node ./scripts/ensure-wine.js && electron-builder --win",
+    "build:win": "node ./scripts/ensure-vcredist.js && node ./scripts/ensure-wine.js && electron-builder --win",
     "build:win:bundle": "npm run build:backend:win && npm run build:codex-proxy:win && npm run build:win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "build:dir": "node ./scripts/ensure-wine.js && electron-builder --win --dir"
+    "build:dir": "node ./scripts/ensure-vcredist.js && node ./scripts/ensure-wine.js && electron-builder --win --dir"
   },
   "build": {
     "appId": "io.topabaem05.hwpx-mcp",
@@ -78,6 +78,13 @@
           "filter": [
             "**/*"
           ]
+        },
+        {
+          "from": "../dist/windows-prereqs",
+          "to": "windows-prereqs",
+          "filter": [
+            "vc_redist.x64.exe"
+          ]
         }
       ]
     },
@@ -86,7 +93,8 @@
       "runAfterFinish": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "include": "installer.nsh"
     },
     "mac": {
       "target": "dmg",

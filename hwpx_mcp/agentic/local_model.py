@@ -18,7 +18,7 @@ LOCAL_MODEL_ENV = "HWPX_LOCAL_MODEL_ID"
 LOCAL_MODEL_HOME_ENV = "HWPX_LOCAL_MODEL_HOME"
 HF_HOME_ENV = "HF_HOME"
 HF_HUB_DISABLE_SYMLINKS_WARNING_ENV = "HF_HUB_DISABLE_SYMLINKS_WARNING"
-LOCAL_DEFAULT_MODEL = "Qwen/Qwen3.5-4B"
+LOCAL_DEFAULT_MODEL = "Qwen/Qwen3.5-4B-Instruct"
 _WINDOWS_DLL_DIRECTORY_HANDLES: list[object] = []
 _WINDOWS_DLL_DIRECTORIES: set[str] = set()
 
@@ -316,12 +316,15 @@ class LocalTransformersModelManager:
             auto_tokenizer_cls = getattr(transformers, "AutoTokenizer")
 
             tokenizer = auto_tokenizer_cls.from_pretrained(
-                str(self.local_dir), trust_remote_code=True
+                str(self.local_dir),
+                trust_remote_code=True,
+                local_files_only=True,
             )
             model = auto_model_cls.from_pretrained(
                 str(self.local_dir),
                 trust_remote_code=True,
                 torch_dtype="auto",
+                local_files_only=True,
             )
             if not torch.cuda.is_available():
                 model.to("cpu")

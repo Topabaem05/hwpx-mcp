@@ -723,7 +723,7 @@ def test_agent_health_includes_local_model_status(monkeypatch):
         "model_id": LOCAL_DEFAULT_MODEL,
         "provider": "local",
         "model_home": "/tmp/local-models",
-        "download_path": "/tmp/local-models/Qwen__Qwen3.5-4B",
+        "download_path": "/tmp/local-models/Qwen__Qwen3.5-4B-Instruct",
         "detail": "local_model_not_downloaded",
         "dependency_installed": True,
     }

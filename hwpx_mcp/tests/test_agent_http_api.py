@@ -464,14 +464,14 @@ def test_agent_config_endpoint_switches_runtime_to_local_provider():
             "/agent/config",
             json={
                 "provider": "local",
-                "model": "Qwen/Qwen3.5-4B-Instruct",
+                "model": "Qwen/Qwen2.5-1.5B-Instruct",
             },
         )
         assert config_set.status_code == 200
         config_payload = config_set.json()
         assert config_payload["runtime"] == {
             "provider": "local",
-            "model": "Qwen/Qwen3.5-4B-Instruct",
+            "model": "Qwen/Qwen2.5-1.5B-Instruct",
         }
         assert config_payload["auth"] == {
             "configured": False,
@@ -483,10 +483,10 @@ def test_agent_config_endpoint_switches_runtime_to_local_provider():
                 "ready": False,
                 "downloaded": False,
                 "downloading": False,
-                "model_id": "Qwen/Qwen3.5-4B-Instruct",
+                "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
                 "provider": "local",
                 "model_home": "/tmp/local-models",
-                "download_path": "/tmp/local-models/Qwen__Qwen3.5-4B-Instruct",
+                "download_path": "/tmp/local-models/Qwen__Qwen2.5-1.5B-Instruct",
                 "detail": "local_model_not_downloaded",
                 "dependency_installed": True,
             },
@@ -498,9 +498,9 @@ def test_agent_config_endpoint_switches_runtime_to_local_provider():
         health_payload = health_after.json()
         assert health_payload["runtime"] == {
             "provider": "local",
-            "model": "Qwen/Qwen3.5-4B-Instruct",
+            "model": "Qwen/Qwen2.5-1.5B-Instruct",
         }
-        assert health_payload["local_model"]["model_id"] == "Qwen/Qwen3.5-4B-Instruct"
+        assert health_payload["local_model"]["model_id"] == "Qwen/Qwen2.5-1.5B-Instruct"
 
 
 def test_openrouter_provider_does_not_silently_fallback_to_local(monkeypatch):
@@ -723,7 +723,7 @@ def test_agent_health_includes_local_model_status(monkeypatch):
         "model_id": LOCAL_DEFAULT_MODEL,
         "provider": "local",
         "model_home": "/tmp/local-models",
-        "download_path": "/tmp/local-models/Qwen__Qwen3.5-4B-Instruct",
+        "download_path": "/tmp/local-models/Qwen__Qwen2.5-1.5B-Instruct",
         "detail": "local_model_not_downloaded",
         "dependency_installed": True,
     }

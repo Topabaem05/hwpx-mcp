@@ -100,6 +100,11 @@ jobs:
             throw "Bundled backend Python runtime missing in resources/backend-win."
           }
 
+          $bundledVCRedist = Join-Path $env:GITHUB_WORKSPACE "dist/electron-installer/win-unpacked/resources/windows-prereqs/vc_redist.x64.exe"
+          if (-not (Test-Path $bundledVCRedist)) {
+            throw "Bundled VC++ redistributable missing in resources/windows-prereqs."
+          }
+
           $proxyLauncher = Join-Path $env:GITHUB_WORKSPACE "dist/codex-proxy-win/codex-proxy.bat"
           if (-not (Test-Path $proxyLauncher)) {
             throw "Windows codex proxy launcher missing: $proxyLauncher"

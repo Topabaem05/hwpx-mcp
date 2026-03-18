@@ -83,7 +83,8 @@
           "from": "../dist/windows-prereqs",
           "to": "windows-prereqs",
           "filter": [
-            "vc_redist.x64.exe"
+            "vc_redist.x64.exe",
+            "install-local-model.py"
           ]
         }
       ]

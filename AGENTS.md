@@ -1,8 +1,8 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-02-19 20:31:09 KST
-**Commit:** 5660768
-**Branch:** main
+**Generated:** 2026-03-02 18:56:13 KST
+**Commit:** 5d03014
+**Branch:** wt/mcp
 
 ## OVERVIEW
 FastMCP-based backend for HWP/HWPX operations with two surfaces: full backend tools and a deterministic agentic gateway.
@@ -30,11 +30,12 @@ hwpx-mcp/
 | UI + local stack bootstrap | `electron-ui/`, `scripts/quick-start-bunx.*` | UI expects streamable HTTP endpoint |
 
 ## CODE MAP
-LSP document/workspace symbol APIs were unavailable during generation.
-Use direct entrypoints as central anchors:
-- `hwpx_mcp/server.py`: backend `FastMCP` app and registration chain.
-- `hwpx_mcp/gateway_server.py`: gateway `FastMCP` wrapper and stdio run path.
-- `hwpx_mcp/eval/run_eval.py`: offline routing eval against backend MCP surface.
+| Symbol | Type | Location | Refs | Role |
+|--------|------|----------|------|------|
+| `initialize_server` | Function | `hwpx_mcp/server.py:147` | High | Registers tool modules and initializes backend MCP app |
+| `main` | Function | `hwpx_mcp/server.py:1086` | High | Runtime entrypoint for stdio/http/sse/streamable-http |
+| `main` | Function | `hwpx_mcp/gateway_server.py:72` | High | Gateway stdio bootstrap and route/call interface exposure |
+| `evaluate` | Function | `hwpx_mcp/eval/run_eval.py:50` | Medium | Offline routing quality evaluation against backend tools |
 
 ## CONVENTIONS
 - Packaging/scripts live in `pyproject.toml` (`hwpx-mcp`, `hwpx-mcp-gateway`, `hwpx-mcp-eval`).

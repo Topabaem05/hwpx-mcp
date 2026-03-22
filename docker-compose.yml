@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "${MCP_HTTP_HOST_PORT:-8200}:8000"
     environment:
       - MCP_TRANSPORT=http
       - MCP_HOST=0.0.0.0
@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8001:8001"
+      - "${MCP_SSE_HOST_PORT:-8201}:8001"
     environment:
       - MCP_TRANSPORT=sse
       - MCP_HOST=0.0.0.0
